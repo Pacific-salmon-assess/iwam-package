@@ -1,0 +1,27 @@
+{
+    "id": "08A60F99",
+    "path": "~/GitHub/iwam-package/R/IWAM_model.R",
+    "project_path": "R/IWAM_model.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1700521162985.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "82,31",
+        "scrollLine": "62",
+        "docOutlineVisible": "1"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1700518003,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1700518003,
+    "read_only": false,
+    "read_only_alternatives": []
+}
