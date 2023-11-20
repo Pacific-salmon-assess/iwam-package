@@ -1,0 +1,188 @@
+---
+title: "IWAM_ModelDef"
+format: pdf
+editor: visual
+---
+
+## Integrated Watershed-Area Model Objectives
+
+\[Insert\] overall objective of IWAM model: The integrated watershed are model was developed by the Stock Assessment and Recruitment Team (DFO) for the purpose of estimating population statistics, SMSY and SREP, in low-data use-cases.
+
+#### Model References
+
+This model was developed by (TEAM/WORKING GROUP) by interpreting the models of \[Insert\] publication references to e.g., Parken et al. 2006, Liermann et al., etc.
+
+#### Model Description
+
+The equations and description below will walk you through the hierarchical structure of the IWAM model from raw input to final predictive estimates of spawners required for maximum sustainable yield ($S_{MSY}$) and spawners required for replacement ($S_{REP}$), including a detailed definitions list of all notation used and its corresponding label in the supplied repository code \[[carrieholt/Watershed-Area-Model: Watershed Area Model (github.com)](https://github.com/carrieholt/Watershed-Area-Model)\].
+
+## Basic Ricker Model
+
+$$
+R = S e^{\alpha- \beta S}e^\tau
+$$
+
+Which contains the following terms: $R$ : recruitment per stock \[numeric, often scaled\], $S$ : Spawners or spawner abundance \[numeric, often scaled\], $\alpha$ : dimensionless number of recruits per spawner produced at very low spawner density \[dimensionless\], this may also be thought of as the intercept of the relationship between $\frac{R}{S}$ and $S$, $\beta$ : the strength of the density dependence expressed as $1/S_{MAX}$ \[$spawners^{-1}$\], similarly this can be described as the slope of the previously described relationship, $\tau$ : the normally distributed error. The base Ricker model is written in this form to reflect a stochastic process (time ordered and random) by adding the log-normal error term $\tau$, a normal distributed term often used to account for environmental variability.
+
+#### Hierarchical Ricker ($\alpha$) and Linear Form Ricker
+
+This baseline form is then converted into the two following forms of a hierarchical Ricker (1) and a linearized Ricker (2).
+
+$$
+R_i = S_i \cdot e^{\alpha_i-\beta_i\cdot S_i}\cdot e^{\tau_i}
+$$
+
+Which is then linearized by log transformation into the form:
+
+$$
+log(\frac{R_i}{S_i}) = log(\alpha_i)-\beta_i \cdot S_i + \tau_i
+$$
+
+Where $\tau \sim Normal(0, \sigma_\tau)$
+
+and $log(\alpha_i) \sim Normal(\mu Log(\alpha), SigmaLog(\alpha))$,
+
+and $\mu log(\alpha_i) \sim Normal(1.5,5)$,
+
+and $\sigma log(\alpha_i) \sim InvGamma(0.01,0.01)$.
+
+In this regard, $\alpha$ is the intercept and $\beta$ is the slope of the spawner-recruit relationship. The hyper-priors (incorrect term) on $log(\alpha)$ are likelihood penalties. In a frequentist model description, the penalizing function is a method for smoothing and to improve the sampling of the estimator - in this case \[INSERT SAMPLER\].
+
+**BIAS CORRECTION EQUATIONS?**
+
+**INSERT PRIOR DISTRIBUTION PLOTS**
+
+## Watershed Area Model
+
+$$
+ln(S_{MSY}) = ln(\delta_0) + \delta_1 \cdot ln(WA) + \delta_\epsilon
+$$
+
+$$
+ln(S_{REP}) = ln(\gamma_o) + \gamma_1 \cdot ln(WA) + \gamma_\epsilon
+$$
+
+where,
+
+$$
+\delta_\epsilon \sim N(0,\sigma_\delta^2)
+$$
+
+$$
+\delta_\gamma \sim N(0,\sigma^2_\gamma)
+$$
+
+Where $\delta_0$ is the intercept and $\delta_1$ is the slope for the relationship between watershed area and either $S_{MSY}$ and $S_{REP}$. These are then adapted further to separate stream-type and ocean-type fish in the watershed area model. This is done by creating an offset with the baseline as the stream type population.
+
+$$
+ln(S_{MSY}) = ln(\delta_{0,stream}) + ln(\delta_{0,ocean}) \cdot X + (\delta_{1,stream} + \delta_{1,ocean} \cdot X) \cdot ln(WA) + \delta_\epsilon
+$$
+
+where, $\delta_\epsilon \sim Normal(0,\sigma_\epsilon)$ and $X = 0$ for stream type and $X = 1$ is for ocean type populations.
+
+#### $S_{MSY}$ and $S_{REP}$ Calculation
+
+$$
+S_{MSY} = \frac{1-W(e^{1-(\alpha)})}{\beta}
+$$
+
+$$
+S_{REP} = \frac{\alpha}{\beta}
+$$
+
+## IWAM Model Outline Reference
+
+This section provides a walk through the 6 sections of the IWAM code repository and provided references to possible areas that may require changes depending on your intended usage case. The sections are as listed:
+
+1.  Read in data
+2.  Create data and parameter lists for TMB
+    1.  Data Removals and Cleaning
+
+    2.  Scale Calculation
+
+    3.  Calculation of Survival Covariates
+
+    4.  Read in watershed area data and life-history type
+3.  Estimate SR parameters from synoptic data set and SMSY and SREPs
+4.  Compile model outputs
+5.  Calculate diagnostics and plot SR curves, etc.
+    1.  Plot SR Curves
+
+    2.  Plot WA Regression
+6.  Calculate prediction intervals for SMSY and SREP for additional stocks
+
+## TMB Model Outline Reference
+
+This section is dedicated to providing a written guide to the format of the IWAM TMB model. The code is divided into the following sections:
+
+## Dictionary of Referenced Functions
+
+This section provides a reference to all associated scripts that work alongside the IWAM.
+
+-   PlotSR.R: Features the following functions:
+
+    -   t_col():
+
+    -   PlotSRCurve():
+
+    -   PlotSRLinear():
+
+    -   PlotStdResid():
+
+    -   Plotacf():
+
+    -   plotWAregressionSMSY():
+
+    -   plotWAregressionSREP():
+
+    -   plotWAregression_Parken():
+
+    -   plotWAregression_ParkenSep():
+
+    -   plotRicA():
+
+    -   plotTestStocks():
+
+    -   plotSMSY():
+
+    -   plotWCVIBenchmarks():
+
+    -   plotWCVI_timeseries():
+
+    -   plotWCVI_SMUtimeseries():
+
+    -   plotLogistic():
+
+    -   PlotAnnualIndicator():
+
+-   helperFunctions.R: Features the following functions:
+
+    -   inv_logit():
+
+    -   logit():
+
+    -   gm_mean():
+
+    -   count.dig():
+
+    -   '%not in%':
+
+    -   PredInt():
+
+    -   sGenOptimum():
+
+    -   sGenSolver():
+
+    -   bEst():
+
+    -   bSolver():
+
+    -   Sgen.fn():
+
+    -   Sgen.fn2():
+
+    -   ggplot.corr():
+
+## Dictionary of Terms and Variables
+
+This section is provides a written reference to all key model variables cross-referenced between IWAM.R and the .cpp TMB file.
