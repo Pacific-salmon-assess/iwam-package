@@ -1,12 +1,11 @@
-#-------------------------------------------------------------------------------
+# Summary ----------------------------------------------------------------------
 # Code to estimate LRPs for WCVI CK from watershed-area based Sgen by
 # bootstrapping from SREP estimates from the watershed-area model and Ricker 
 # a values from a plausible range derived from expert opinion and a 
 # life-history model
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-# Libraries and Functions
-#-------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------- #
+# Libraries and Functions ------------------------------------------------------
+# ---------------------------------------------------------------------------- #
 library(tidyverse)
 library(ggplot2)
 library(gsl)
@@ -17,8 +16,7 @@ library(viridis)
 source("R/helperFunctions.r")
 
 
-#-------------------------------------------------------------------------------
-# Function to estimate LRPs for WCVI CK
+# Function to estimate LRPs for WCVI CK ----------------------------------------
 # Arguments; 
   # remove.EnhStocks = A logical reflecting if enhanced stock are to be 
     # included
@@ -52,9 +50,9 @@ source("R/helperFunctions.r")
 Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE, 
                         prod="LifeStageModel", LOO = NA, run_logReg=TRUE){
 
-  #----------------------------------------------------------------------------
-  # Read in watershed area-based reference points (SREP and SMSY)
-  #----------------------------------------------------------------------------
+  #--------------------------------------------------------------------------- #
+  # Read in watershed area-based reference points (SREP and SMSY) --------------
+  #--------------------------------------------------------------------------- #
   if (remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
   if (!remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
@@ -79,9 +77,9 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
   #SREP_logSE <- wcviRPs %>% mutate(SE = (log(wcviRPs$SREPUL) - log(wcviRPs$SREP)) / 1.96)
   SREP_logSE <- SREP_logSE %>% dplyr::select(Stock, SE)
   
-  #----------------------------------------------------------------------------
-  # Calculate Sgen 2 ways
-  #----------------------------------------------------------------------------
+  #--------------------------------------------------------------------------- #
+  # Calculate Sgen 2 ways ------------------------------------------------------
+  #--------------------------------------------------------------------------- #
   
   # 1.Use Watershed-area SMSY and SREP to estimate Sgen (assuming productivity
   # SGENcalcs <- purrr::map2_dfr (wcviRPs$SMSY/Scale,wcviRPs$SREP/Scale, Sgen.fn) 
@@ -222,9 +220,9 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
   
   
   
-  #----------------------------------------------------------------------------
-  # Add Sgen and revised SMSY to wcviRPs data frame
-  #----------------------------------------------------------------------------
+  #--------------------------------------------------------------------------- #
+  # Add Sgen and revised SMSY to wcviRPs data frame ----------------------------
+  #--------------------------------------------------------------------------- #
   
 
   
@@ -235,10 +233,10 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
   # if (!remove.EnhStocks) write.csv(wcviRPs, "DataOut/wcviRPs_wEnh.csv")
   
   
-  #----------------------------------------------------------------------------
-  # Scenario if productivity is reducted by half, as in WSP SBC CK assessment 
+  #--------------------------------------------------------------------------- #
+  # Scenario if productivity is reducted by half, as in WSP SBC CK assessment ----
   # (DFO 2014). NOT NEEDED
-  #----------------------------------------------------------------------------
+  #--------------------------------------------------------------------------- #
   # 
   # SGENcalcsv2 <- map2_dfr (wcviRPs$SMSY/Scale,wcviRPs$SREP/Scale, 
   #                          Sgen.fn, half.a = TRUE, const.SMAX = FALSE)
@@ -265,9 +263,9 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
     return(list(bench= select(SGENcalcs,-apar, -bpar)*Scale))
     
   }
-  #----------------------------------------------------------------------------
-  # Sum escapements across indicators within inlets
-  #----------------------------------------------------------------------------
+  #--------------------------------------------------------------------------- #
+  # Sum escapements across indicators within inlets ----------------------------
+  #--------------------------------------------------------------------------- #
   if(run_logReg==TRUE){
     WCVIEsc <- data.frame(read.csv("DataIn/WCVIEsc.csv", row.names="Yr")) %>% 
       dplyr::select (-"Little.Zeballos")
@@ -327,9 +325,9 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
     }
     
     
-    #----------------------------------------------------------------------------
-    # Sum escapements across indicators within CUs
-    #----------------------------------------------------------------------------
+    #------------------------------------------------------------------------- #
+    # Sum escapements across indicators within CUs -----------------------------
+    #------------------------------------------------------------------------- #
     
     nCU <- length(unique(WCVIStocks$CU))
     CU_Sum <- matrix(NA, nrow=length(Years), ncol=nCU)
@@ -357,12 +355,12 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
     
     WCVIEsc <- cbind(WCVIEsc, Inlet_Sum, CU_Sum) 
     
-    #----------------------------------------------------------------------------
-    # Assess status for each inlet relative to inlet-level SGEN for each year
+    #------------------------------------------------------------------------- #
+    # Assess status for each inlet relative to inlet-level SGEN for each year ----
     #   Is Inlet level escapement above inlet-level Sgen: T/F?
     #   Inlet_Status = FALSE if summed escapement is below Sgen
     #   Inlet_Status = TRUE if summed escapement is below Sgen
-    #----------------------------------------------------------------------------
+    #------------------------------------------------------------------------- #
     
     Inlet_Status <- matrix(NA, nrow=length(Years), ncol=length(Inlet_Names) )
     colnames(Inlet_Status) <- Inlet_Names
@@ -376,12 +374,12 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
     
     Inlet_Status <- as.data.frame(Inlet_Status)
     
-    #----------------------------------------------------------------------------
-    # Assess status for each CU for each year of the time-series 
+    #------------------------------------------------------------------------- #
+    # Assess status for each CU for each year of the time-series ---------------
     #   (floor of summed CU-level numeric statuses)
     #   CU_Status = below LB if any inlet within the CU below their Sgen = 0 
     #   CU_Status = above LB if all inlets within the CU above their Sgen = 1
-    #----------------------------------------------------------------------------
+    #------------------------------------------------------------------------- #
     
     CU_Status <- matrix(NA, nrow=length(Years), ncol=length(CU_Names))
     colnames(CU_Status) <- CU_Names
@@ -423,16 +421,16 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
       
     }
     
-    #----------------------------------------------------------------------------
-    # Proportion of CUs that are not in the red zone
-    #----------------------------------------------------------------------------
+    #------------------------------------------------------------------------- #
+    # Proportion of CUs that are not in the red zone ---------------------------
+    #------------------------------------------------------------------------- #
     
     ppnAboveFun <- function(x) {sum( as.numeric(x), na.rm=F) / length(x) }
     SMU_ppn <- apply(X=CU_Status, MARGIN=1, FUN=ppnAboveFun)
     
-    #----------------------------------------------------------------------------
-    # Logistic regression
-    #----------------------------------------------------------------------------
+    #------------------------------------------------------------------------- #
+    # Logistic regression ------------------------------------------------------
+    #------------------------------------------------------------------------- #
     # Get SMU-level escapement time-series
     SMU_Esc <- apply(Inlet_Sum, 1, sum, na.rm=F)
     
@@ -551,8 +549,8 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
 } # Eng of Get.LRP.bs() function
 
 
-#-------------------------------------------------------------------------------
-# Now run bootstraps to derive benchmarks with uncertainty (see LRP code)
+#----------------------------------------------------------------------------- #
+# Run bootstraps to derive benchmarks with uncertainty (see LRP code) ------
 run.bootstraps <- FALSE
 
 if (run.bootstraps){
@@ -619,8 +617,9 @@ if (run.bootstraps){
   write.csv(dfout, "DataOut/wcviCK-BootstrappedRPs1000v3.csv") 
 }
 
-#-------------------------------------------------------------------------------
-# Now run bootstraps to derive LRPs with uncertainty in benchmarks ************* FORMAL SUBMISSION VALUES ******************
+#----------------------------------------------------------------------------- #
+# Run bootstraps to derive LRPs with uncertainty in benchmarks -------------
+  # ************* FORMAL SUBMISSION VALUES ******************
 # See implementation of this in WCVI_LRPs.Rmd
 
 run.bootstraps <- FALSE
@@ -708,10 +707,10 @@ for (i in 1:n){
  se.upr[i] <- sd.upr[i]/mean.upr[i]
 }
 
-#----------------------------------------------------------------------------
-# R version of logistic regression
+#----------------------------------------------------------------------------- #
+# R version of logistic regression ---------------------------------------------
 #   This matches results from TMB code when penalty=FALSE
-#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------- #
 R.logReg <- FALSE
 
 if (R.logReg) {
@@ -769,10 +768,10 @@ if (R.logReg) {
 }
 
 
-#----------------------------------------------------------------------------
-# TMB version of code to estimate Sgen from SMSY and SREP (WA_Sgen.cpp): 
+#----------------------------------------------------------------------------- #
+# TMB version of code to estimate Sgen from SMSY and SREP (WA_Sgen.cpp): -------
 # NOT WORKING
-#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------- #
 
 # # Do not need TMB code given I need to run this over bootstraps PRIOR to 
 # # logististic regression. 

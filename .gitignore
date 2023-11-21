@@ -11,3 +11,4 @@ DataIn/WA_Parken.csv
 DataIn/Surv.csv
 DataIn/ParkenSREP.csv
 DataIn/ParkenSMSY.csv
+R/IWAMarchived_model.R
