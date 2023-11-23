@@ -13,7 +13,7 @@ library(TMB)
 library(viridis)
 
 # Functions
-source("R/helperFunctions.r")
+source (here::here("R/helperFunctions.R"))
 
 
 # Function to estimate LRPs for WCVI CK ----------------------------------------
@@ -46,15 +46,26 @@ source("R/helperFunctions.r")
   # Dataframe $CU_Status
   # Dataframe $SMU_ppn
 
+# Current wcvi example uses 
+remove.EnhStocks <- TRUE
+Bern_logistic <- FALSE
+prod <- "LifeStageModel"
+LOO <- NA
+run_logReg <- FALSE
 
-Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE, 
-                        prod="LifeStageModel", LOO = NA, run_logReg=TRUE){
+Get.LRP.bs <- function(remove.EnhStocks=TRUE,  Bern_logistic=FALSE, 
+                        prod="LifeStageModel", LOO = NA, run_logReg=FALSE){
 
   #--------------------------------------------------------------------------- #
   # Read in watershed area-based reference points (SREP and SMSY) --------------
   #--------------------------------------------------------------------------- #
-  if (remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
-  if (!remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
+  # Core data: 
+    # New files:
+  if(remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/dataout_target_ocean_noEnh.csv")
+  if(!remove.EnhStocks) wcviRPs_long<- read.csv("DataOut/dataout_target_ocean_wEnh.csv")
+    # Old files:
+  # if (remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
+  # if (!remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
   # Remove Cypre as it's not a core indicator (Diana McHugh, 22 Oct 2020)
   stock_SMSY <- wcviRPs_long %>% filter(Stock != "Cypre") %>% 
@@ -100,6 +111,7 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
   # Lower estimate of Ricker a derived from life-stage model (Luedke pers.
   # comm.) 
   # DEFAULT
+  # prod <-  "LifeStageModel"
   if(prod == "LifeStageModel"){
     Mean.Ric.A <- 1 # Derived from life-history model (Luedke pers.comm.) and 
     # WCVI CK run reconstruction SR analysis (Dobson pers. comm.)
@@ -216,7 +228,7 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
     wcviRPs <- wcviRPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
                          "SREPLL", "SREPUL", "a.par")]#"CU"
  
-  }# if(prod == "RunReconstruction"){
+  } # if(prod == "RunReconstruction"){
   
   
   
@@ -258,7 +270,7 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
   # wcviRPs <- wcviRPs %>% mutate (SREPha.cSMAX = SGENcalcsv3$SREP) %>% 
   #   mutate( SREPha.cSMAX = round( SREPha.cSMAX*Scale, 0 ) )
 
-  
+  # run_logReg <- TRUE
   if(run_logReg==FALSE){
     return(list(bench= select(SGENcalcs,-apar, -bpar)*Scale))
     
@@ -487,8 +499,8 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
     param$B_1 <- 0.1
     
     
-    #dyn.unload(dynlib(paste("TMB_Files/Logistic_LRPs", sep="")))
-    #compile(paste("TMB_Files/Logistic_LRPs.cpp", sep=""))
+    # dyn.unload(dynlib(paste("TMB_Files/Logistic_LRPs", sep="")))
+    # compile(paste("TMB_Files/Logistic_LRPs.cpp", sep=""))
     
     dyn.load(dynlib(paste("TMB_Files/Logistic_LRPs", sep=""))) 
     
@@ -538,15 +550,30 @@ Get.LRP.bs <- function (remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
                                    mutate(xx =Estimate + 1.96*Std..Error) %>% 
                                    pull(xx) ) * ScaleSMU)
     
-    return(list(out=out, WCVIEsc=WCVIEsc, SMU_Esc=SMU_Esc, 
-                CU_Status=CU_Status, SMU_ppn=SMU_ppn, 
-                LRPppn= data$p, nLL=obj$report()$ans, LOO=LOO, 
-                bench= select(SGENcalcs,-apar, -bpar)*Scale))
-    
-    
+    return(list(out=out, # C
+                WCVIEsc=WCVIEsc, # C
+                SMU_Esc=SMU_Esc, # C
+                CU_Status=CU_Status, # C
+                SMU_ppn=SMU_ppn, # C
+                LRPppn= data$p, # C
+                nLL=obj$report()$ans, # within
+                LOO=LOO, # Outside
+                bench=select(SGENcalcs, -apar, -bpar)*Scale))
   }
-   
-} # Eng of Get.LRP.bs() function
+  # FUNCTION STALLING HERE
+  # return(out=out, WCVIEsc=WCVIEsc, SMU_Esc=SMU_Esc,
+  #             CU_Status=CU_Status, SMU_ppn=SMU_ppn,
+  #             LRPppn= data$p, nLL=obj$report()$ans, LOO=LOO,
+  #             bench= select(SGENcalcs,-apar, -bpar)*Scale)
+} 
+
+# Return statements are not working
+# When removed function runs completely. 
+
+# **********************************************************************************************************************
+# Eng of Get.LRP.bs() function ----
+# **********************************************************************************************************************
+
 
 
 #----------------------------------------------------------------------------- #
@@ -619,14 +646,15 @@ if (run.bootstraps){
 
 #----------------------------------------------------------------------------- #
 # Run bootstraps to derive LRPs with uncertainty in benchmarks -------------
-  # ************* FORMAL SUBMISSION VALUES ******************
+  # ************* FORMAL SUBMISSION VALUES *******************************************************************************
 # See implementation of this in WCVI_LRPs.Rmd
 
-run.bootstraps <- FALSE
+#run.bootstraps <- FALSE
+run.bootstraps <- TRUE
 
 if (run.bootstraps){
-  set.seed(1)#10#12#13(work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
-  nBS <- 20000 # number trials for bootstrapping
+  set.seed(1) #10#12#13 (work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
+  nBS <- 10 # number trials for bootstrapping
   outBench <- list() 
   
   for (k in 1:nBS) {
@@ -642,7 +670,8 @@ if (run.bootstraps){
   # Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
   # 95th percentiles
   SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
-  stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
+  # stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
+  stockNames <- read.csv("DataOut/dataout_target_ocean_noEnh.csv") %>% 
     filter(Stock != "Cypre") %>% pull(Stock)
   stockNames <- unique(stockNames)
 
@@ -683,7 +712,8 @@ if (run.bootstraps){
   write.csv(dfout, "DataOut/wcviCK-BootstrappedRPs.csv") 
   
 }
-#Found with 20000 the results have stabilized to two significant digits. Use 20000v1, and recommend 2 signifcant digits to users
+#Found with 20000 the results have stabilized to two significant digits. Use 20000v1, 
+# and recommend 2 signifcant digits to users
 # To check the SE is within 2% with 5 trials of 20,000
 
 d1 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v1.csv")

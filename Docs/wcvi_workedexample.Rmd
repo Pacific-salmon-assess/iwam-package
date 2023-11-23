@@ -1,0 +1,86 @@
+---
+title: "WCVI Worked Example"
+output: pdf_document
+date: "2023-11-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE}
+library(rsample)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(reshape2)
+library(TMB)
+library(zoo)
+library(viridis)
+library(hrbrthemes)
+
+library(gsl)
+
+source (here::here("R/helperFunctions.R"))
+source(here::here("R/PlotFunctions.R")) 
+source(here::here("R/WCVILRPs_bootstrap.R")) # Will this correctly pull the main function?
+```
+
+# WCVI Worked Example
+
+## Content
+
+- Summary
+- Key code repositories, where to find data, etc. ("Data Map")
+- Reference to comparison paper: https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-5/Fs70-5-2023-010-eng.pdf 
+- Link to iwam-package repository
+- Preliminary code loading
+  - Packages (code chunk)
+  - Source functions (code chunk)
+
+## Stage 1
+- IWAM_model - produce the initial SREP estimates 
+  - Run code internally - what is worth hiding versus not?
+
+```{r iwam-model, include=FALSE}
+# IWAM Model Setup
+```
+
+```{r iwam-model, include=FALSE}
+# IWAM Model Run - consider including
+```
+
+```{r iwam-model, include=FALSE, echo=FALSE}
+# echo=FALSE prevents printing the code and just allows for the figure output
+# IWAM Model Outputs/Plotting - consider including
+# WA regression SMSY
+# WA regression SREP
+# SR IWAM
+# SRLin IWAM
+# StdResid IWAM
+```
+
+## Stage 2
+- WCVILRPs_bootstrap - produce final SREP, SMSY, and SGen estimates for stocks
+
+```{r bootstrap, include=TRUE}
+# Bootstrap code loop - include
+```
+
+```{r bootstrap, include=TRUE}
+# Bootstrap ouputs e.g. Table 9 in Case Study 2 Page 53:
+  # Benchmarks and approximate 95% confidence limits for five inlets, not enhanced
+# Is this the only major comparative outputs for the paper?
+```
+
+```{r bootstrap, include=TRUE}
+# Plot: plotWCVI_timeseries (PlotFunctions.R)
+# plotWCVI_timeseries(WCVIEsc=xx$WCVIEsc, remove.EnhStocks = TRUE, 
+#                     prod="LifeStageModel")
+```
+
+## Stage 3
+- Comparison of current outputs and previous outputs used in publication (LRP Paper)
+
+## Conclusions

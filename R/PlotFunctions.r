@@ -1,6 +1,6 @@
 # Plot SR models: curves and linearized mddel
 
-# Functions
+# Functions ####
 t_col <- function(color, percent = 50, name = NULL) {
   #      color = color name
   #    percent = % transparency
@@ -20,7 +20,7 @@ t_col <- function(color, percent = 50, name = NULL) {
   #invisible(t.col)
 }
 
-# Plot SR curves
+# Plot SR curves ####
 
 PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_surv=NULL, stks_surv, r2, removeSkagit, mod) {
   Stks <- unique(srdat$Stocknumber)
@@ -205,8 +205,8 @@ PlotSRLinear <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_su
   
 }
 
-#-------------------------------------------------------------------------------------------------
-#Plot standardized residuals
+#------------------------------------------------------------------------------- #
+#Plot standardized residuals ####
 
 PlotStdResid <- function(SRes){
   
@@ -257,8 +257,8 @@ Plotacf <- function(Preds){
 # Cow.SMSY.ll <- Cow.SMSY.ll * srdat %>% filter (Name=="Cowichan") %>% select(scale) %>% distinct() %>% as.numeric()
 
 
-#------------------------------------------------------------------
-# Plot  WA regression
+#------------------------------------------------------------------ #
+# Plot  WA regression ####
 
 plotWAregressionSMSY <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
 
@@ -625,8 +625,8 @@ plotSMSY <- function(data = WCVISMSY){
 # plotSMSY()
 # dev.off()
 
-#==========================================================
-# Get Quantiles of escapement to plot against benchmarks
+#========================================================== #
+# Get Quantiles of escapement to plot against benchmarks ####
 # 
 # WCVIEsc <- as.data.frame(read.csv("DataIn/WCVIEsc.csv", row.names="Yr"))
 # WCVI_RPs <- as.data.frame(read.csv("DataOut/WCVI_SMSY.csv")) %>% select (-X)
@@ -646,7 +646,8 @@ plotSMSY <- function(data = WCVISMSY){
 # WCVIEscQuant <- WCVIEscQuant %>% mutate(Estimate = round(Estimate, 0), LL = round(LL, 0), UL = round(UL, 0))
 #write.csv(WCVIEscQuant, "DataOut/WCVIbenchmarks.csv")
 #read.csv("DataOut/WCVIbenchmarks.csv")
-#==========================================================
+
+# WCVI Specific ================================================================
 
 plotWCVIBenchmarks <- function(data = WCVIEscQuant){
   
@@ -906,9 +907,9 @@ plotWCVI_SMUtimeseries <- function(SMU_Esc=SMU_Esc, out=out$LRP, WCVI_Esc=WCVIEs
 # apply(dum,2,geoMean)
 #Clayoquot: (prod(dum[c(1,2,4),2]))^(1/3)
 
-#==================================================================
-# Plot time-series of CU status
-#==================================================================
+#================================================================== #
+# Plot time-series of CU status ----
+#================================================================== #
 
 ## xx <- Get.LRP(remove.EnhStocks=TRUE)
 # png("DataOut/WCVI_CUstatus_noEnh.png", width=4.5, height=6.5, units="in", res=200)
@@ -925,9 +926,9 @@ plotWCVI_SMUtimeseries <- function(SMU_Esc=SMU_Esc, out=out$LRP, WCVI_Esc=WCVIEs
 
 
 
-#==================================================================
-# Plot time-series of SMU ppns without enh
-#==================================================================
+#================================================================== #
+# Plot time-series of SMU ppns without enh ----
+#================================================================== #
 ## xx <- Get.LRP(remove.EnhStocks=TRUE)
 
 # png("DataOut/WCVI_SMUstatus_noEnh.png", width=4.5, height=3.5, units="in", res=200)
@@ -941,9 +942,9 @@ plotWCVI_SMUtimeseries <- function(SMU_Esc=SMU_Esc, out=out$LRP, WCVI_Esc=WCVIEs
 # Plot data for log regression: Need df: SMU_Esc from "WCVILRPs.R"
 # plot(x=SMU_Esc, y=SMU_ppn, xlab="Aggregate Escapement", ylab="Proportion CUs above red zone", las=1, ylim=c(0,1), xlim=c(0, max(SMUEsc, na.rm=T)))
 
-#==================================================================
-# Plot logistic model from 
-#==============================================================
+#================================================================== #
+# Plot logistic model from ####
+#============================================================== #
 
 plotLogistic <- function(Data, Preds, LRP, useGenMean = F, plotName, outDir, p=0.95, useBern_Logistic = F){
   
@@ -1006,9 +1007,9 @@ plotLogistic <- function(Data, Preds, LRP, useGenMean = F, plotName, outDir, p=0
 #if(yy$out$LRP$lwr<=0) yy$out$LRP$lwr <-1
 
 
-#===============================================================================
-# Plot annual indicator abundance plots (WCVIO
-#===============================================================================
+#=============================================================================== #
+# Plot annual indicator abundance plots (WCVIO) ####
+#=============================================================================== #
 
 PlotAnnualIndicator <- FALSE
 if(PlotAnnualIndicator){
@@ -1093,9 +1094,9 @@ if(PlotAnnualIndicator){
   
 }
 
-#==================================================================
-# Plot annual inlet status plot (WCVI(
-#==============================================================
+#================================================================== #
+# Plot annual inlet status plot (WCVI) ####
+#============================================================== #
 
 library(patchwork)
 

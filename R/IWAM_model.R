@@ -679,11 +679,11 @@ data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_S
 
 # Step 6: Final writing step for outputting targets
 # Write SMSY and SREP with PIs to file
-if(remove.EnhStocks) write.csv(data_out_ocean, "DataOut/dataout_target_noEnh.csv")
-if(!remove.EnhStocks) write.csv(data_out_ocean, "DataOut/dataout_target_wEnh.csv")
+if(remove.EnhStocks) write.csv(data_out_ocean, "DataOut/dataout_target_ocean_noEnh.csv")
+if(!remove.EnhStocks) write.csv(data_out_ocean, "DataOut/dataout_target_ocean_wEnh.csv")
 
-if(remove.EnhStocks) write.csv(data_out_stream, "DataOut/dataout_target_noEnh.csv")
-if(!remove.EnhStocks) write.csv(data_out_stream, "DataOut/dataout_target_wEnh.csv")
+if(remove.EnhStocks) write.csv(data_out_stream, "DataOut/dataout_target_stream_noEnh.csv")
+if(!remove.EnhStocks) write.csv(data_out_stream, "DataOut/dataout_target_stream_wEnh.csv")
 
 # if(remove.EnhStocks) write.csv(data_out, "DataOut/dataout_target_noEnh.csv")
 # if(!remove.EnhStocks) write.csv(data_out, "DataOut/dataout_target_wEnh.csv")
