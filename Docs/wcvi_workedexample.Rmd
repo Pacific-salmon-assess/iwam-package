@@ -8,7 +8,7 @@ date: "2023-11-22"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r libraries, include=FALSE}
+```{r libraries, include=FALSE, echo=FALSE}
 library(rsample)
 library(tidyverse)
 library(ggplot2)
@@ -19,12 +19,13 @@ library(TMB)
 library(zoo)
 library(viridis)
 library(hrbrthemes)
-
 library(gsl)
+```
 
+```{r source files, include=FALSE, echo=FALSE}
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R")) 
-source(here::here("R/WCVILRPs_bootstrap.R")) # Will this correctly pull the main function?
+source(here::here("R/WCVILRPs_bootstrap.R"))
 ```
 
 # WCVI Worked Example
@@ -45,10 +46,260 @@ source(here::here("R/WCVILRPs_bootstrap.R")) # Will this correctly pull the main
 
 ```{r iwam-model, include=FALSE}
 # IWAM Model Setup
+remove.EnhStocks <- TRUE
+
+srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # PRIVATE
+WA <- read.csv(here::here("DataIn/WatershedArea.csv")) # PRIVATE
+wcvistocks <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+
+srdatwna <- srdatwna %>% filter(Name != "Hoko" & Name != "Hoh") 
+stockwna <- srdatwna %>% filter (is.na(Rec) == TRUE) %>% 
+  dplyr::select (Stocknumber) %>%  unique() %>% unlist() 
+srdat <- srdatwna %>% filter(Rec != "NA") 
+
+if(max(srdat$Stocknumber) >= stockwna[1]) { 
+  for (i in 1:length(stockwna)) { 
+    len <- length (srdat[which (srdat$Stocknumber == stockwna[i]), ]$yr_num) - 1
+    srdat [which (srdat$Stocknumber == stockwna[i]), ]$yr_num <- c (0:len)
+  }
+}
+
+srdat <- digit_scaling(srdat)
+srdat_scale <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
+srdat_scale <- srdat_scale$scale 
+srdat_cow <- srdat %>% filter(Name == "Cowichan" & 
+                                Yr >= 1985 & 
+                                Yr !=1986 & 
+                                Yr != 1987) # length = 10
+n_cow <- length(srdat_cow$Yr)
+srdat_cow$yr_num <- 0:(n_cow-1)
+srdat <- srdat %>%  filter(Name != "Cowichan") %>% bind_rows(srdat_cow) %>%
+  arrange(Stocknumber)
+
+names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
+WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
+stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream is still capcased
+  group_by(Stocknumber) %>% 
+  summarize(lh=max(Stream)) %>% 
+  arrange (Stocknumber)
+
+data <- list()
+
+scale_TMB <- srdat$scale # scale enters the TMB data as: scale
+data$S <- srdat$Sp/scale_TMB # Spawners / scale 
+data$logRS <- log( (srdat$Rec/srdat$scale) / (srdat$Sp/srdat$scale) )
+data$stk <- as.numeric(srdat$Stocknumber) # stock number
+data$yr <- srdat$yr_num
+N_Stocks <- length(unique(srdat$Name))
+data$logMuA_stream_mean <- 1.5 
+data$logMuA_stream_sig <- 2
+data$logMuA_ocean_mean <- 0 #1.5
+data$logMuA_ocean_sig <- 2
+data$HalfNormMean <- 0 #TMB_Inputs$Tau_sigma
+data$HalfNormSig <- 1 #TMB_Inputs$Tau_sigma
+data$HalfNormMeanA <- 0 #0.44 #TMB_Inputs$Tau_sigma
+data$HalfNormSigA <- 1 #0.5 #TMB_Inputs$Tau_sigma
+data$WA <- WA$WA
+data$stream <- stream$lh
+data$scale <- srdat_scale # Ordered by Stocknumber
+data$SigRicPriorNorm <- as.numeric(F)
+data$SigRicPriorGamma <- as.numeric(T)
+data$SigRicPriorCauchy <- as.numeric(F)
+data$biasCor <- as.numeric(TRUE)
+data$SigDeltaPriorNorm <- as.numeric(F)
+data$SigDeltaPriorGamma <- as.numeric(T)
+data$SigDeltaPriorCauchy <- as.numeric(F)
+data$Tau_dist <- 0.1
+data$Tau_D_dist <- 1
+data$SigDelta_mean <- 0.80 # See KFrun.R, #For half-normal use N(0,1)
+data$SigDelta_sig <- 0.28 # See KFrun.R,
+data$SigNu_mean <- 0.84 # See KFrun.R,
+data$SigNu_sig <- 0.275 # See KFrun.R,
+
+data$pred_lnWA <- seq(min(log(WA$WA)), max(log(WA$WA)), 0.1)
+
+data$target_lnWA_ocean <- wcvistocks %>% # PUBLIC
+  mutate (lnWA=log(WA)) %>%
+  filter(lh==1) %>% 
+  pull(lnWA)
+
+data$target_lnWA_stream <- wcvistocks %>% # PUBLIC
+  mutate (lnWA=log(WA)) %>%
+  filter(lh==0) %>% # not present in wcvistocks
+  pull(lnWA)
+
+InletlnWA <- data.frame(wcvistocks) %>%
+  filter(Stock != "Cypre") %>% 
+  group_by(Inlet) %>%
+  summarize(InletlnWA = log(sum(WA))) %>% 
+  filter(Inlet != "San Juan") %>%
+  filter(Inlet !="Nitinat")
+
+InletlnWAnoEnh <- data.frame(wcvistocks) %>% 
+  filter(Stock != "Cypre") %>% filter(Enh==0) %>%
+  group_by(Inlet) %>% 
+  summarize(InletlnWA = log(sum(WA))) %>% 
+  filter(Inlet != "San Juan") %>%
+  filter(Inlet !="Nitinat")
+
+CUlnWA <- data.frame(wcvistocks) %>% 
+  filter(Stock != "Cypre") %>% 
+  group_by(CU) %>%
+  summarize(CUlnWA = log(sum(WA)))
+
+CUlnWAnoEnh <- data.frame(wcvistocks) %>% 
+  filter(Stock != "Cypre") %>% 
+  filter(Enh==0) %>%
+  group_by(CU) %>% 
+  summarize(CUlnWA = log(sum(WA)))
+
+if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+                                         InletlnWAnoEnh$InletlnWA,
+                                           CUlnWAnoEnh$CUlnWA)
+
+param <- list()
+
+param$logA <- ( srdat %>% group_by (Stocknumber) %>% 
+                      summarise(yi = lm(log( Rec / Sp) ~ Sp )$coef[1] ) )$yi
+B <- srdat %>% group_by(Stocknumber) %>% 
+  summarise( m = - lm(log( Rec / Sp) ~ Sp )$coef[2] )
+param$logB <- log ( 1/ ( (1/B$m)/data$scale ))
+param$logSigma <- rep(-2, N_Stocks)
+param$logMuA_stream <- 1.5
+param$logSigmaA <- -2
+param$logMuA_ocean <- 0
+param$logDelta1 <- 3 
+param$logDelta1_ocean <- 0
+param$logDelta2 <- log(0.72) 
+param$Delta2_ocean <- 0 
+param$logDeltaSigma <- -0.412 
+param$logNu1 <- 3
+param$logNu1_ocean <- 0
+param$logNu2 <- log(0.72)
+param$Nu2_ocean <- 0
+param$logNuSigma <- -0.412 
 ```
 
 ```{r iwam-model, include=FALSE}
-# IWAM Model Run - consider including
+# IWAM Model Run
+mod <- "IWAM_Liermann" 
+# dyn.unload(dynlib(paste("TMB_Files/", mod, sep="")))
+# compile(paste("TMB_Files/", mod, ".cpp", sep=""))
+dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+
+obj <- MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
+
+upper <- unlist(obj$par)
+upper[1:length(upper)]<- Inf
+lower <- unlist(obj$par)
+lower[1:length(lower)]<- -Inf
+
+opt <- nlminb(obj$par, 
+              obj$fn, 
+              obj$gr, 
+              control = list(eval.max = 1e5, iter.max = 1e5), 
+              lower=lower, 
+              upper=upper)
+
+pl <- obj$env$parList(opt$par) 
+
+all_pars <- data.frame(summary(sdreport(obj)))
+all_pars$Param <- row.names(all_pars)
+
+all_pars$Param <- sapply(all_pars$Param, function(x) (unlist(strsplit(x, "[.]"))[[1]]))
+
+
+pars <- data.frame()
+pars <- all_pars %>% filter (Param %in% c("logA", 
+                                          "logB", 
+                                          "logSigma",  
+                                          "SMSY", 
+                                          "SREP"))
+
+stnum <- unique(srdat[, c("Stocknumber")])
+pars$Stocknumber <- rep(stnum)
+pars <- left_join(pars, unique(srdat[, c("Stocknumber", "Name")]))
+
+logDeltaSigma <- all_pars %>% filter (Param %in% c("logDeltaSigma")) 
+DeltaSigmaUCL <- exp(logDeltaSigma$Estimate + logDeltaSigma$Std..Error*1.96)
+DeltaSigmaLCL <- exp(logDeltaSigma$Estimate - logDeltaSigma$Std..Error*1.96) 
+DeltaSigma <- exp(logDeltaSigma$Estimate)
+
+pars$Param <- sapply(pars$Param, function(x) (unlist(strsplit(x, "[_]"))[[1]]))
+pars <- pars %>% left_join(stream, by="Stocknumber")
+
+
+all_Deltas <- data.frame()
+all_Deltas <- all_pars %>% filter (Param %in% c("logDelta1", 
+                                                "logDelta2",
+                                                "sigma_delta", 
+                                                "Delta2_bounded", 
+                                                "logDelta1_ocean", 
+                                                "Delta2_ocean", 
+                                                "logNu1", 
+                                                "logNu2", 
+                                                "sigma_nu", 
+                                                "logNu1_ocean", 
+                                                "Nu2_ocean"))
+
+nLL <- data.frame(nLL=obj$report()$nLL) %>% 
+  add_column(Stocknumber=srdat$Stocknumber) %>% group_by(Stocknumber) %>% 
+  summarize(CnLL=sum(nLL))
+AIC <- nLL %>% mutate(aic = 2 * 3 + 2*CnLL) 
+
+pred_RS <- data.frame()
+pred_RS <- all_pars %>% filter (Param %in% c("logRS_pred"))
+
+all_pred <- srdat %>% dplyr::select("Stocknumber",
+                                 "yr_num", 
+                                 "Sp", 
+                                 "Rec", 
+                                 "scale", 
+                                 "Name") %>% 
+  add_column(Pred=pred_RS$Estimate)
+
+if (length(pred_RS$Estimate) == length(data$S)) {
+  print("Lengths checked passed.")
+} else {
+  print("WARNING: The output and inputs are not the same length.")
+}
+
+all_pred <- all_pred %>% mutate(ObslogRS = log ( (Rec / scale) / (Sp/scale) ) )
+r2 <- all_pred %>% group_by(Stocknumber) %>% summarize(r2=cor(ObslogRS,Pred)^2)
+
+pred_lnSMSY <- data.frame() 
+pred_lnSMSY <- all_pars %>% filter (Param %in% c("pred_lnSMSY_stream", 
+                                                "pred_lnSMSY_ocean", 
+                                                "pred_lnSMSY_CI", 
+                                                "pred_lnSMSY_stream_CI", 
+                                                "pred_lnSMSY_ocean_CI"))
+pred_lnSREP <- data.frame() 
+pred_lnSREP <- all_pars %>% filter (Param %in% c("pred_lnSREP_stream", 
+                                                "pred_lnSREP_ocean", 
+                                                "pred_lnSREP_CI", 
+                                                "pred_lnSREP_stream_CI", 
+                                                "pred_lnSREP_ocean_CI"))
+
+SRes <- all_pred %>% mutate ( Res = ObslogRS- Pred)
+sigma <- pars %>% filter(Param=="logSigma") %>% dplyr::select(Stocknumber, Estimate, Name)
+SRes <- SRes %>% left_join(sigma) %>% rename(logSig = Estimate)
+SRes <- SRes %>% mutate (StdRes = Res/exp(logSig))
+```
+
+```{r iwam plotting, include=FALSE, echo=FALSE}
+PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
+```
+
+```{r iwam plotting, include=FALSE, echo=FALSE}
+PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
+```
+
+```{r iwam plotting, include=FALSE, echo=FALSE}
+PlotStdResid(SRes)
+```
+
+```{r iwam plotting, include=FALSE, echo=FALSE}
+Plotacf(SRes)
 ```
 
 ```{r iwam-model, include=FALSE, echo=FALSE}
@@ -59,6 +310,165 @@ source(here::here("R/WCVILRPs_bootstrap.R")) # Will this correctly pull the main
 # SR IWAM
 # SRLin IWAM
 # StdResid IWAM
+
+# Remove looping and make them plot naturally in RMD
+# PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
+# PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
+# PlotStdResid(SRes)
+# Plotacf(SRes)
+
+# if (plot==TRUE){
+#   png(paste("DataOut/SR_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
+#   PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
+#   dev.off()
+#   png(paste("DataOut/SRLin_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+#   PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
+#   dev.off()
+#   png(paste("DataOut/StdResid_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+#   PlotStdResid(SRes)
+#   dev.off()
+#   png(paste("DataOut/ACF_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+#   Plotacf(SRes)
+#   dev.off()
+# }
+
+par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
+title_plot <- "Prior Ricker sigma and prior WA regression sigma"
+plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, 
+                        pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+# dev.off()
+
+par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
+title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
+plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
+                        pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+# dev.off()
+
+# if(plot==TRUE){
+#   png(paste("DataOut/WAregSMSY_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+#   par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
+#   title_plot <- "Prior Ricker sigma and prior WA regression sigma"
+#   #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
+#   plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, 
+#                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+#   dev.off()
+#   
+#   png(paste("DataOut/WAregSREP_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+#   #png(paste("DataOut/WAreg_Liermann_SepRicA_UniformSigmaAPrior.png", sep=""), width=7, height=7, units="in", res=500)
+#   par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
+#   title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
+#   #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
+#   plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
+#                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+#   dev.off()
+#   #plotWAregression (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, pred_lnWA = data$pred_lnWA, 
+#   # title1="Common, fixed yi (logDelta1), \nRandom slope (Delta2)")
+# }
+```
+
+```{r final step, include=FALSE}
+pred_lnSMSY_pi <- data.frame()
+pred_lnSMSY_pi <- all_pars %>% filter   (Param %in% c("pred_lnSMSY", "lnSMSY"))
+pred_lnSREP_pi <- data.frame()
+pred_lnSREP_pi <- all_pars %>% filter (Param %in% c("pred_lnSREP", "lnSREP"))
+
+pred_lnSMSY_pi$Stocknumber <- rep(stnum)
+pred_lnSREP_pi$Stocknumber <- rep(stnum)
+
+scale_pi <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
+pred_lnSMSY_pi <- pred_lnSMSY_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
+  left_join(scale_pi)
+pred_lnSREP_pi <- pred_lnSREP_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
+  left_join(scale_pi)
+
+pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(stream) %>% 
+  filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs
+pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(stream) %>% 
+  filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
+obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(stream) %>% 
+  filter( lh== 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
+obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(stream) %>% 
+  filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
+
+pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(stream) %>% 
+  filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream
+pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(stream) %>% 
+  filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
+obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(stream) %>% 
+  filter(lh == 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
+obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(stream) %>% 
+  filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
+
+wa_stream <- WA %>% left_join(stream) %>% filter(lh == 0) %>% pull(WA)
+wa_ocean <- WA %>% left_join(stream) %>% filter(lh == 1) %>% pull(WA)
+stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+target_SMSY_ocean <- data.frame()
+target_SREP_ocean <- data.frame()
+
+target_SMSY_stream <- data.frame()
+target_SREP_stream <- data.frame()
+
+condition_target <- cbind("ocean","stream") # choose if you want ocean, stream, or both
+
+if ("ocean" %in% condition_target) {
+  # Step 1
+  target_SMSY_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames)
+  target_SREP_ocean <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames)
+  target_SMSY_pull_ocean <- target_SMSY_ocean %>% pull(Estimate)
+  target_SREP_pull_ocean <- target_SREP_ocean %>% pull(Estimate)
+  # Step 2
+  target_SMSY_pi_ocean <- PredInt(x = log(wa_ocean), y = obs_lSMSY_ocean, Predy = target_SMSY_pull_ocean, Newx = data$target_lnWA_ocean)
+  target_SREP_pi_ocean <- PredInt(x = log(wa_ocean), y = obs_SREP_ocean, Predy = target_SREP_pull_ocean, Newx = data$target_lnWA_ocean)
+  # Step 3
+  target_SMSY_ocean <- target_SMSY_ocean %>% add_column(LL = exp(target_SMSY_pi_ocean$lwr), UL = exp(target_SMSY_pi_ocean$upr))
+  target_SREP_ocean <- target_SREP_ocean %>% add_column(LL = exp(target_SREP_pi_ocean$lwr), UL = exp(target_SREP_pi_ocean$upr))
+  # Step 4
+  target_SMSY_ocean <- target_SMSY_ocean %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+    add_column(Param = "SMSY")
+  target_SREP_ocean <- target_SREP_ocean %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+    add_column(Param = "SREP")
+  # Step 5
+  target_estimates_SMSY_ocean <- target_SMSY_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+  target_estimates_SREP_ocean <- target_SREP_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+}
+
+# length_check_params <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean"))
+# if (length(stocknames) == length(length_check_params$Estimate)) {
+#   print("Lengths checked passed.")
+# } else {
+#   print("WARNING: The output and inputs are not the same length.")
+# }
+
+# if ("stream" %in% condition_target){
+#   # Step 1
+#   target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames)
+#   target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames)
+#   target_SMSY_pull_stream <- target_SMSY_stream %>% pull(Estimate)
+#   target_SREP_pull_stream <- target_SREP_stream %>% pull(Estimate)
+#   # Step 2
+#   target_SMSY_pi_stream <- PredInt(x = log(wa_stream), y = obs_lSMSY_stream, Predy = target_SMSY_pull_stream, Newx = data$target_lnWA_stream)
+#   target_SREP_pi_stream <- PredInt(x = log(wa_stream), y = obs_SREP_stream, Predy = target_SREP_pull_stream, Newx = data$target_lnWA_stream)
+#   # Step 3
+#   target_SMSY_stream <- target_SMSY_stream %>% add_column(LL = exp(target_SMSY_pi_stream$lwr), UL = exp(target_SMSY_pi_stream$upr))
+#   target_SREP_stream <- target_SREP_stream %>% add_column(LL = exp(target_SREP_pi_stream$lwr), UL = exp(target_SREP_pi_stream$upr))
+#   # Step 4
+#   target_SMSY_stream <- target_SMSY_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+#     add_column(Param = "SMSY")
+#   target_SREP_stream <- target_SREP_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+#     add_column(Param = "SREP")
+#   # Step 5
+#   target_estimates_SMSY_stream <- target_SMSY_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+#   target_estimates_SREP_stream <- target_SREP_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+# }
+
+data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
+# data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
+
+if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/WCVI_target_ocean_noEnh.csv"))
+if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/WCVI_target_ocean_wEnh.csv"))
+
+# if(remove.EnhStocks) write.csv(data_out_stream, "DataOut/WCVI_target_stream_noEnh.csv")
+# if(!remove.EnhStocks) write.csv(data_out_stream, "DataOut/WCVI_target_stream_wEnh.csv")
 ```
 
 ## Stage 2

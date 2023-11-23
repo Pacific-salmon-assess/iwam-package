@@ -470,6 +470,8 @@ plot <- TRUE
 # Plotted values are RE-SCALED either by plotting function or are already
   # scaled e.g., "SRes"
 
+# PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
+
 if (plot==TRUE){
   png(paste("DataOut/SR_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
   PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)

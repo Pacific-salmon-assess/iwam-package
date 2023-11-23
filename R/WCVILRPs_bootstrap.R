@@ -61,8 +61,8 @@ Get.LRP.bs <- function(remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
   #--------------------------------------------------------------------------- #
   # Core data: 
     # New files:
-  if(remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/dataout_target_ocean_noEnh.csv")
-  if(!remove.EnhStocks) wcviRPs_long<- read.csv("DataOut/dataout_target_ocean_wEnh.csv")
+  if(remove.EnhStocks) wcviRPs_long <- read.csv(here::here("DataOut/dataout_target_ocean_noEnh.csv"))
+  #if(!remove.EnhStocks) wcviRPs_long<- read.csv(here::here("DataOut/dataout_target_ocean_wEnh.csv"))
     # Old files:
   # if (remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
   # if (!remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
@@ -671,7 +671,7 @@ if (run.bootstraps){
   # 95th percentiles
   SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   # stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
-  stockNames <- read.csv("DataOut/dataout_target_ocean_noEnh.csv") %>% 
+  stockNames <- read.csv(here::here("DataOut/dataout_target_ocean_noEnh.csv")) %>% 
     filter(Stock != "Cypre") %>% pull(Stock)
   stockNames <- unique(stockNames)
 
@@ -709,33 +709,34 @@ if (run.bootstraps){
     mutate(lwr=signif(lwr,2)) %>% 
     mutate (upr=signif(upr,2))
   
-  write.csv(dfout, "DataOut/wcviCK-BootstrappedRPs.csv") 
-  
+  write.csv(dfout, here::here("DataOut/wcviCK-BootstrappedRPs.csv"))
+
 }
 #Found with 20000 the results have stabilized to two significant digits. Use 20000v1, 
 # and recommend 2 signifcant digits to users
 # To check the SE is within 2% with 5 trials of 20,000
 
-d1 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v1.csv")
-d2 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v2.csv")
-d3 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v3.csv")
-d4 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v4.csv")
-d5 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v5.csv")
-n<-length(d1$Value)
-sd.Value <- NA; sd.lwr <- NA; sd.upr <- NA
-mean.Value <- NA; mean.lwr <- NA; mean.upr <- NA
-se.Value <- NA; se.lwr <- NA; se.upr <- NA
-for (i in 1:n){
- sd.Value[i] <- sd(c(d1$Value[i], d2$Value[i], d3$Value[i], d4$Value[i], d5$Value[i])) 
- mean.Value[i] <- mean(c(d1$Value[i], d2$Value[i], d3$Value[i], d4$Value[i], d5$Value[i]))
- se.Value[i] <- sd.Value[i]/mean.Value[i]
- sd.lwr[i] <- sd(c(d1$lwr[i], d2$lwr[i], d3$lwr[i], d4$lwr[i], d5$lwr[i])) 
- mean.lwr[i] <- mean(c(d1$lwr[i], d2$lwr[i], d3$lwr[i], d4$lwr[i], d5$lwr[i]))
- se.lwr[i] <- sd.lwr[i]/mean.lwr[i]
- sd.upr[i] <- sd(c(d1$upr[i], d2$upr[i], d3$upr[i], d4$upr[i], d5$upr[i])) 
- mean.upr[i] <- mean(c(d1$upr[i], d2$upr[i], d3$upr[i], d4$upr[i], d5$upr[i]))
- se.upr[i] <- sd.upr[i]/mean.upr[i]
-}
+# Commented out for the purpose of the wcvi_workedexample.RMD
+# d1 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v1.csv")
+# d2 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v2.csv")
+# d3 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v3.csv")
+# d4 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v4.csv")
+# d5 <- read.csv("DataOut/wcviCK-BootstrappedRPs20000v5.csv")
+# n<-length(d1$Value)
+# sd.Value <- NA; sd.lwr <- NA; sd.upr <- NA
+# mean.Value <- NA; mean.lwr <- NA; mean.upr <- NA
+# se.Value <- NA; se.lwr <- NA; se.upr <- NA
+# for (i in 1:n){
+#  sd.Value[i] <- sd(c(d1$Value[i], d2$Value[i], d3$Value[i], d4$Value[i], d5$Value[i]))
+#  mean.Value[i] <- mean(c(d1$Value[i], d2$Value[i], d3$Value[i], d4$Value[i], d5$Value[i]))
+#  se.Value[i] <- sd.Value[i]/mean.Value[i]
+#  sd.lwr[i] <- sd(c(d1$lwr[i], d2$lwr[i], d3$lwr[i], d4$lwr[i], d5$lwr[i]))
+#  mean.lwr[i] <- mean(c(d1$lwr[i], d2$lwr[i], d3$lwr[i], d4$lwr[i], d5$lwr[i]))
+#  se.lwr[i] <- sd.lwr[i]/mean.lwr[i]
+#  sd.upr[i] <- sd(c(d1$upr[i], d2$upr[i], d3$upr[i], d4$upr[i], d5$upr[i]))
+#  mean.upr[i] <- mean(c(d1$upr[i], d2$upr[i], d3$upr[i], d4$upr[i], d5$upr[i]))
+#  se.upr[i] <- sd.upr[i]/mean.upr[i]
+# }
 
 #----------------------------------------------------------------------------- #
 # R version of logistic regression ---------------------------------------------

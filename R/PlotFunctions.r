@@ -48,7 +48,7 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
     
     if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!= 'IWAM_Liermann' & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
       if (i %in% stksNum_surv) {  #stocknumber 0 and either 22 or 23, depending on if Skagit is removed
-        surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name==name$Name)
+        surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name==name$Name)
         #if(i==0) surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name==name$Name) 
         #if(i==22|i==23)surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name=="Cowichan") 
         #if(i==22|i==23) { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
@@ -127,7 +127,7 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
     }
     
     
-    ParkenSMSY <- read.csv("DataIn/ParkenSMSY.csv")
+    ParkenSMSY <- read.csv(here::here("DataIn/ParkenSMSY.csv"))
     #if (removeSkagit==TRUE) ParkenSMSY <- ParkenSMSY %>% filter(Name != "Skagit")
     ParkenSMSY <- ParkenSMSY %>% filter(Name==as.character(name$Name)) %>% dplyr::select (SMSY) %>% as.numeric()
     abline(v=ParkenSMSY, lty="dashed")
@@ -172,8 +172,8 @@ PlotSRLinear <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_su
     if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!="IWAM_Liermann" & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
       if (i %in% stksNum_surv) {  #stocknumber 0 and either 22 or 23, depending on if Skagit is removed
         
-        if(i==0) surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name=="Harrison") 
-        if(i==22|i==23)surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name=="Cowichan") 
+        if(i==0) surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name=="Harrison") 
+        if(i==22|i==23)surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name=="Cowichan") 
         if(i==22|i==23) { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
         mean.log.surv <- surv.dat %>% summarize(mean = mean(log(Surv)))
         gamma <- pars %>% filter (Stocknumber==i) %>% filter(Param=="gamma") %>% dplyr::select(Estimate)
@@ -452,7 +452,7 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnS
 plotWAregression_Parken <- function(data, all_Deltas){
   par(cex=1.5)
   col.use <- NA
-  Parken_data <- as.data.frame(read.csv("DataIn/WA_Parken.csv"))
+  Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
   for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
   plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
   points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
@@ -471,7 +471,7 @@ plotWAregression_Parken <- function(data, all_Deltas){
 plotWAregression_ParkenSep <- function(data, all_Deltas){
   par(cex=1.5)
   col.use <- NA
-  Parken_data <- as.data.frame(read.csv("DataIn/WA_Parken.csv"))
+  Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
   for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
   plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
   points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
@@ -678,7 +678,7 @@ plotWCVI_timeseries <- function(WCVIEsc=WCVIEsc, remove.EnhStocks=TRUE,
   
   #EnhStocks <- c("Burman",  "Conuma", "Leiner", "Nitinat", "Sarita",  "Somass",  
   # "Zeballos", "San Juan")
-  EnhStocks <- data.frame(read.csv("DataIn/WCVIStocks.csv")) %>% 
+  EnhStocks <- data.frame(read.csv(here::here("DataIn/WCVIStocks.csv"))) %>% 
     filter (Enh==1) %>% pull(Stock)
   EnhStocks <- as.character(EnhStocks)
   
@@ -686,17 +686,17 @@ plotWCVI_timeseries <- function(WCVIEsc=WCVIEsc, remove.EnhStocks=TRUE,
   
   if(prod=="LifeStageModel"){
     if(remove.EnhStocks) WCVI_RPs <- 
-        as.data.frame(read.csv("DataOut/wcviRPs_noEnh.csv")) %>% 
+        as.data.frame(read.csv(here::here("DataOut/wcviRPs_noEnh.csv"))) %>% 
         rename(StockNames=Stock)  %>% filter (StockNames != "Little Zeballos")
     
     if(!remove.EnhStocks) WCVI_RPs <- 
-        as.data.frame(read.csv("DataOut/wcviRPs_wEnh.csv")) %>% 
+        as.data.frame(read.csv(here::here("DataOut/wcviRPs_wEnh.csv"))) %>% 
         rename(StockNames=Stock)  %>% filter (StockNames != "Little Zeballos")
   }#End of if(prod=="LifeStageModel")
   
   if(prod=="RunReconstruction"){
     if(remove.EnhStocks) WCVI_RPs <- 
-        as.data.frame(read.csv("DataOut/wcviRPs_noEnh_lowSgen.csv")) %>% 
+        as.data.frame(read.csv(here::here("DataOut/wcviRPs_noEnh_lowSgen.csv"))) %>% 
         rename(StockNames=Stock)  %>% filter (StockNames != "Little Zeballos")
     if(!remove.EnhStocks) print("Error. wcviRPs_wEnh_lowSgen.csv does not exist. 
                                 Need to generate it for with Enhancement 
