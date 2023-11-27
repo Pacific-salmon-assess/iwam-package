@@ -428,10 +428,10 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnS
   }
   if(mod=="IWAM_FixedCombined"){
     text(x=6, y=10.5,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="maroon", cex=0.8)
-    
   }
+  # Liermann (old was y=7)
   if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta"){
-    text(x=9, y=7,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
+    text(x=9, y=8,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
     text(x=6, y=10.5,labels= paste0("log(Nu1)=",round(logN1o[1],2), ", \nNu2=", round(N2o[1],2)), col="dodgerblue3", cex=0.8)
   }
   if(mod=="IWAM_FixedSep_Constm"){

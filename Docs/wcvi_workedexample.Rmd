@@ -2,13 +2,58 @@
 title: "WCVI Worked Example"
 output: pdf_document
 date: "2023-11-22"
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message=FALSE)
 ```
 
-```{r libraries, include=FALSE, echo=FALSE}
+# WCVI Worked Example
+
+## Document Contents
+
+1.  Summary
+2.  Data Map: Code repositories, where to find data
+3.  IWAM Model Package Code
+4.  Final Estimate Bootstrapping
+5.  SREP, SGEN, SMSY Estimates
+
+## S1. Document Summary
+
+Lorem ... - Reference to comparison paper:
+<https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-5/Fs70-5-2023-010-eng.pdf>
+
+## S2. Data Map
+
+The following worked example is from the IWAM Package Repo hosted
+publicly through the Pacific Salmon Assess organization available at
+[this link.](https://github.com/Pacific-salmon-assess/iwam-package)
+
+The package currently utilizes the following data sets:
+
+-   CUPars_nBC *\**
+-   CUPars_wBC *\**
+-   ParkenSMSY *\**
+-   ParkenSREP *\**
+-   SRinputs *\**
+-   Surv *\**
+-   WA_Parken *\**
+-   WatershedArea *\**
+-   WCVIEsc *\**
+-   *WCVIStocks (Public)*
+
+(\*) Currently private, but available upon request.
+
+## S3: IWAM Model (Produce initial SREP estimates)
+
+-   IWAM_model - produce the initial SREP estimates
+
+Initial code summary ...
+
+```{r libraries, include=FALSE, echo=FALSE, message=FALSE}
 library(rsample)
 library(tidyverse)
 library(ggplot2)
@@ -20,32 +65,20 @@ library(zoo)
 library(viridis)
 library(hrbrthemes)
 library(gsl)
-library(knitr) # maybe?
+library(knitr)
 ```
 
-```{r source files, include=FALSE, echo=FALSE}
+### Source Files
+
+```{r source files, include=FALSE, echo=FALSE, message=FALSE}
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R")) 
 source(here::here("R/WCVILRPs_bootstrap.R"))
 ```
 
-# WCVI Worked Example
-
-## Document Contents
-
-- Summary
-- Key code repositories, where to find data, etc. ("Data Map")
-- Reference to comparison paper: https://publications.gc.ca/collections/collection_2023/mpo-dfo/fs70-5/Fs70-5-2023-010-eng.pdf 
-- Link to iwam-package repository
-- Preliminary code loading
-  - Packages (code chunk)
-  - Source functions (code chunk)
-
-## Stage 1: IWAM Model (Produce initial SREP estimates)
-- IWAM_model - produce the initial SREP estimates 
-  - Run code internally - what is worth hiding versus not?
-
 ### Data Setup
+
+Summary of data setup ...
 
 ```{r iwam data, include=FALSE, echo=FALSE}
 # IWAM Model Setup
@@ -85,9 +118,11 @@ stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream i
   group_by(Stocknumber) %>% 
   summarize(lh=max(Stream)) %>% 
   arrange (Stocknumber)
+```
 
-#### Consider showing the data list ####
+Description of data list ...
 
+```{r data list, message=FALSE}
 data <- list()
 
 scale_TMB <- srdat$scale # scale enters the TMB data as: scale
@@ -121,7 +156,9 @@ data$SigDelta_sig <- 0.28 # See KFrun.R,
 data$SigNu_mean <- 0.84 # See KFrun.R,
 data$SigNu_sig <- 0.275 # See KFrun.R,
 data$pred_lnWA <- seq(min(log(WA$WA)), max(log(WA$WA)), 0.1)
+```
 
+```{r stock data, include=FALSE}
 data$target_lnWA_ocean <- wcvistocks %>% # PUBLIC
   mutate (lnWA=log(WA)) %>%
   filter(lh==1) %>% 
@@ -160,9 +197,11 @@ CUlnWAnoEnh <- data.frame(wcvistocks) %>%
 if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
                                          InletlnWAnoEnh$InletlnWA,
                                            CUlnWAnoEnh$CUlnWA)
+```
 
-#### Consider showing the params list ####
+Description of params list ...
 
+```{r params list, message=FALSE}
 param <- list()
 
 param$logA <- ( srdat %>% 
@@ -189,6 +228,10 @@ param$logNuSigma <- -0.412
 ```
 
 ### TMB Model Call and Run
+
+Summary of IWAM model running/setup ...
+
+What data is output ...
 
 ```{r iwam model, include=FALSE, echo=FALSE}
 # IWAM Model Run
@@ -295,21 +338,26 @@ SRes <- SRes %>% mutate (StdRes = Res/exp(logSig))
 ```{r iwam plotting 1, echo=FALSE}
 PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
 ```
+
 *Figure 1. Stock-Recruitment Curves per WCVI Stock. INCLUDE UNITS.*
 
 ```{r iwam plotting 2, echo=FALSE}
 PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
 ```
-*Figure 2. Stock-Recruitment Linear Relationship per WCVI Stock. INCLUDE UNITS.*
+
+*Figure 2. Stock-Recruitment Linear Relationship per WCVI Stock. INCLUDE
+UNITS.*
 
 ```{r iwam plotting 3, echo=FALSE}
 PlotStdResid(SRes)
 ```
+
 *Figure 3. Standard Residuals. INCLUDE UNITS.*
 
 ```{r iwam plotting 4, echo=FALSE}
 Plotacf(SRes)
 ```
+
 *Figure 4. ACF. INCLUDE UNITS.*
 
 ```{r old plotting 5, echo=FALSE}
@@ -319,19 +367,27 @@ plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY,
                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
 # dev.off()
 ```
-*Figure 5. Prior Ricker sigmas and prior on WA regression for log(SMSY) and log(Watershed Area (km^2)).*
 
-``` {r old plotting 6, echo=FALSE, message=FALSE}
+*Figure 5. Prior Ricker sigmas and prior on WA regression for log(SMSY)
+and log(Watershed Area (km\^2)).*
+
+```{r old plotting 6, echo=FALSE, message=FALSE}
 par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
 title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
 plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
 ```
-*Figure 6. Prior Ricker sigmas and prior on WA regression for log(SREP) and log(Watershed Area (km^2)).*
+
+*Figure 6. Prior Ricker sigmas and prior on WA regression for log(SREP)
+and log(Watershed Area (km\^2)).*
 
 **Fix the equation placement.**
 
 ### Output Data from IWAM Model
+
+What data is put out ...
+
+-   predictions lnsmsy and lnsrep (pi)
 
 ```{r iwam data out, include=FALSE}
 pred_lnSMSY_pi <- data.frame()
@@ -405,10 +461,18 @@ if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/WCVI_target_o
 if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/WCVI_target_ocean_wEnh.csv"))
 ```
 
-## Stage 2: Bootstrapping and final estimates of SREP, SGEN, and SMSY
-- WCVILRPs_bootstrap - produce final SREP, SMSY, and SGen estimates for stocks
+## S3: Bootstrapping and final estimates of SREP, SGEN, and SMSY
 
-The following section includes the code for bootstrapping and the re-calculation of the SREP, SGEN, and SMSY estimates for the West-Coast Vancouver Island Stocks (Table 1-3).
+The following section includes the code for bootstrapping and the
+re-calculation of the SREP, SGEN, and SMSY estimates for the West-Coast
+Vancouver Island Stocks (Table 1-3). The following stocks of; Barkley,
+Clayoquot, Kyuquot, Nootka/Esperanza, and Quatsino, are displayed for
+direct comparison, however all stocks are available and can be accessed
+in this example if further comparison is desired. The bootstrap was run
+in this case with 10 trails to reduce run time and for ease of sharing.
+To change the number of trails - please see the `{r} nBS` object. The
+final estimates include the median (50%) their 2.5% and 97.5% quantiles,
+rounded to two significant figures.
 
 ```{r bootstrap run, include=TRUE, echo=FALSE}
 # Bootstrap code loop - include
@@ -469,10 +533,11 @@ if (run.bootstraps){
 }
 ```
 
+## S4: SREP, SGEN, SMSY Estimates
+
 ```{r bootstrap 2, echo=FALSE, message=FALSE}
 # Bootstrap ouputs e.g. Table 9 in Case Study 2 Page 53:
   # Benchmarks and approximate 95% confidence limits for five inlets, not enhanced
-# Is this the only major comparative outputs for the paper?
 
 # Paper Shows: Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino
   # Re-work df for only those locations
@@ -493,7 +558,9 @@ SREP <- dfout %>%
 
 kable(SREP)
 ```
-*Table 1. SREP*
+
+*Table 1. SREP estimates including 0.25% and 97.5% quantiles for
+Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
 ```{r SGEN, echo=FALSE, message=FALSE}
 SGEN <- dfout %>% 
@@ -505,7 +572,9 @@ SGEN <- dfout %>%
 
 kable(SGEN)
 ```
-*Table 2. SGEN*
+
+*Table 2. SGEN estimates including 0.25% and 97.5% quantiles for
+Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
 ```{r SMSY, echo=FALSE, message=FALSE}
 SMSY <- dfout %>% 
@@ -517,12 +586,6 @@ SMSY <- dfout %>%
 
 kable(SMSY)
 ```
-*Table 3. SMSY*
 
-```{r bootstrap 3, include=FALSE}
-# Plot: plotWCVI_timeseries (PlotFunctions.R)
-# plotWCVI_timeseries(WCVIEsc=xx$WCVIEsc, remove.EnhStocks = TRUE, 
-#                     prod="LifeStageModel")
-```
-
-## Conclusions
+*Table 3. SMSY Estimates including* 0*.25% and 97.5% quantiles* *for
+Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
