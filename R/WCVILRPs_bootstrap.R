@@ -52,6 +52,7 @@ Bern_logistic <- FALSE
 prod <- "LifeStageModel"
 LOO <- NA
 run_logReg <- FALSE
+run.bootstraps <- TRUE
 
 Get.LRP.bs <- function(remove.EnhStocks=TRUE,  Bern_logistic=FALSE, 
                         prod="LifeStageModel", LOO = NA, run_logReg=FALSE){
@@ -578,78 +579,78 @@ Get.LRP.bs <- function(remove.EnhStocks=TRUE,  Bern_logistic=FALSE,
 
 #----------------------------------------------------------------------------- #
 # Run bootstraps to derive benchmarks with uncertainty (see LRP code) ------
-run.bootstraps <- FALSE
+# run.bootstraps <- FALSE
 
-if (run.bootstraps){
-  set.seed(100)#10#12#13(work for 1000)
-  nBS <- 5000 # number trials for bootstrapping
-  outBench <- list() 
-  
-  for (k in 1:nBS) {
-    out <- Get.LRP.bs()
-    outLRP <- as.data.frame(out$out$LRP) 
-    if(k==1) LRP.bs <- data.frame(fit=outLRP$fit, upr=outLRP$upr, lwr=outLRP$lwr)
-    if(k>1) LRP.bs <- add_row(LRP.bs, outLRP)
-    
-    outBench[[k]] <- out$bench
-  }
-  
-  # # Is 200 enough trials? Yes
-  # running.mean <- cumsum(LRP.bs$fit) / seq_along(LRP.bs$fit) 
-  # plot(running.mean)
-  
-  # Calculate distribution of overall LRPs by integrating bootstrapped LRP 
-  # values with uncertainty of each LRP value from TMB
-  LRP.samples <- rnorm(nBS*10, LRP.bs$fit, (LRP.bs$fit - LRP.bs$lwr) / 1.96)
-  hist(LRP.samples)
-  LRP.boot <- quantile(LRP.samples, probs=c(0.025, 0.5, 0.975))
-  names(LRP.boot) <- c("lwr", "LRP", "upr")
-  
-  # Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
-  # 95th percentiles
-  SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
-  stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
-    filter(Stock != "Cypre") %>% pull(Stock)
-  stockNames <- unique(stockNames)
-  
-  rownames(SGEN.bs) <- stockNames
-  SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
-                          lwr=apply(SGEN.bs, 1, quantile, 0.025),
-                          upr=apply(SGEN.bs, 1, quantile, 0.975) )
-  
-  SMSY.bs <- select(as.data.frame(outBench), starts_with("SMSY"))
-  rownames(SMSY.bs) <- stockNames
-  SMSY.boot <- data.frame(SMSY= apply(SMSY.bs, 1, quantile, 0.5), 
-                          lwr=apply(SMSY.bs, 1, quantile, 0.025),
-                          upr=apply(SMSY.bs, 1, quantile, 0.975) )
-  
-  SREP.bs <- select(as.data.frame(outBench), starts_with("SREP"))
-  rownames(SREP.bs) <- stockNames
-  SREP.boot <- data.frame(SREP= apply(SREP.bs, 1, quantile, 0.5), 
-                          lwr=apply(SREP.bs, 1, quantile, 0.025),
-                          upr=apply(SREP.bs, 1, quantile, 0.975) )
-  
-  boot <- list(LRP.boot=LRP.boot, SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
-               SREP.boot=SREP.boot)
-  
-  df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
-  df1 <- df1 %>% rename(Value=SGEN)
-  df2 <- data.frame(boot[["SREP.boot"]], Stock=rownames(boot[["SREP.boot"]]), RP="SREP")
-  df2 <- df2 %>% rename(Value=SREP)
-  df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
-  df3 <- df3 %>% rename(Value=SMSY)  
-  dfout <- add_row(df1, df2)
-  dfout <- add_row(dfout, df3)
-  rownames(dfout) <- NULL
-  write.csv(dfout, "DataOut/wcviCK-BootstrappedRPs1000v3.csv") 
-}
+# Commented out for Rmd usage
+# if (run.bootstraps){
+#   set.seed(100)#10#12#13(work for 1000)
+#   nBS <- 5000 # number trials for bootstrapping
+#   outBench <- list() 
+#   
+#   for (k in 1:nBS) {
+#     out <- Get.LRP.bs() # logReg=TRUE
+#     outLRP <- as.data.frame(out$out$LRP) 
+#     if(k==1) LRP.bs <- data.frame(fit=outLRP$fit, upr=outLRP$upr, lwr=outLRP$lwr)
+#     if(k>1) LRP.bs <- add_row(LRP.bs, outLRP)
+#     
+#     outBench[[k]] <- out$bench
+#   }
+#   
+#   # # Is 200 enough trials? Yes
+#   # running.mean <- cumsum(LRP.bs$fit) / seq_along(LRP.bs$fit) 
+#   # plot(running.mean)
+#   
+#   # Calculate distribution of overall LRPs by integrating bootstrapped LRP 
+#   # values with uncertainty of each LRP value from TMB
+#   LRP.samples <- rnorm(nBS*10, LRP.bs$fit, (LRP.bs$fit - LRP.bs$lwr) / 1.96)
+#   hist(LRP.samples)
+#   LRP.boot <- quantile(LRP.samples, probs=c(0.025, 0.5, 0.975))
+#   names(LRP.boot) <- c("lwr", "LRP", "upr")
+#   
+#   # Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
+#   # 95th percentiles
+#   SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
+#   stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
+#     filter(Stock != "Cypre") %>% pull(Stock)
+#   stockNames <- unique(stockNames)
+#   
+#   rownames(SGEN.bs) <- stockNames
+#   SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
+#                           lwr=apply(SGEN.bs, 1, quantile, 0.025),
+#                           upr=apply(SGEN.bs, 1, quantile, 0.975) )
+#   
+#   SMSY.bs <- select(as.data.frame(outBench), starts_with("SMSY"))
+#   rownames(SMSY.bs) <- stockNames
+#   SMSY.boot <- data.frame(SMSY= apply(SMSY.bs, 1, quantile, 0.5), 
+#                           lwr=apply(SMSY.bs, 1, quantile, 0.025),
+#                           upr=apply(SMSY.bs, 1, quantile, 0.975) )
+#   
+#   SREP.bs <- select(as.data.frame(outBench), starts_with("SREP"))
+#   rownames(SREP.bs) <- stockNames
+#   SREP.boot <- data.frame(SREP= apply(SREP.bs, 1, quantile, 0.5), 
+#                           lwr=apply(SREP.bs, 1, quantile, 0.025),
+#                           upr=apply(SREP.bs, 1, quantile, 0.975) )
+#   
+#   boot <- list(LRP.boot=LRP.boot, SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
+#                SREP.boot=SREP.boot)
+#   
+#   df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
+#   df1 <- df1 %>% rename(Value=SGEN)
+#   df2 <- data.frame(boot[["SREP.boot"]], Stock=rownames(boot[["SREP.boot"]]), RP="SREP")
+#   df2 <- df2 %>% rename(Value=SREP)
+#   df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
+#   df3 <- df3 %>% rename(Value=SMSY)  
+#   dfout <- add_row(df1, df2)
+#   dfout <- add_row(dfout, df3)
+#   rownames(dfout) <- NULL
+#   write.csv(dfout, "DataOut/wcviCK-BootstrappedRPs1000v3.csv") 
+# }
 
 #----------------------------------------------------------------------------- #
 # Run bootstraps to derive LRPs with uncertainty in benchmarks -------------
   # ************* FORMAL SUBMISSION VALUES *******************************************************************************
 # See implementation of this in WCVI_LRPs.Rmd
 
-#run.bootstraps <- FALSE
 run.bootstraps <- TRUE
 
 if (run.bootstraps){
@@ -658,7 +659,7 @@ if (run.bootstraps){
   outBench <- list() 
   
   for (k in 1:nBS) {
-    out <- Get.LRP.bs(run_logReg=FALSE)
+    out <- Get.LRP.bs(run_logReg=FALSE) 
     outBench[[k]] <- out$bench
   }
 

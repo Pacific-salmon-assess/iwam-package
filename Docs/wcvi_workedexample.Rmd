@@ -5,7 +5,7 @@ date: "2023-11-22"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
 ```
 
 ```{r libraries, include=FALSE, echo=FALSE}
@@ -20,6 +20,7 @@ library(zoo)
 library(viridis)
 library(hrbrthemes)
 library(gsl)
+library(knitr) # maybe?
 ```
 
 ```{r source files, include=FALSE, echo=FALSE}
@@ -30,7 +31,7 @@ source(here::here("R/WCVILRPs_bootstrap.R"))
 
 # WCVI Worked Example
 
-## Content
+## Document Contents
 
 - Summary
 - Key code repositories, where to find data, etc. ("Data Map")
@@ -40,11 +41,13 @@ source(here::here("R/WCVILRPs_bootstrap.R"))
   - Packages (code chunk)
   - Source functions (code chunk)
 
-## Stage 1
+## Stage 1: IWAM Model (Produce initial SREP estimates)
 - IWAM_model - produce the initial SREP estimates 
   - Run code internally - what is worth hiding versus not?
 
-```{r iwam-model, include=FALSE}
+### Data Setup
+
+```{r iwam data, include=FALSE, echo=FALSE}
 # IWAM Model Setup
 remove.EnhStocks <- TRUE
 
@@ -83,6 +86,8 @@ stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream i
   summarize(lh=max(Stream)) %>% 
   arrange (Stocknumber)
 
+#### Consider showing the data list ####
+
 data <- list()
 
 scale_TMB <- srdat$scale # scale enters the TMB data as: scale
@@ -115,7 +120,6 @@ data$SigDelta_mean <- 0.80 # See KFrun.R, #For half-normal use N(0,1)
 data$SigDelta_sig <- 0.28 # See KFrun.R,
 data$SigNu_mean <- 0.84 # See KFrun.R,
 data$SigNu_sig <- 0.275 # See KFrun.R,
-
 data$pred_lnWA <- seq(min(log(WA$WA)), max(log(WA$WA)), 0.1)
 
 data$target_lnWA_ocean <- wcvistocks %>% # PUBLIC
@@ -157,12 +161,16 @@ if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean,
                                          InletlnWAnoEnh$InletlnWA,
                                            CUlnWAnoEnh$CUlnWA)
 
+#### Consider showing the params list ####
+
 param <- list()
 
-param$logA <- ( srdat %>% group_by (Stocknumber) %>% 
-                      summarise(yi = lm(log( Rec / Sp) ~ Sp )$coef[1] ) )$yi
-B <- srdat %>% group_by(Stocknumber) %>% 
-  summarise( m = - lm(log( Rec / Sp) ~ Sp )$coef[2] )
+param$logA <- ( srdat %>% 
+                group_by (Stocknumber) %>% 
+                summarise(yi = lm(log( Rec / Sp) ~ Sp )$coef[1] ) )$yi
+B <- srdat %>% 
+     group_by(Stocknumber) %>% 
+     summarise( m = - lm(log( Rec / Sp) ~ Sp )$coef[2] )
 param$logB <- log ( 1/ ( (1/B$m)/data$scale ))
 param$logSigma <- rep(-2, N_Stocks)
 param$logMuA_stream <- 1.5
@@ -180,7 +188,9 @@ param$Nu2_ocean <- 0
 param$logNuSigma <- -0.412 
 ```
 
-```{r iwam-model, include=FALSE}
+### TMB Model Call and Run
+
+```{r iwam model, include=FALSE, echo=FALSE}
 # IWAM Model Run
 mod <- "IWAM_Liermann" 
 # dyn.unload(dynlib(paste("TMB_Files/", mod, sep="")))
@@ -208,7 +218,6 @@ all_pars$Param <- row.names(all_pars)
 
 all_pars$Param <- sapply(all_pars$Param, function(x) (unlist(strsplit(x, "[.]"))[[1]]))
 
-
 pars <- data.frame()
 pars <- all_pars %>% filter (Param %in% c("logA", 
                                           "logB", 
@@ -227,7 +236,6 @@ DeltaSigma <- exp(logDeltaSigma$Estimate)
 
 pars$Param <- sapply(pars$Param, function(x) (unlist(strsplit(x, "[_]"))[[1]]))
 pars <- pars %>% left_join(stream, by="Stocknumber")
-
 
 all_Deltas <- data.frame()
 all_Deltas <- all_pars %>% filter (Param %in% c("logDelta1", 
@@ -256,13 +264,7 @@ all_pred <- srdat %>% dplyr::select("Stocknumber",
                                  "Rec", 
                                  "scale", 
                                  "Name") %>% 
-  add_column(Pred=pred_RS$Estimate)
-
-if (length(pred_RS$Estimate) == length(data$S)) {
-  print("Lengths checked passed.")
-} else {
-  print("WARNING: The output and inputs are not the same length.")
-}
+            add_column(Pred=pred_RS$Estimate)
 
 all_pred <- all_pred %>% mutate(ObslogRS = log ( (Rec / scale) / (Sp/scale) ) )
 r2 <- all_pred %>% group_by(Stocknumber) %>% summarize(r2=cor(ObslogRS,Pred)^2)
@@ -286,87 +288,52 @@ SRes <- SRes %>% left_join(sigma) %>% rename(logSig = Estimate)
 SRes <- SRes %>% mutate (StdRes = Res/exp(logSig))
 ```
 
-```{r iwam plotting, include=FALSE, echo=FALSE}
+**Add functionality to turn on and off.**
+
+### Plotting IWAM Results
+
+```{r iwam plotting 1, echo=FALSE}
 PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
 ```
+*Figure 1. Stock-Recruitment Curves per WCVI Stock. INCLUDE UNITS.*
 
-```{r iwam plotting, include=FALSE, echo=FALSE}
+```{r iwam plotting 2, echo=FALSE}
 PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
 ```
+*Figure 2. Stock-Recruitment Linear Relationship per WCVI Stock. INCLUDE UNITS.*
 
-```{r iwam plotting, include=FALSE, echo=FALSE}
+```{r iwam plotting 3, echo=FALSE}
 PlotStdResid(SRes)
 ```
+*Figure 3. Standard Residuals. INCLUDE UNITS.*
 
-```{r iwam plotting, include=FALSE, echo=FALSE}
+```{r iwam plotting 4, echo=FALSE}
 Plotacf(SRes)
 ```
+*Figure 4. ACF. INCLUDE UNITS.*
 
-```{r iwam-model, include=FALSE, echo=FALSE}
-# echo=FALSE prevents printing the code and just allows for the figure output
-# IWAM Model Outputs/Plotting - consider including
-# WA regression SMSY
-# WA regression SREP
-# SR IWAM
-# SRLin IWAM
-# StdResid IWAM
-
-# Remove looping and make them plot naturally in RMD
-# PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
-# PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
-# PlotStdResid(SRes)
-# Plotacf(SRes)
-
-# if (plot==TRUE){
-#   png(paste("DataOut/SR_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
-#   PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
-#   dev.off()
-#   png(paste("DataOut/SRLin_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
-#   PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
-#   dev.off()
-#   png(paste("DataOut/StdResid_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
-#   PlotStdResid(SRes)
-#   dev.off()
-#   png(paste("DataOut/ACF_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
-#   Plotacf(SRes)
-#   dev.off()
-# }
-
+```{r old plotting 5, echo=FALSE}
 par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
 title_plot <- "Prior Ricker sigma and prior WA regression sigma"
 plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, 
                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
 # dev.off()
+```
+*Figure 5. Prior Ricker sigmas and prior on WA regression for log(SMSY) and log(Watershed Area (km^2)).*
 
+``` {r old plotting 6, echo=FALSE, message=FALSE}
 par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
 title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
 plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
-# dev.off()
-
-# if(plot==TRUE){
-#   png(paste("DataOut/WAregSMSY_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-#   par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
-#   title_plot <- "Prior Ricker sigma and prior WA regression sigma"
-#   #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
-#   plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, 
-#                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
-#   dev.off()
-#   
-#   png(paste("DataOut/WAregSREP_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-#   #png(paste("DataOut/WAreg_Liermann_SepRicA_UniformSigmaAPrior.png", sep=""), width=7, height=7, units="in", res=500)
-#   par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
-#   title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
-#   #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
-#   plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
-#                         pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
-#   dev.off()
-#   #plotWAregression (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, pred_lnWA = data$pred_lnWA, 
-#   # title1="Common, fixed yi (logDelta1), \nRandom slope (Delta2)")
-# }
 ```
+*Figure 6. Prior Ricker sigmas and prior on WA regression for log(SREP) and log(Watershed Area (km^2)).*
 
-```{r final step, include=FALSE}
+**Fix the equation placement.**
+
+### Output Data from IWAM Model
+
+```{r iwam data out, include=FALSE}
 pred_lnSMSY_pi <- data.frame()
 pred_lnSMSY_pi <- all_pars %>% filter   (Param %in% c("pred_lnSMSY", "lnSMSY"))
 pred_lnSREP_pi <- data.frame()
@@ -432,65 +399,130 @@ if ("ocean" %in% condition_target) {
   target_estimates_SREP_ocean <- target_SREP_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
 }
 
-# length_check_params <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean"))
-# if (length(stocknames) == length(length_check_params$Estimate)) {
-#   print("Lengths checked passed.")
-# } else {
-#   print("WARNING: The output and inputs are not the same length.")
-# }
-
-# if ("stream" %in% condition_target){
-#   # Step 1
-#   target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames)
-#   target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames)
-#   target_SMSY_pull_stream <- target_SMSY_stream %>% pull(Estimate)
-#   target_SREP_pull_stream <- target_SREP_stream %>% pull(Estimate)
-#   # Step 2
-#   target_SMSY_pi_stream <- PredInt(x = log(wa_stream), y = obs_lSMSY_stream, Predy = target_SMSY_pull_stream, Newx = data$target_lnWA_stream)
-#   target_SREP_pi_stream <- PredInt(x = log(wa_stream), y = obs_SREP_stream, Predy = target_SREP_pull_stream, Newx = data$target_lnWA_stream)
-#   # Step 3
-#   target_SMSY_stream <- target_SMSY_stream %>% add_column(LL = exp(target_SMSY_pi_stream$lwr), UL = exp(target_SMSY_pi_stream$upr))
-#   target_SREP_stream <- target_SREP_stream %>% add_column(LL = exp(target_SREP_pi_stream$lwr), UL = exp(target_SREP_pi_stream$upr))
-#   # Step 4
-#   target_SMSY_stream <- target_SMSY_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
-#     add_column(Param = "SMSY")
-#   target_SREP_stream <- target_SREP_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
-#     add_column(Param = "SREP")
-#   # Step 5
-#   target_estimates_SMSY_stream <- target_SMSY_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-#   target_estimates_SREP_stream <- target_SREP_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-# }
-
 data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
-# data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
 
 if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/WCVI_target_ocean_noEnh.csv"))
 if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/WCVI_target_ocean_wEnh.csv"))
-
-# if(remove.EnhStocks) write.csv(data_out_stream, "DataOut/WCVI_target_stream_noEnh.csv")
-# if(!remove.EnhStocks) write.csv(data_out_stream, "DataOut/WCVI_target_stream_wEnh.csv")
 ```
 
-## Stage 2
+## Stage 2: Bootstrapping and final estimates of SREP, SGEN, and SMSY
 - WCVILRPs_bootstrap - produce final SREP, SMSY, and SGen estimates for stocks
 
-```{r bootstrap, include=TRUE}
+The following section includes the code for bootstrapping and the re-calculation of the SREP, SGEN, and SMSY estimates for the West-Coast Vancouver Island Stocks (Table 1-3).
+
+```{r bootstrap run, include=TRUE, echo=FALSE}
 # Bootstrap code loop - include
+run.bootstraps <- TRUE
+
+if (run.bootstraps){
+  set.seed(1) #10#12#13 (work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
+  nBS <- 10 # number trials for bootstrapping
+  outBench <- list() 
+  
+  for (k in 1:nBS) {
+    out <- Get.LRP.bs(run_logReg=FALSE) 
+    outBench[[k]] <- out$bench
+  }
+
+  SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
+  # stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
+  stockNames <- read.csv(here::here("DataOut/WCVI_target_ocean_noEnh.csv")) %>% 
+    filter(Stock != "Cypre") %>% pull(Stock)
+  stockNames <- unique(stockNames)
+
+  rownames(SGEN.bs) <- stockNames
+  SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
+                          lwr=apply(SGEN.bs, 1, quantile, 0.025),
+                          upr=apply(SGEN.bs, 1, quantile, 0.975) )
+  
+  SMSY.bs <- select(as.data.frame(outBench), starts_with("SMSY"))
+  rownames(SMSY.bs) <- stockNames
+  SMSY.boot <- data.frame(SMSY= apply(SMSY.bs, 1, quantile, 0.5), 
+                          lwr=apply(SMSY.bs, 1, quantile, 0.025),
+                          upr=apply(SMSY.bs, 1, quantile, 0.975) )
+  
+  SREP.bs <- select(as.data.frame(outBench), starts_with("SREP"))
+  rownames(SREP.bs) <- stockNames
+  SREP.boot <- data.frame(SREP= apply(SREP.bs, 1, quantile, 0.5), 
+                          lwr=apply(SREP.bs, 1, quantile, 0.025),
+                          upr=apply(SREP.bs, 1, quantile, 0.975) )
+  
+  boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
+               SREP.boot=SREP.boot)
+  
+  df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
+  df1 <- df1 %>% rename(Value=SGEN)
+  df2 <- data.frame(boot[["SREP.boot"]], Stock=rownames(boot[["SREP.boot"]]), RP="SREP")
+  df2 <- df2 %>% rename(Value=SREP)
+  df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
+  df3 <- df3 %>% rename(Value=SMSY)  
+  dfout <- add_row(df1, df2)
+  dfout <- add_row(dfout, df3)
+  rownames(dfout) <- NULL
+  # now round to 2 signif digits
+  dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% 
+    mutate(lwr=signif(lwr,2)) %>% 
+    mutate (upr=signif(upr,2))
+  
+  write.csv(dfout, here::here("DataOut/wcviCK-example-BootstrappedRPs.csv"))
+
+}
 ```
 
-```{r bootstrap, include=TRUE}
+```{r bootstrap 2, echo=FALSE, message=FALSE}
 # Bootstrap ouputs e.g. Table 9 in Case Study 2 Page 53:
   # Benchmarks and approximate 95% confidence limits for five inlets, not enhanced
 # Is this the only major comparative outputs for the paper?
+
+# Paper Shows: Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino
+  # Re-work df for only those locations
+  # Re-name lwr and upr to be more accurate to their calculation
+  # Divide them into different tables by SGEN, SREP, and SMSY
+  # Re-name Value to the given esimate name per table
+  # Output the tables
+locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 ```
 
-```{r bootstrap, include=TRUE}
+```{r SREP, echo=FALSE, message=FALSE}
+SREP <- dfout %>% 
+  filter(RP=='SREP') %>% 
+  filter(Stock %in% locations) %>% 
+  rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>% 
+  mutate(RP = NULL) %>% 
+  relocate(Stock)
+
+kable(SREP)
+```
+*Table 1. SREP*
+
+```{r SGEN, echo=FALSE, message=FALSE}
+SGEN <- dfout %>% 
+  filter(RP=='SGEN') %>% 
+  filter(Stock %in% locations) %>% 
+  rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>% 
+  mutate(RP = NULL) %>% 
+  relocate(Stock)
+
+kable(SGEN)
+```
+*Table 2. SGEN*
+
+```{r SMSY, echo=FALSE, message=FALSE}
+SMSY <- dfout %>% 
+  filter(RP=='SMSY') %>% 
+  filter(Stock %in% locations) %>% 
+  rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>% 
+  mutate(RP = NULL) %>% 
+  relocate(Stock)
+
+kable(SMSY)
+```
+*Table 3. SMSY*
+
+```{r bootstrap 3, include=FALSE}
 # Plot: plotWCVI_timeseries (PlotFunctions.R)
 # plotWCVI_timeseries(WCVIEsc=xx$WCVIEsc, remove.EnhStocks = TRUE, 
 #                     prod="LifeStageModel")
 ```
-
-## Stage 3
-- Comparison of current outputs and previous outputs used in publication (LRP Paper)
 
 ## Conclusions
