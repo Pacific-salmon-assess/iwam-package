@@ -1,0 +1,164 @@
+---
+title: "IWAM Function Vignette"
+output: html_document
+date: "2023-12-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE, echo=FALSE, message=FALSE}
+library(rsample)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(reshape2)
+library(TMB)
+library(zoo)
+library(viridis)
+library(hrbrthemes)
+library(gsl)
+library(knitr)
+# library(kableExtra)
+```
+
+### Source Files
+
+```{r source files, include=FALSE, echo=FALSE, message=FALSE}
+source (here::here("R/helperFunctions.R"))
+source(here::here("R/PlotFunctions.R"))
+# source(here::here("R/WCVILRPs_bootstrap.R")) # Not used anymore directly
+source(here::here("R/IWAM_model.R")) # Will itself source the bootstrap code through the function Get.LRP.bs()
+```
+
+
+# IWAM Function Vignette
+
+Authors: Carrie Holt (1)
+
+(1) Department of Fisheries and Oceans (DFO), Canada
+
+## Document Contents
+
+1.  Summary (Function Inputs and Outputs)
+2.  Data Map
+3.  Function Run Example
+4.  Outputs
+
+## S1. Summary
+
+The purpose of the IWAM function is to provide estimates for SREP, SGEN, and SMSY, using habitat-based assessments methods (the Integrated Watershed Area model) in a streamlined process. This function is based upon the work of (insert history). This function is maintained by (insert authors).
+
+## S2. Data Map
+
+The following function vignette/example is from the IWAM Package Repo hosted publicly through the Pacific Salmon Assess organization available at [this link.](https://github.com/Pacific-salmon-assess/iwam-package)
+
+The package currently utilizes the following data sets:
+
+-   CUPars_nBC *\**
+-   CUPars_wBC *\**
+-   ParkenSMSY *\**
+-   ParkenSREP *\**
+-   SRinputs *\**
+-   Surv *\**
+-   WA_Parken *\**
+-   WatershedArea *\**
+-   WCVIEsc *\**
+-   *WCVIStocks (Public)*
+
+(*\**) Currently private, but available upon request. You will require all listed files to run the function.
+
+## S3. Function Run Example
+
+The IWAM function is defined by the following outputs:
+
+-  ```WA```: a string  containing the file path to your watershed area data.
+-  ```run.bootstrap```: a TRUE/FALSE statement of whether to run the bootstrapping internal process.
+-  ```bs_seed```: a NUMERIC value for your desired bootstrapping seed.
+-  ```bs_nBS```: a NUMERIC value for your desired number of trials.
+-  ```mod```: the name of your TMB model.
+-  ```remove.EnhStocks```: a TRUE/FALSE statement of whether or not to remove enhanced stock populations from analysis.
+-  ```plot```: a TRUE/FALSE statement of whether to print out plots to your DataOut folder.
+-  ```est.table```: a TRUE/FALSE statement of whether to store final SREP, SGEN, and SMSY tables. Please see Section 4 for examples.
+
+In the example here, using a West Coast Vancouver Island Stocks data-set, the function parameters will read:
+
+``` {r iwam_model, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
+IWAM_test <- IWAM_func(WA = "DataIn/WatershedArea.csv",
+          # datain = "file/path", # reference to outputs of IWAM output - just in case they change (REDUNDANCY)
+          run.bootstrap = TRUE, 
+          bs_seed = 1, # change the internal seed for the bootstrap from outside
+          bs_nBS = 10, # change the internal number of trials for the bootstrap from outside (Original run 20000)
+          mod = "IWAM_Liermann", # TMB Mod name
+          remove.EnhStocks = TRUE,
+          plot = FALSE, # print plots to DataOut/
+          est.table = TRUE # store tables # Not functioning
+)
+```
+
+## S4. Outputs Example
+
+Once the model and bootstrapping has completed, the function will store the following objects:
+
+- ```dfout```:
+- ```others...```:
+
+For comparison to (INSERT PAPER), please find Tables 1-3.
+
+```{r example summary, include=FALSE}
+# Bootstrap ouputs e.g. Table 9 in Case Study 2 Page 53:
+  # Benchmarks and approximate 95% confidence limits for five inlets, not enhanced
+# Paper Shows: Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino
+  # Re-work df for only those locations
+  # Re-name lwr and upr to be more accurate to their calculation
+  # Divide them into different tables by SGEN, SREP, and SMSY
+  # Re-name Value to the given esimate name per table
+  # Output the tables
+# locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
+```
+
+```{r SREP, echo=FALSE, message=FALSE}
+kable(IWAM_test[[2]])
+
+# SREP <- dfout %>%
+#   filter(RP=='SREP') %>%
+#   filter(Stock %in% locations) %>%
+#   rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
+#   mutate(RP = NULL) %>%
+#   relocate(Stock)
+# 
+# kable(SREP)
+```
+
+*Table 1. SREP estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
+
+```{r SGEN, echo=FALSE, message=FALSE}
+kable(IWAM_test[[3]])
+
+# SGEN <- dfout %>%
+#   filter(RP=='SGEN') %>%
+#   filter(Stock %in% locations) %>%
+#   rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
+#   mutate(RP = NULL) %>%
+#   relocate(Stock)
+# 
+# kable(SGEN)
+```
+
+*Table 2. SGEN estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
+
+```{r SMSY, echo=FALSE, message=FALSE}
+kable(IWAM_test[[4]])
+
+# SMSY <- dfout %>%
+#   filter(RP=='SMSY') %>%
+#   filter(Stock %in% locations) %>%
+#   rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
+#   mutate(RP = NULL) %>%
+#   relocate(Stock)
+# 
+# kable(SMSY)
+```
+*Table 3. SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
