@@ -360,79 +360,133 @@ display: none;
 </div>
 <div id="iwam-function-vignette" class="section level1">
 <h1>IWAM Function Vignette</h1>
-<p>Authors:</p>
+<p>Authors: Carrie Holt (1), Kendra Holt (1), and Brooke Davis (1)</p>
+<ol style="list-style-type: decimal">
+<li>Department of Fisheries and Oceans (DFO), Canada</li>
+</ol>
 <div id="document-contents" class="section level2">
 <h2>Document Contents</h2>
 <ol style="list-style-type: decimal">
-<li>Summary (Function Inputs and Outputs)</li>
+<li>Summary</li>
 <li>Data Map</li>
-<li>Function Run Example</li>
-<li>Outputs Example</li>
+<li>Function</li>
+<li>Outputs</li>
 </ol>
 </div>
 <div id="s1.-summary" class="section level2">
 <h2>S1. Summary</h2>
-<p>The purpose of the IWAM function is to …</p>
+<p>The purpose of the IWAM function is to provide estimates for SREP,
+SGEN, and SMSY, using habitat-based assessments methods (the Integrated
+Watershed Area model) in a streamlined process. This function is based
+upon the work of (insert history). This function is maintained by Carrie
+Holt (1) and Tor Kitching (1).</p>
+<ol style="list-style-type: decimal">
+<li>Department of Fisheries and Oceans (DFO), Canada</li>
+</ol>
 </div>
 <div id="s2.-data-map" class="section level2">
 <h2>S2. Data Map</h2>
-<p>The data used by this function is as follows:</p>
-<ul>
-<li>WatershedArea.csv:</li>
-<li>…</li>
-</ul>
-<p>The following worked example is from the IWAM Package Repo hosted
-publicly through the Pacific Salmon Assess organization available at <a href="https://github.com/Pacific-salmon-assess/iwam-package">this
+<p>The following function vignette/example is from the IWAM Package Repo
+hosted publicly through the Pacific Salmon Assess organization available
+at <a href="https://github.com/Pacific-salmon-assess/iwam-package">this
 link.</a></p>
 <p>The package currently utilizes the following data sets:</p>
 <ul>
-<li>CUPars_nBC <em>*</em></li>
-<li>CUPars_wBC <em>*</em></li>
-<li>ParkenSMSY <em>*</em></li>
-<li>ParkenSREP <em>*</em></li>
-<li>SRinputs <em>*</em></li>
-<li>Surv <em>*</em></li>
-<li>WA_Parken <em>*</em></li>
-<li>WatershedArea <em>*</em></li>
-<li>WCVIEsc <em>*</em></li>
-<li><em>WCVIStocks (Public)</em></li>
+<li>SRinputfile: Private data-sets developed by Parken et al. (2006).
+Required to run the complete function and is available upon request. To
+be updated with publicly available data. Life histories are included: 1
+= ocean type, 0 = stream type. Contains stock names, year, spawners,
+recruits, and life history identification.</li>
+<li><em>WatershedArea (Public)</em>: Internal input containing watershed
+areas per stock.</li>
+<li><em>CUPars_nBC (Public)</em>: Input file with Ricker <span class="math inline">\(\alpha\)</span>’s from Diana Dobson’s Run
+Reconstruction coded in TMB. Has a higher estimate of Ricker <span class="math inline">\(\alpha\)</span> (lower Sgen).</li>
+<li><em>CUPars_wBC (Public)</em>: Input file with Ricker <span class="math inline">\(\alpha\)</span>’s from Diana Dobson’s Run
+Reconstruction coded in TMB. Has a higher estimate of Ricker <span class="math inline">\(\alpha\)</span> (lower Sgen).</li>
+<li><em>WCVIStocks (Public)</em>: User watershed area input file. Must
+contain watershed areas, life history identification, enhancement
+identification, and stock name. Aggregation within the IWAM function can
+be done with both CU and Inlet scales.</li>
 </ul>
-<p>(<em>*</em>) Currently private, but available upon request.</p>
 </div>
 <div id="s3.-function-run-example" class="section level2">
 <h2>S3. Function Run Example</h2>
-<p>The IWAM function is defined by the following outputs:</p>
+<p>The IWAM function is defined by two sets of parameters, the
+inputs;</p>
 <ul>
-<li><code>WA</code>: a string containing the file path to your watershed
-area data.</li>
+<li><code>WAin</code>: a string containing the file path to your
+watershed area data.</li>
+<li><code>remove.EnhStocks</code>: a TRUE/FALSE statement of whether or
+not to remove enhanced stock populations from analysis.</li>
+</ul>
+<p>and the run specifications;</p>
+<ul>
 <li><code>run.bootstrap</code>: a TRUE/FALSE statement of whether to run
 the bootstrapping internal process.</li>
 <li><code>bs_seed</code>: a NUMERIC value for your desired bootstrapping
 seed.</li>
 <li><code>bs_nBS</code>: a NUMERIC value for your desired number of
 trials.</li>
-<li><code>mod</code>: the name of your TMB model.</li>
-<li><code>remove.EnhStocks</code>: a TRUE/FALSE statement of whether or
-not to remove enhanced stock populations from analysis.</li>
 <li><code>plot</code>: a TRUE/FALSE statement of whether to print out
 plots to your DataOut folder.</li>
 <li><code>est.table</code>: a TRUE/FALSE statement of whether to store
 final SREP, SGEN, and SMSY tables. Please see Section 4 for
 examples.</li>
 </ul>
-<pre class="r"><code>IWAM_test &lt;- IWAM_func(WA = &quot;DataIn/WatershedArea.csv&quot;,
-          # datain = &quot;file/path&quot;, # reference to outputs of IWAM output - just in case they change (REDUNDANCY)
-          run.bootstrap = TRUE, 
-          bs_seed = 1, # change the internal seed for the bootstrap from outside
-          bs_nBS = 10, # change the internal number of trials for the bootstrap from outside (Original run 20000)
-          mod = &quot;IWAM_Liermann&quot;, # TMB Mod name
-          remove.EnhStocks = TRUE,
-          plot = FALSE, # print plots to DataOut/
-          est.table = TRUE # store tables # Not functioning
+<p>The IWAM function is divided into two major sections.</p>
+<ol style="list-style-type: decimal">
+<li>The IWAM model; which estimates SREP and SMSY. This model is based
+upon the work of Parken et al. 2006 and Liermann et al. as a
+modification to the Ricker model.</li>
+<li>Model bootstrapping; which takes the estimates of the IWAM model and
+runs them through an iterative bootstrap to re-estimate SREP, SMSY, and
+SGEN based on an updated set of priors (CITATION).</li>
+</ol>
+<pre class="r"><code>IWAM_WCVI &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks.csv&quot;, # INPUT Data
+                       remove.EnhStocks = TRUE, # Enhancement INPUT
+                       run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
+                       bs_seed = 1, # change the internal seed for the bootstrap
+                       bs_nBS = 10, # change the internal number of trials for the bootstrap
+                       plot = FALSE, # print plots to DataOut/
+                       est.table = TRUE # store tables - NOT FUNCTIONING
+)</code></pre>
+<pre class="r"><code># This is a test function run on dummy data with NO AGGREGATIONS
+IWAM_NoInlet &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks_NoInlet.csv&quot;, # INPUT Data
+                          remove.EnhStocks = TRUE, # Enhancement INPUT
+                          run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
+                          bs_seed = 1, # change the internal seed for the bootstrap
+                          bs_nBS = 10, # change the internal number of trials for the bootstrap
+                          plot = FALSE, # print plots to DataOut/
+                          est.table = TRUE # store tables - NOT FUNCTIONING
+)</code></pre>
+<pre class="r"><code># This is a test function run on dummy data with NO AGGREGATIONS
+IWAM_NoAgg &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks_NoAgg.csv&quot;, # INPUT Data
+                        remove.EnhStocks = TRUE, # Enhancement INPUT
+                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
+                        bs_seed = 1, # change the internal seed for the bootstrap
+                        bs_nBS = 10, # change the internal number of trials for the bootstrap
+                        plot = FALSE, # print plots to DataOut/
+                        est.table = TRUE # store tables - NOT FUNCTIONING
 )</code></pre>
 </div>
 <div id="s4.-outputs-example" class="section level2">
 <h2>S4. Outputs Example</h2>
+<p>Once the model and bootstrapping has completed, the function will
+store the following objects:</p>
+<ul>
+<li><code>dfout</code>: A complete data frame containing the SGEN, SREP,
+and SMSY estimates for each stock and their upper and lower
+quantiles.</li>
+<li><code>SREP</code>: A subset of only SREP estimates for a comparative
+subset of WCVI stocks.</li>
+<li><code>SGEN</code>: A subset of only SGEN estimates for a comparative
+subset of WCVI stocks.</li>
+<li><code>SMSY</code>: A subset of only SMSY estimates for a comparative
+subset of WCVI stocks.</li>
+<li><code>TBD</code>: …</li>
+</ul>
+<p>The following tables (1-3) have been prepared for comparison to Holt
+et al. (2023) (Table 9).</p>
 <table>
 <thead>
 <tr class="header">

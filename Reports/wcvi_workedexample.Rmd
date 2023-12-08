@@ -73,7 +73,8 @@ library(knitr)
 ```{r source files, include=FALSE, echo=FALSE, message=FALSE}
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R")) 
-source(here::here("R/WCVILRPs_bootstrap.R"))
+# source(here::here("R/WCVILRPs_bootstrap.R"))
+source(here::here("R/Get_LRP_bs.R"))
 ```
 
 ### Data Setup
@@ -187,9 +188,9 @@ names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
 
 WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
 
-stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream is still capcased
+stream <- srdat %>% dplyr::select(Stocknumber, Name, lh) %>% #srdat Stream is still capcased
   group_by(Stocknumber) %>% 
-  summarize(lh=max(Stream)) %>% 
+  summarize(lh=max(lh)) %>% 
   arrange (Stocknumber)
 ```
 
@@ -726,7 +727,7 @@ SRes <- SRes %>% mutate (StdRes = Res/exp(logSig))
 
 *Add functionality to turn on and off.*
 
-```{r iwam plotting 1, include=FALSE, echo=FALSE}
+```{r iwam plotting 1, include=TRUE, echo=FALSE}
 PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
 # *Figure 1. Stock-Recruitment Curves per WCVI Stock. INCLUDE UNITS.*
 ```
@@ -1045,7 +1046,7 @@ if (run.bootstraps){
 
   SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   # stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
-  stockNames <- read.csv(here::here(datain) %>% # datain as called by Get.LRP.bs()
+  stockNames <- read.csv(here::here("DataOut/WCVI_target_ocean_noEnh.csv")) %>% # datain as called by Get.LRP.bs()
     filter(Stock != "Cypre") %>% pull(Stock)
   stockNames <- unique(stockNames)
 

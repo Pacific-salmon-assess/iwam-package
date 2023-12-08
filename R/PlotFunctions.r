@@ -45,21 +45,21 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
     b <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logB") %>% 
       summarise(B=exp(Estimate)/Sc) %>% as.numeric()
     
-    
-    if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!= 'IWAM_Liermann' & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
-      if (i %in% stksNum_surv) {  #stocknumber 0 and either 22 or 23, depending on if Skagit is removed
-        surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name==name$Name)
-        #if(i==0) surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name==name$Name) 
-        #if(i==22|i==23)surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name=="Cowichan") 
-        #if(i==22|i==23) { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
-        if(name$Name == "Cowichan") { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
-        mean.log.surv <- surv.dat %>% summarize(mean = mean(log(Surv)))
-        gamma <- pars %>% filter (Stocknumber==i) %>% filter(Param=="gamma") %>% dplyr::select(Estimate)
-        a <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logA") %>% 
-          summarise(A=exp(Estimate + gamma$Estimate*mean.log.surv$mean)) %>% as.numeric()
-      }
-      
-    }
+# Test removal 
+  #   if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!= 'IWAM_Liermann' & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
+  #     if (i %in% stksNum_surv) {  #stocknumber 0 and either 22 or 23, depending on if Skagit is removed
+  #   surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name==name$Name)
+  #   #if(i==0) surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name==name$Name)
+  #   #if(i==22|i==23)surv.dat <- as.data.frame(read.csv("DataIn/Surv.csv")) %>% filter(Name=="Cowichan")
+  #   #if(i==22|i==23) { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
+  #   if(name$Name == "Cowichan") { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
+  #   mean.log.surv <- surv.dat %>% summarize(mean = mean(log(Surv)))
+  #   gamma <- pars %>% filter (Stocknumber==i) %>% filter(Param=="gamma") %>% dplyr::select(Estimate)
+  #   a <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logA") %>%
+  #     summarise(A=exp(Estimate + gamma$Estimate*mean.log.surv$mean)) %>% as.numeric()
+  # }
+  #     
+  #   }
     #Parken values for skagit
     skagit_alpha <- 7.74
     skagit_beta <- 0.0000657
@@ -117,7 +117,7 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
     
     if(mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=='IWAM_Liermann'|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta")  polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), y=c(-10000,-10000,max(R$Rec),max(R$Rec)), col=grey(0.8, alpha=0.4), border=NA )
     #else polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), y=c(0,0,max(R$Rec),max(R$Rec)), col=grey(0.8, alpha=0.4), border=NA )
-    
+  
     if(!is.null(SMSY_std)) {
       SMSY_std <- SMSY_std %>% right_join(names) %>% filter(Name==name$Name)#filter(Stocknumber != 22) 
       if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedCombined"|mod=="Ricker_AllMod"){
@@ -126,11 +126,12 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
       }
     }
     
-    
-    ParkenSMSY <- read.csv(here::here("DataIn/ParkenSMSY.csv"))
+    # PARKEN SMSY REMOVAL *******************************************************************************************************
+    # ParkenSMSY <- read.csv(here::here("DataIn/ParkenSMSY.csv"))
     #if (removeSkagit==TRUE) ParkenSMSY <- ParkenSMSY %>% filter(Name != "Skagit")
-    ParkenSMSY <- ParkenSMSY %>% filter(Name==as.character(name$Name)) %>% dplyr::select (SMSY) %>% as.numeric()
-    abline(v=ParkenSMSY, lty="dashed")
+    # ParkenSMSY <- ParkenSMSY %>% filter(Name==as.character(name$Name)) %>% dplyr::select (SMSY) %>% as.numeric()
+    # abline(v=ParkenSMSY, lty="dashed")
+    
     if(is.data.frame(r2)==TRUE) {
       lab <-  r2 %>% filter(Stocknumber==i) %>% dplyr::select(r2) %>% as.numeric() %>% round(2)
       legend("topright", legend = "", title= paste0("r2=",lab), bty="n")
@@ -169,18 +170,18 @@ PlotSRLinear <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_su
     B <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logB") %>% 
       summarise(B=exp(Estimate)/Sc) %>% as.numeric()
 
-    if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!="IWAM_Liermann" & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
-      if (i %in% stksNum_surv) {  #stocknumber 0 and either 22 or 23, depending on if Skagit is removed
-        
-        if(i==0) surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name=="Harrison") 
-        if(i==22|i==23)surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name=="Cowichan") 
-        if(i==22|i==23) { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
-        mean.log.surv <- surv.dat %>% summarize(mean = mean(log(Surv)))
-        gamma <- pars %>% filter (Stocknumber==i) %>% filter(Param=="gamma") %>% dplyr::select(Estimate)
-        logA <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logA") %>% 
-          summarise(logA.adj=(Estimate + gamma$Estimate*mean.log.surv$mean)) %>% as.numeric()
-      }
-    }
+    # if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!="IWAM_Liermann" & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
+    #   if (i %in% stksNum_surv) {  #stocknumber 0 and either 22 or 23, depending on if Skagit is removed
+    #     
+    #     if(i==0) surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name=="Harrison") 
+    #     if(i==22|i==23)surv.dat <- as.data.frame(read.csv(here::here("DataIn/Surv.csv"))) %>% filter(Name=="Cowichan") 
+    #     if(i==22|i==23) { surv.dat <- surv.dat %>% filter(Yr >= 1985 & Yr !=1986 & Yr != 1987) }
+    #     mean.log.surv <- surv.dat %>% summarize(mean = mean(log(Surv)))
+    #     gamma <- pars %>% filter (Stocknumber==i) %>% filter(Param=="gamma") %>% dplyr::select(Estimate)
+    #     logA <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logA") %>% 
+    #       summarise(logA.adj=(Estimate + gamma$Estimate*mean.log.surv$mean)) %>% as.numeric()
+    #   }
+    # }
     
 
     # if (i %in% stksNum_ar) col.use <- "red"
@@ -449,46 +450,46 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnS
 }
 
 
-plotWAregression_Parken <- function(data, all_Deltas){
-  par(cex=1.5)
-  col.use <- NA
-  Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
-  for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
-  plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
-  points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
-  logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
-  D2 <- all_Deltas %>% filter(Param=="Delta2_bounded") %>% dplyr::select(Estimate) %>% pull()
-  abline(a=logD1, b=D2, col="maroon", lwd=2)
-  
-  #abline(lm(log(data$SMSY*data$scale) ~ log(data$WA)))
-  #text(x=9, y=8,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
-  text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(D2[1],2)), col="maroon", cex=0.8)
-  
-  title("Parken Data: Combined")
-  
-}
+# plotWAregression_Parken <- function(data, all_Deltas){
+#   par(cex=1.5)
+#   col.use <- NA
+#   Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
+#   for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
+#   plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
+#   points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
+#   logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
+#   D2 <- all_Deltas %>% filter(Param=="Delta2_bounded") %>% dplyr::select(Estimate) %>% pull()
+#   abline(a=logD1, b=D2, col="maroon", lwd=2)
+#   
+#   #abline(lm(log(data$SMSY*data$scale) ~ log(data$WA)))
+#   #text(x=9, y=8,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
+#   text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(D2[1],2)), col="maroon", cex=0.8)
+#   
+#   title("Parken Data: Combined")
+#   
+# }
 
-plotWAregression_ParkenSep <- function(data, all_Deltas){
-  par(cex=1.5)
-  col.use <- NA
-  Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
-  for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
-  plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
-  points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
-  logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
-  logD1o <- all_Deltas %>% filter(Param=="logDelta1_ocean") %>% dplyr::select(Estimate) %>% pull() + logD1
-  logD2 <- all_Deltas %>% filter(Param=="logDelta2") %>% dplyr::select(Estimate) %>% pull()
-  D2o <- exp(all_Deltas %>% filter(Param=="logDelta2_ocean") %>% dplyr::select(Estimate) %>% pull() ) + exp(logD2)
-  abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
-  abline(a=logD1o, b=D2o, col="dodgerblue3", lwd=2)
-  
-  #abline(lm(log(data$SMSY*data$scale) ~ log(data$WA)))
-  text(x=9, y=7,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
-  text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1o[1],2), ", \nDelta2=", round(D2o[1],2)), col="dodgerblue3", cex=0.8)
-  
-  title("Parken Data: Separated")
-  
-}
+# plotWAregression_ParkenSep <- function(data, all_Deltas){
+#   par(cex=1.5)
+#   col.use <- NA
+#   Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
+#   for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
+#   plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
+#   points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
+#   logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
+#   logD1o <- all_Deltas %>% filter(Param=="logDelta1_ocean") %>% dplyr::select(Estimate) %>% pull() + logD1
+#   logD2 <- all_Deltas %>% filter(Param=="logDelta2") %>% dplyr::select(Estimate) %>% pull()
+#   D2o <- exp(all_Deltas %>% filter(Param=="logDelta2_ocean") %>% dplyr::select(Estimate) %>% pull() ) + exp(logD2)
+#   abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
+#   abline(a=logD1o, b=D2o, col="dodgerblue3", lwd=2)
+#   
+#   #abline(lm(log(data$SMSY*data$scale) ~ log(data$WA)))
+#   text(x=9, y=7,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
+#   text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1o[1],2), ", \nDelta2=", round(D2o[1],2)), col="dodgerblue3", cex=0.8)
+#   
+#   title("Parken Data: Separated")
+#   
+# }
 
 
 # Not currently adjusted for IWAM_Liermann * MOST UCRRENT TMB MODEL

@@ -76,15 +76,20 @@ source(here::here("R/Get_LRP_bs.R"))
 # Originally part of the main wrapper function stated outright
 # remove.EnhStocks <- TRUE
 # WA <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
+WAin <- c("DataIn/WCVIStocks_NoAgg.csv") 
 
 #### New Wrapper function ------------------------------------------------------
 
-IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas file location within the base repository
+# Testing WCVIStocks_NoAgg.csv
+# Testing WCVIStocks_NoInlet.csv
+# Original WCVIStocks.csv
+
+IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
+                        # NEEDS RENAMING to _____
+                      remove.EnhStocks = TRUE,
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
-                      mod = "IWAM_Liermann", # TMB model name for .cpp            
-                      remove.EnhStocks = TRUE,
                       plot = FALSE, # whether or not to create plots stored in DataOut/
                       est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
 )
@@ -97,10 +102,15 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
   # NA's are present in this sample data set and will be removed in the 
   # following sections.
   srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # PRIVATE
+  
   # Added watersheds # PRIVATE
-  WA <- read.csv(here::here(WA)) # PRIVATE
+  # WA <- read.csv(here::here(WA)) # PRIVATE
+  WA <- read.csv(here::here("DataIn/WatershedArea.csv"))
+  
   # Add WCVIstocks # PUBLIC
-  wcvistocks <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+  wcvistocks <- read.csv(here::here(WAin))
+    # change wcvistocks to WAin (for now)
+  # wcvistocks <- read.csv(here::here("DataIn/WCVIStocks.csv"))
   # sn <- read.csv(here::here("DataIn/WCVIStocks.csv")) # overwritten by wcvistocks
   
   #Naming issue:
@@ -191,9 +201,9 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
   
   WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
   
-  stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream is still capcased
+  stream <- srdat %>% dplyr::select(Stocknumber, Name, lh) %>% 
     group_by(Stocknumber) %>% 
-    summarize(lh=max(Stream)) %>% 
+    summarize(lh=max(lh)) %>% 
     arrange (Stocknumber)
   
   
@@ -258,9 +268,13 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
     filter(lh==0) %>% # not present in wcvistocks
     pull(lnWA)
   
+  
   # Add aggregated wa_stream at inlet level
     # Not part of main function, not generic enough
     # Want a list of WA aggregation
+
+  if (exists("Inlet", where = wcvistocks)){
+# Make sure that this runs if BLANK
   InletlnWA <- data.frame(wcvistocks) %>%
     filter(Stock != "Cypre") %>% 
     group_by(Inlet) %>%
@@ -274,7 +288,10 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
     summarize(InletlnWA = log(sum(WA))) %>% 
     filter(Inlet != "San Juan") %>%
     filter(Inlet !="Nitinat")
+  }
   
+  if (exists("CU", where = wcvistocks)){
+# Caveat: CU's might be blank - meaning no aggregation
   CUlnWA <- data.frame(wcvistocks) %>% 
     filter(Stock != "Cypre") %>% 
     group_by(CU) %>%
@@ -285,18 +302,54 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
     filter(Enh==0) %>%
     group_by(CU) %>% 
     summarize(CUlnWA = log(sum(WA)))
-  
+  }
   # Remove aggregation of populations into inlets
     # This code WILL BE REMOVED FROM MAIN REPOSITORY
     # Function: set watershed areas at various spatial scales included
-  
+  remove.EnhStocks <- TRUE
   # To remain in main function
-  if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
-                                           InletlnWAnoEnh$InletlnWA,
-                                             CUlnWAnoEnh$CUlnWA)
-  if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
-                                            InletlnWA$InletlnWA,
-                                              CUlnWA$CUlnWA )
+  # if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+  #                                                  InletlnWAnoEnh$InletlnWA,
+  #                                                  CUlnWAnoEnh$CUlnWA)
+  #  
+  # if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+  #                                                   InletlnWA$InletlnWA,
+  #                                                   CUlnWA$CUlnWA)
+  
+  # new statement with the following conditions
+    # IF CU and Inlet (above two statements)
+    # IF ONLY CU ()
+    # IF NOTHING
+  # This will most likely work well as a IF, ELIF, ELSE statement
+  
+  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = wcvistocks)))) { # Complete aggregation
+    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+                                                     InletlnWAnoEnh$InletlnWA,
+                                                     CUlnWAnoEnh$CUlnWA)
+    if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+                                                      InletlnWA$InletlnWA,
+                                                      CUlnWA$CUlnWA)
+    # (!exists("Inlet", where = wcvistocks)) 
+  } else if (all(sapply("CU", function(col) exists(col, where = wcvistocks)) &
+    !sapply("Inlet", function(col) exists(col, where = wcvistocks, inherits = FALSE)))) { # Just CU's
+    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+                                                     # InletlnWAnoEnh$InletlnWA,
+                                                     CUlnWAnoEnh$CUlnWA)
+    if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
+                                                      # InletlnWA$InletlnWA,
+                                                      CUlnWA$CUlnWA)
+  } else { # Just overwriting at this point - this is overkill
+    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean # , 
+                                                     # InletlnWAnoEnh$InletlnWA,
+                                                     # CUlnWAnoEnh$CUlnWA
+                                                     )
+    if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean # , 
+                                                      # InletlnWA$InletlnWA,
+                                                      # CUlnWA$CUlnWA
+                                                      )
+  }
+  
+  # data$target_lnWA_ocean
   
   #### * PARAMETERS ####
   param <- list()
@@ -335,7 +388,7 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
   
   
   # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs ----------
-  # mod <- "IWAM_Liermann" 
+  mod <- "IWAM_Liermann" 
   # Compile model if changed:
   # dyn.unload(dynlib(paste("TMB_Files/", mod, sep="")))
   compile(here::here(paste("TMB_Files/", mod, ".cpp", sep="")))
@@ -585,7 +638,16 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
   # Get names of WCVI stocks
     # using wcvistocks instead of sn now
     # * Requires Inlet aggregation information **************************************************************************
-  stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+  # Create another triple if, elif, else statment
+  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = wcvistocks)))) { # Complete aggregation
+    stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+  } else if (all(sapply("CU", function(col) exists(col, where = wcvistocks)) &
+             !sapply("Inlet", function(col) exists(col, where = wcvistocks, inherits = FALSE)))) { # Just CU's
+    stocknames <- c(as.vector(wcvistocks$Stock), as.vector(CUlnWA$CU))
+  } else { # Just overwriting at this point - this is overkill
+    stocknames <- c(as.vector(wcvistocks$Stock))
+  }
+  # stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU)) # Original line
     # *******************************************************************************************************************
   
   # Get Predicted SMSY and SREP values for new "test/target" WCVI stocks and their Prediction Intervals
@@ -832,11 +894,11 @@ IWAM_func <- function(WA = "DataIn/WatershedArea.csv", # insert Watershed areas 
 }
 
 # Check that the function runs: 
-store <- IWAM_func(WA = "DataIn/WatershedArea.csv", # insert Watershed areas file location within the base repository
+store <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
                    run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                    bs_seed = 1, # seed for bootstrapping
                    bs_nBS = 10, # trials for bootstrapping
-                   mod = "IWAM_Liermann", # TMB model name for .cpp            
+                   # mod = "IWAM_Liermann", # TMB model name for .cpp
                    remove.EnhStocks = TRUE,
                    plot = FALSE, # whether or not to create plots stored in DataOut/
                    est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
