@@ -76,7 +76,7 @@ source(here::here("R/Get_LRP_bs.R"))
 # Originally part of the main wrapper function stated outright
 # remove.EnhStocks <- TRUE
 # WA <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-WAin <- c("DataIn/WCVIStocks_NoAgg.csv") 
+WAin <- c("DataIn/WCVIStocks.csv") 
 
 #### New Wrapper function ------------------------------------------------------
 
@@ -201,9 +201,10 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
   
-  stream <- srdat %>% dplyr::select(Stocknumber, Name, lh) %>% 
+  # rename stream to --> "lh"
+  stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
     group_by(Stocknumber) %>% 
-    summarize(lh=max(lh)) %>% 
+    summarize(lh=max(Stream)) %>% 
     arrange (Stocknumber)
   
   

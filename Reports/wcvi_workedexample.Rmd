@@ -36,8 +36,8 @@ The package currently utilizes the following data sets:
 
 -   *SRinputfile (Private)*: Private data-sets developed by Parken et al. (2006). Required to run the complete function and is available upon request. To be updated with publicly available data. Life histories are included: 1 = ocean type, 0 = stream type. Contains stock names, year, spawners, recruits, and life history identification. 
 -   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
--   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
--   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s without bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
 -   *WCVIStocks (Public)*: User watershed area input file. Must contain watershed areas, life history identification, enhancement identification, and stock name. Aggregation within the IWAM function can be done with both CU and Inlet scales.
 
 ## S3: IWAM Model (Produce initial SREP estimates)
@@ -66,7 +66,6 @@ library(knitr)
 ```{r source files, include=FALSE, echo=FALSE, message=FALSE}
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R")) 
-# source(here::here("R/WCVILRPs_bootstrap.R"))
 source(here::here("R/Get_LRP_bs.R"))
 ```
 
@@ -181,9 +180,9 @@ names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
 
 WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
 
-stream <- srdat %>% dplyr::select(Stocknumber, Name, lh) %>% #srdat Stream is still capcased
+stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream is still capcased
   group_by(Stocknumber) %>% 
-  summarize(lh=max(lh)) %>% 
+  summarize(lh=max(Stream)) %>% 
   arrange (Stocknumber)
 ```
 
