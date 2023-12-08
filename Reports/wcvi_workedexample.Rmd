@@ -34,18 +34,11 @@ publicly through the Pacific Salmon Assess organization available at
 
 The package currently utilizes the following data sets:
 
--   CUPars_nBC *\**
--   CUPars_wBC *\**
--   ParkenSMSY *\**
--   ParkenSREP *\**
--   SRinputs *\**
--   Surv *\**
--   WA_Parken *\**
--   WatershedArea *\**
--   WCVIEsc *\**
--   *WCVIStocks (Public)*
-
-(\*) Currently private, but available upon request.
+-   *SRinputfile (Private)*: Private data-sets developed by Parken et al. (2006). Required to run the complete function and is available upon request. To be updated with publicly available data. Life histories are included: 1 = ocean type, 0 = stream type. Contains stock names, year, spawners, recruits, and life history identification. 
+-   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
+-   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *WCVIStocks (Public)*: User watershed area input file. Must contain watershed areas, life history identification, enhancement identification, and stock name. Aggregation within the IWAM function can be done with both CU and Inlet scales.
 
 ## S3: IWAM Model (Produce initial SREP estimates)
 

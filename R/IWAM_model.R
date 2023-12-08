@@ -306,7 +306,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # Remove aggregation of populations into inlets
     # This code WILL BE REMOVED FROM MAIN REPOSITORY
     # Function: set watershed areas at various spatial scales included
-  remove.EnhStocks <- TRUE
+  # remove.EnhStocks <- TRUE
   # To remain in main function
   # if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
   #                                                  InletlnWAnoEnh$InletlnWA,
