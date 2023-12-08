@@ -6,7 +6,7 @@ R Package for the Integrated Watershed Area Model. Used for estimating LRP's.
 
 ## Authors
 
-Authors: Carrie Holt, Kendra Holt, and Brooke Davis, adapted from Parken et al. (2006)
+Authors: Carrie Holt, Kendra Holt, Brooke Davis, and Tor Kitching adapted from Parken et al. (2006) and Liermann et al. (2010)
 
 # Summary
 

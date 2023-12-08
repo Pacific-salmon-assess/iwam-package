@@ -893,14 +893,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   #### End of IWAM_func ####
 }
 
-# Check that the function runs: 
-store <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
-                   run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
-                   bs_seed = 1, # seed for bootstrapping
-                   bs_nBS = 10, # trials for bootstrapping
-                   # mod = "IWAM_Liermann", # TMB model name for .cpp
-                   remove.EnhStocks = TRUE,
-                   plot = FALSE, # whether or not to create plots stored in DataOut/
-                   est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
-                   )
-
+# # Check that the function runs: 
+# store <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
+#                    run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+#                    bs_seed = 1, # seed for bootstrapping
+#                    bs_nBS = 10, # trials for bootstrapping
+#                    # mod = "IWAM_Liermann", # TMB model name for .cpp
+#                    remove.EnhStocks = TRUE,
+#                    plot = FALSE, # whether or not to create plots stored in DataOut/
+#                    est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+#                    )
+# 
