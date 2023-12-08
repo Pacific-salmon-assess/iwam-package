@@ -1,15 +1,6 @@
 .Rproj.user/
 .Rhistory/
 
-DataIn/CUPars_nBC.csv
-DataIn/CUPars_wBC.csv
-DataIn/SRDat.csv
-DataIn/WCVIEsc.csv
-DataIn/WatershedArea.csv
 DataIn/SRinputfile.csv
-DataIn/WA_Parken.csv
-DataIn/Surv.csv
-DataIn/ParkenSREP.csv
-DataIn/ParkenSMSY.csv
 R/IWAMarchived_model.R
 .Rhistory
