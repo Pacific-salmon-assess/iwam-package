@@ -135,10 +135,6 @@ This section provides a reference to all associated scripts that work alongside 
 
     -   plotWAregressionSREP():
 
-    -   plotWAregression_Parken():
-
-    -   plotWAregression_ParkenSep():
-
     -   plotRicA():
 
     -   plotTestStocks():

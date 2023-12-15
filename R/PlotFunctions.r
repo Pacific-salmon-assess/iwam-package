@@ -261,7 +261,7 @@ Plotacf <- function(Preds){
 #------------------------------------------------------------------ #
 # Plot  WA regression ####
 
-plotWAregressionSMSY <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
+plotWAregressionSMSY <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
 
   SMSY <- pars %>% filter(Param=="SMSY") %>% mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
   # what is scale of SMSY?
@@ -356,7 +356,7 @@ plotWAregressionSMSY <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnS
 }
 
 
-plotWAregressionSREP <- function (pars, all_Deltas, srdat, stream, WA,  pred_lnSREP=NA, pred_lnWA, title1, mod) {
+plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_lnSREP=NA, pred_lnWA, title1, mod) {
   
   SREP <- pars %>% filter(Param=="SREP") %>% mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
   # what is scale of SREP?

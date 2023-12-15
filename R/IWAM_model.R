@@ -201,8 +201,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
   
-  # rename stream to --> "lh"
-  stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+  # rename stream to --> "lifehist
+  lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
     group_by(Stocknumber) %>% 
     summarize(lh=max(Stream)) %>% 
     arrange (Stocknumber)
@@ -234,7 +234,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   # Read in watershed area data and life-history type and scale
   data$WA <- WA$WA
-  data$stream <- stream$lh
+  data$lifehist <- lifehist$lh
   data$scale <- srdat_scale # Ordered by Stocknumber
   
   data$SigRicPriorNorm <- as.numeric(F)
@@ -451,7 +451,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # Combine again and rename
   # pars <- All_Est <- All_Ests_std
   pars$Param <- sapply(pars$Param, function(x) (unlist(strsplit(x, "[_]"))[[1]]))
-  pars <- pars %>% left_join(stream, by="Stocknumber")
+  pars <- pars %>% left_join(lifehist, by="Stocknumber")
   
   
   all_Deltas <- data.frame()
@@ -565,7 +565,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigma and prior WA regression sigma"
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
-    plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, 
+    plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WA, pred_lnSMSY, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
     
@@ -574,7 +574,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
-    plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
+    plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WA, pred_lnSREP, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
     #plotWAregression (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, pred_lnWA = data$pred_lnWA, 
@@ -613,28 +613,28 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # and same for SREP
   
   # consider removing "_" between to match the names
-  pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(stream) %>% 
+  pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
     filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs
-  pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(stream) %>% 
+  pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
     filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-  obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(stream) %>% 
+  obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
     filter( lh== 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-  obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(stream) %>% 
+  obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
     filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
   
-  pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(stream) %>% 
+  pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
     filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream
-  pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(stream) %>% 
+  pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
     filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-  obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(stream) %>% 
+  obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
     filter(lh == 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-  obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(stream) %>% 
+  obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
     filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
   
   
   # Get watershed areas for synoptic data set to calculate PIs for stream and ocean
-  wa_stream <- WA %>% left_join(stream) %>% filter(lh == 0) %>% pull(WA)
-  wa_ocean <- WA %>% left_join(stream) %>% filter(lh == 1) %>% pull(WA)
+  wa_stream <- WA %>% left_join(lifehist) %>% filter(lh == 0) %>% pull(WA)
+  wa_ocean <- WA %>% left_join(lifehist) %>% filter(lh == 1) %>% pull(WA)
   
   # Get names of WCVI stocks
     # using wcvistocks instead of sn now
@@ -760,6 +760,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # Write SMSY and SREP with PIs to file
   if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"))
   if(remove.EnhStocks) datain <- c("DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv")
+  
   if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
   if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
   
@@ -785,7 +786,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     
     for (k in 1:nBS) {
       # datain must match the above Step 6 for writing output target estimates
-      out <- Get.LRP.bs(datain = datain,# "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
+      out <- Get.LRP.bs(datain = datain, # "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
                         Bern_logistic=FALSE, 
                         prod="LifeStageModel", 
                         LOO = NA, 
@@ -845,6 +846,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 
   }
   # print(dfout)
+  
+  
+  
   #### Table outputs ####
   
   # Can you store kables as objects?
@@ -852,16 +856,17 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # SREP_out <- NULL
   # SGEN_out <- NULL
   # SMSY_out <- NULL
-  # 
+  
   if (est.table == TRUE){
     # Output locations
-    locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
+      # These locations are specific to WCVI
+    #locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 
     # SREP Store
     SREP_out <- data.frame()
     SREP_out <- dfout %>%
       filter(RP=='SREP') %>%
-      filter(Stock %in% locations) %>%
+      #filter(Stock %in% locations) %>%
       rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
       mutate(RP = NULL) %>%
       relocate(Stock)
@@ -870,7 +875,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     SGEN_out <- data.frame()
     SGEN_out <- dfout %>%
       filter(RP=='SGEN') %>%
-      filter(Stock %in% locations) %>%
+      #filter(Stock %in% locations) %>%
       rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
       mutate(RP = NULL) %>%
       relocate(Stock)
@@ -879,7 +884,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     SMSY_out <-data.frame()
     SMSY_out <- dfout %>%
       filter(RP=='SMSY') %>%
-      filter(Stock %in% locations) %>%
+      #filter(Stock %in% locations) %>%
       rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
       mutate(RP = NULL) %>%
       relocate(Stock)
@@ -890,12 +895,15 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   }
   
   # Return function 
-  return(list(dfout, SREP_out, SGEN_out, SMSY_out)) # WORKING
+  return(list(data_out_ocean, dfout, SREP_out, SGEN_out, SMSY_out)) # WORKING
   #### End of IWAM_func ####
 }
 
-# # Check that the function runs: 
-# store <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
+
+#### Ouput checks ####
+
+# # # Check that the function runs: 
+# store_NoAgg <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
 #                    run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
 #                    bs_seed = 1, # seed for bootstrapping
 #                    bs_nBS = 10, # trials for bootstrapping
@@ -905,3 +913,22 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 #                    est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
 #                    )
 # 
+# store_NoInlet <- IWAM_func(WAin = "DataIn/WCVIStocks_NoInlet.csv", # insert Watershed areas file location within the base repository
+#                          run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+#                          bs_seed = 1, # seed for bootstrapping
+#                          bs_nBS = 10, # trials for bootstrapping
+#                          # mod = "IWAM_Liermann", # TMB model name for .cpp
+#                          remove.EnhStocks = TRUE,
+#                          plot = FALSE, # whether or not to create plots stored in DataOut/
+#                          est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+# )
+# 
+# store_AllStocks <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
+#                          run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+#                          bs_seed = 1, # seed for bootstrapping
+#                          bs_nBS = 10, # trials for bootstrapping
+#                          # mod = "IWAM_Liermann", # TMB model name for .cpp
+#                          remove.EnhStocks = TRUE,
+#                          plot = FALSE, # whether or not to create plots stored in DataOut/
+#                          est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+# )

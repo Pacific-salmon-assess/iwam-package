@@ -59,7 +59,7 @@ Type objective_function<Type>:: operator() ()
   DATA_SCALAR(HalfNormSigA);
   DATA_VECTOR(WA); 
   DATA_VECTOR(scale);
-  DATA_IVECTOR(stream);
+  DATA_IVECTOR(lifehist);
   DATA_INTEGER(SigRicPriorNorm);
   DATA_INTEGER(SigRicPriorGamma);
   DATA_INTEGER(SigRicPriorCauchy);
@@ -130,7 +130,7 @@ Type objective_function<Type>:: operator() ()
   // Add hierarchical structure to A ==============
   for(int i=0; i<N_stks; i++){
     // add prior on logA, 
-    ans += -dnorm(logA(i), logMuA_stream + logMuA_ocean * stream(i), sigmaA, true );
+    ans += -dnorm(logA(i), logMuA_stream + logMuA_ocean * lifehist(i), sigmaA, true );
      // add prior on sigma 
     if (SigRicPriorGamma == 1) {
        ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true);
@@ -186,11 +186,11 @@ Type objective_function<Type>:: operator() ()
   Type sigma_nu = exp(logNuSigma);
   
   for (int i=0; i<N_stks; i++){ // THE ACTUAL WATERSHED MODEL
-    pred_lnSMSY(i) = logDelta1 + logDelta1_ocean * stream(i) + ( exp(logDelta2) + Delta2_ocean * stream(i) ) * log(WA(i)) ;
+    pred_lnSMSY(i) = logDelta1 + logDelta1_ocean * lifehist(i) + ( exp(logDelta2) + Delta2_ocean * lifehist(i) ) * log(WA(i)) ;
       // Confusion about log-space vs non log-space
       // From Parken model (allometric equation)
     ans += -dnorm( pred_lnSMSY(i), log(SMSY(i) * scale(i) ),  sigma_delta, true);
-    pred_lnSREP(i) = logNu1 + logNu1_ocean * stream(i) + ( exp(logNu2) + Nu2_ocean * stream(i) ) * log(WA(i)) ;
+    pred_lnSREP(i) = logNu1 + logNu1_ocean * lifehist(i) + ( exp(logNu2) + Nu2_ocean * lifehist(i) ) * log(WA(i)) ;
     ans += -dnorm( pred_lnSREP(i), log(SREP(i) * scale(i) ),  sigma_nu, true);
   }
   // Stream-type is the base and deviation for the ocean
