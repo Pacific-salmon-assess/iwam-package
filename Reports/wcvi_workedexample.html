@@ -378,18 +378,26 @@ publicly through the Pacific Salmon Assess organization available at <a href="ht
 link.</a></p>
 <p>The package currently utilizes the following data sets:</p>
 <ul>
-<li>CUPars_nBC <em>*</em></li>
-<li>CUPars_wBC <em>*</em></li>
-<li>ParkenSMSY <em>*</em></li>
-<li>ParkenSREP <em>*</em></li>
-<li>SRinputs <em>*</em></li>
-<li>Surv <em>*</em></li>
-<li>WA_Parken <em>*</em></li>
-<li>WatershedArea <em>*</em></li>
-<li>WCVIEsc <em>*</em></li>
-<li><em>WCVIStocks (Public)</em></li>
+<li><em>SRinputfile (Private)</em>: Private data-sets developed by
+Parken et al. (2006). Required to run the complete function and is
+available upon request. To be updated with publicly available data. Life
+histories are included: 1 = ocean type, 0 = stream type. Contains stock
+names, year, spawners, recruits, and life history identification.</li>
+<li><em>WatershedArea (Public)</em>: Internal input containing watershed
+areas per stock.</li>
+<li><em>CUPars_nBC (Public)</em>: Input file with Ricker <span class="math inline">\(\alpha\)</span>’s without bias correction
+(CITATION) from Diana Dobson’s Run Reconstruction coded in TMB. Has a
+higher estimate of Ricker <span class="math inline">\(\alpha\)</span>
+(lower Sgen).</li>
+<li><em>CUPars_wBC (Public)</em>: Input file with Ricker <span class="math inline">\(\alpha\)</span>’s with bias correction (CITATION)
+from Diana Dobson’s Run Reconstruction coded in TMB. Has a higher
+estimate of Ricker <span class="math inline">\(\alpha\)</span> (lower
+Sgen).</li>
+<li><em>WCVIStocks (Public)</em>: User watershed area input file. Must
+contain watershed areas, life history identification, enhancement
+identification, and stock name. Aggregation within the IWAM function can
+be done with both CU and Inlet scales.</li>
 </ul>
-<p>(*) Currently private, but available upon request.</p>
 </div>
 <div id="s3-iwam-model-produce-initial-srep-estimates" class="section level2">
 <h2>S3: IWAM Model (Produce initial SREP estimates)</h2>

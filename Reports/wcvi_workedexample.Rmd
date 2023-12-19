@@ -87,9 +87,9 @@ remove.EnhStocks <- TRUE
 # following sections.
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # PRIVATE
 # Added watersheds # PRIVATE
-WA <- read.csv(here::here("DataIn/WatershedArea.csv")) # PRIVATE
+WAbase <- read.csv(here::here("DataIn/WatershedArea.csv")) # PRIVATE
 # Add WCVIstocks # PUBLIC
-wcvistocks <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+WAin <- read.csv(here::here("DataIn/WCVIStocks.csv")) # old wcvistocks
 # sn <- read.csv(here::here("DataIn/WCVIStocks.csv")) # overwritten by wcvistocks
 
 #Naming issue:
@@ -178,9 +178,9 @@ srdat <- srdat %>%  filter(Name != "Cowichan") %>% bind_rows(srdat_cow) %>%
 # Create a df of names and corresponding stock numbers to use in joining
 names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
 
-WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
+WAbase <- WAbase %>% full_join(names, by="Name") %>% arrange(Stocknumber)
 
-stream <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream is still capcased
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% #srdat Stream is still capcased
   group_by(Stocknumber) %>% 
   summarize(lh=max(Stream)) %>% 
   arrange (Stocknumber)
@@ -251,8 +251,8 @@ data$HalfNormMeanA <- 0 #0.44 #TMB_Inputs$Tau_sigma
 data$HalfNormSigA <- 1 #0.5 #TMB_Inputs$Tau_sigma
 
 # Read in watershed area data and life-history type and scale
-data$WA <- WA$WA
-data$stream <- stream$lh
+data$WAbase <- WAbase$WA
+data$lifehist <- lifehist$lh
 data$scale <- srdat_scale # Ordered by Stocknumber
 
 data$SigRicPriorNorm <- as.numeric(F)
@@ -274,15 +274,15 @@ data$SigNu_sig <- 0.275 # See KFrun.R,
 
 # Read in log(watershed area) for additional stocks
 # Predicted lnWA for plottig CIs:
-data$pred_lnWA <- seq(min(log(WA$WA)), max(log(WA$WA)), 0.1)
+data$pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
 # TestlnWAo
 
-data$target_lnWA_ocean <- wcvistocks %>% # PUBLIC
+data$target_lnWA_ocean <- WAin %>% # PUBLIC
   mutate (lnWA=log(WA)) %>%
   filter(lh==1) %>% 
   pull(lnWA)
 
-data$target_lnWA_stream <- wcvistocks %>% # PUBLIC
+data$target_lnWA_stream <- WAin %>% # PUBLIC
   mutate (lnWA=log(WA)) %>%
   filter(lh==0) %>% # not present in wcvistocks
   pull(lnWA)
@@ -290,26 +290,26 @@ data$target_lnWA_stream <- wcvistocks %>% # PUBLIC
 # Add aggregated wa_stream at inlet level
   # Not part of main function, not generic enough
   # Want a list of WA aggregation
-InletlnWA <- data.frame(wcvistocks) %>%
+InletlnWA <- data.frame(WAin) %>%
   filter(Stock != "Cypre") %>% 
   group_by(Inlet) %>%
   summarize(InletlnWA = log(sum(WA))) %>% 
   filter(Inlet != "San Juan") %>%
   filter(Inlet !="Nitinat")
 
-InletlnWAnoEnh <- data.frame(wcvistocks) %>% 
+InletlnWAnoEnh <- data.frame(WAin) %>% 
   filter(Stock != "Cypre") %>% filter(Enh==0) %>%
   group_by(Inlet) %>% 
   summarize(InletlnWA = log(sum(WA))) %>% 
   filter(Inlet != "San Juan") %>%
   filter(Inlet !="Nitinat")
 
-CUlnWA <- data.frame(wcvistocks) %>% 
+CUlnWA <- data.frame(WAin) %>% 
   filter(Stock != "Cypre") %>% 
   group_by(CU) %>%
   summarize(CUlnWA = log(sum(WA)))
 
-CUlnWAnoEnh <- data.frame(wcvistocks) %>% 
+CUlnWAnoEnh <- data.frame(WAin) %>% 
   filter(Stock != "Cypre") %>% 
   filter(Enh==0) %>%
   group_by(CU) %>% 
@@ -534,7 +534,7 @@ DeltaSigma <- exp(logDeltaSigma$Estimate)
 # Combine again and rename
 # pars <- All_Est <- All_Ests_std
 pars$Param <- sapply(pars$Param, function(x) (unlist(strsplit(x, "[_]"))[[1]]))
-pars <- pars %>% left_join(stream, by="Stocknumber")
+pars <- pars %>% left_join(lifehist, by="Stocknumber")
 
 
 all_Deltas <- data.frame()
@@ -662,7 +662,7 @@ DeltaSigmaLCL <- exp(logDeltaSigma$Estimate - logDeltaSigma$Std..Error*1.96)
 DeltaSigma <- exp(logDeltaSigma$Estimate)
 
 pars$Param <- sapply(pars$Param, function(x) (unlist(strsplit(x, "[_]"))[[1]]))
-pars <- pars %>% left_join(stream, by="Stocknumber")
+pars <- pars %>% left_join(lifehist, by="Stocknumber")
 
 all_Deltas <- data.frame()
 all_Deltas <- all_pars %>% filter (Param %in% c("logDelta1", 
@@ -747,9 +747,9 @@ Plotacf(SRes)
 title_plot_SMSY <- "Prior Ricker sigma and prior WA regression sigma"
 title_plot_SREP <- "Prior Ricker sigmas and prior on WA regression sigma"
 
-plot_SMSY <- plotWAregressionSMSY (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, 
+plot_SMSY <- plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
                         pred_lnWA = data$pred_lnWA, title1=title_plot_SMSY, mod)
-plot_SREP <- plotWAregressionSREP (pars, all_Deltas, srdat, stream, WA, pred_lnSREP, 
+plot_SREP <- plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
                         pred_lnWA = data$pred_lnWA, title1=title_plot_SREP, mod)
 
 # plot_grid(plot_SMSY, plot_SREP, labels = "AUTO")
@@ -798,33 +798,33 @@ pred_lnSREP_pi <- pred_lnSREP_pi %>% left_join(unique(srdat[, c("Stocknumber", "
 # and same for SREP
 
 # consider removing "_" between to match the names
-pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(stream) %>% 
+pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
   filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs
-pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(stream) %>% 
+pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
   filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(stream) %>% 
+obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
   filter( lh== 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(stream) %>% 
+obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
   filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
 
-pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(stream) %>% 
+pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
   filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream
-pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(stream) %>% 
+pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
   filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(stream) %>% 
+obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
   filter(lh == 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(stream) %>% 
+obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
   filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
 
 
 # Get watershed areas for synoptic data set to calculate PIs for stream and ocean
-wa_stream <- WA %>% left_join(stream) %>% filter(lh == 0) %>% pull(WA)
-wa_ocean <- WA %>% left_join(stream) %>% filter(lh == 1) %>% pull(WA)
+wa_stream <- WAbase %>% left_join(lifehist) %>% filter(lh == 0) %>% pull(WA)
+wa_ocean <- WAbase %>% left_join(lifehist) %>% filter(lh == 1) %>% pull(WA)
 
 # Get names of WCVI stocks
   # using wcvistocks instead of sn now
   # * Requires Inlet aggregation information **************************************************************************
-stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
   # *******************************************************************************************************************
 
 
@@ -981,7 +981,7 @@ obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(strea
 
 wa_stream <- WA %>% left_join(stream) %>% filter(lh == 0) %>% pull(WA)
 wa_ocean <- WA %>% left_join(stream) %>% filter(lh == 1) %>% pull(WA)
-stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
 target_SMSY_ocean <- data.frame()
 target_SREP_ocean <- data.frame()
 

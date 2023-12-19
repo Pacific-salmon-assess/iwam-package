@@ -57,7 +57,7 @@ Type objective_function<Type>:: operator() ()
   DATA_SCALAR(HalfNormSig);
   DATA_SCALAR(HalfNormMeanA);
   DATA_SCALAR(HalfNormSigA);
-  DATA_VECTOR(WA); 
+  DATA_VECTOR(WAbase); 
   DATA_VECTOR(scale);
   DATA_IVECTOR(lifehist);
   DATA_INTEGER(SigRicPriorNorm);
@@ -186,11 +186,11 @@ Type objective_function<Type>:: operator() ()
   Type sigma_nu = exp(logNuSigma);
   
   for (int i=0; i<N_stks; i++){ // THE ACTUAL WATERSHED MODEL
-    pred_lnSMSY(i) = logDelta1 + logDelta1_ocean * lifehist(i) + ( exp(logDelta2) + Delta2_ocean * lifehist(i) ) * log(WA(i)) ;
+    pred_lnSMSY(i) = logDelta1 + logDelta1_ocean * lifehist(i) + ( exp(logDelta2) + Delta2_ocean * lifehist(i) ) * log(WAbase(i)) ;
       // Confusion about log-space vs non log-space
       // From Parken model (allometric equation)
     ans += -dnorm( pred_lnSMSY(i), log(SMSY(i) * scale(i) ),  sigma_delta, true);
-    pred_lnSREP(i) = logNu1 + logNu1_ocean * lifehist(i) + ( exp(logNu2) + Nu2_ocean * lifehist(i) ) * log(WA(i)) ;
+    pred_lnSREP(i) = logNu1 + logNu1_ocean * lifehist(i) + ( exp(logNu2) + Nu2_ocean * lifehist(i) ) * log(WAbase(i)) ;
     ans += -dnorm( pred_lnSREP(i), log(SREP(i) * scale(i) ),  sigma_nu, true);
   }
   // Stream-type is the base and deviation for the ocean

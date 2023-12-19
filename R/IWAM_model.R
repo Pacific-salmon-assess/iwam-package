@@ -56,33 +56,21 @@ library(zoo)
 library(viridis)
 library(hrbrthemes)
 
-# Both helperFunctions and PlotFunctions are required.
-
 # Tor- based on your experience with COSEWIC R package, can we remove here::here 
 # to avoid problems when using in pkg? And in the meantime, if we're running 
 # from *.Proj files, a simple source("R/helperFunctions.R") should work.Correct?
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
-# source(here::here("R/WCVILRPs_bootstrap.R"))
 source(here::here("R/Get_LRP_bs.R"))
 
-# Consider renaming all model.R scripts to include "mod" or some
-  # other suffix/prefix
-# To do - rename this to IWAM_model.R and rename IWAM.R to IWAMarchived_model.R
-
-
-#### Remaining wrapper function objects ----------------------------------------
+#### Test wrapper function objects ----------------------------------------
 
 # Originally part of the main wrapper function stated outright
 # remove.EnhStocks <- TRUE
-# WA <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-WAin <- c("DataIn/WCVIStocks.csv") 
+# WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
+# WAin <- c("DataIn/WCVIStocks.csv")
 
 #### New Wrapper function ------------------------------------------------------
-
-# Testing WCVIStocks_NoAgg.csv
-# Testing WCVIStocks_NoInlet.csv
-# Original WCVIStocks.csv
 
 IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
                         # NEEDS RENAMING to _____
@@ -98,24 +86,16 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   #### 1. Read in data -------------------------------------------------
   
   # Our data includes: Stock name, stock number, year, spawners, recruits, 
-  # stream num., and year num.
+    # stream num., and year num.
   # NA's are present in this sample data set and will be removed in the 
-  # following sections.
+    # following sections.
   srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # PRIVATE
   
-  # Added watersheds # PRIVATE
-  # WA <- read.csv(here::here(WA)) # PRIVATE
-  WA <- read.csv(here::here("DataIn/WatershedArea.csv"))
+  # Added baseline watershed data
+  WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
   
-  # Add WCVIstocks # PUBLIC
-  wcvistocks <- read.csv(here::here(WAin))
-    # change wcvistocks to WAin (for now)
-  # wcvistocks <- read.csv(here::here("DataIn/WCVIStocks.csv"))
-  # sn <- read.csv(here::here("DataIn/WCVIStocks.csv")) # overwritten by wcvistocks
-  
-  #Naming issue:
-    # All columns in the above base files are capcase
-    # Insert lines below to convert all column names into lowercase
+  # Add your watershed data
+  WAin <- read.csv(here::here(WAin))
   
   # * Data Removals and Cleaning ----
   # First, remove any unused stocks using filter()
@@ -199,7 +179,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # Create a df of names and corresponding stock numbers to use in joining
   names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
   
-  WA <- WA %>% full_join(names, by="Name") %>% arrange(Stocknumber)
+  WAbase <- WAbase %>% full_join(names, by="Name") %>% arrange(Stocknumber)
   
   # rename stream to --> "lifehist
   lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
@@ -233,7 +213,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   data$HalfNormSigA <- 1 #0.5 #TMB_Inputs$Tau_sigma
   
   # Read in watershed area data and life-history type and scale
-  data$WA <- WA$WA
+  data$WAbase <- WAbase$WA
   data$lifehist <- lifehist$lh
   data$scale <- srdat_scale # Ordered by Stocknumber
   
@@ -256,17 +236,17 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   # Read in log(watershed area) for additional stocks
   # Predicted lnWA for plottig CIs:
-  data$pred_lnWA <- seq(min(log(WA$WA)), max(log(WA$WA)), 0.1)
+  data$pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
   # TestlnWAo
   
-  data$target_lnWA_ocean <- wcvistocks %>% # PUBLIC
+  data$target_lnWA_ocean <- WAin %>% # PUBLIC
     mutate (lnWA=log(WA)) %>%
     filter(lh==1) %>% 
     pull(lnWA)
   
-  data$target_lnWA_stream <- wcvistocks %>% # PUBLIC
+  data$target_lnWA_stream <- WAin %>% # PUBLIC
     mutate (lnWA=log(WA)) %>%
-    filter(lh==0) %>% # not present in wcvistocks
+    filter(lh==0) %>%
     pull(lnWA)
   
   
@@ -274,16 +254,16 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # Not part of main function, not generic enough
     # Want a list of WA aggregation
 
-  if (exists("Inlet", where = wcvistocks)){
+  if (exists("Inlet", where = WAin)){
 # Make sure that this runs if BLANK
-  InletlnWA <- data.frame(wcvistocks) %>%
+  InletlnWA <- data.frame(WAin) %>%
     filter(Stock != "Cypre") %>% 
     group_by(Inlet) %>%
     summarize(InletlnWA = log(sum(WA))) %>% 
     filter(Inlet != "San Juan") %>%
     filter(Inlet !="Nitinat")
   
-  InletlnWAnoEnh <- data.frame(wcvistocks) %>% 
+  InletlnWAnoEnh <- data.frame(WAin) %>% 
     filter(Stock != "Cypre") %>% filter(Enh==0) %>%
     group_by(Inlet) %>% 
     summarize(InletlnWA = log(sum(WA))) %>% 
@@ -291,14 +271,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     filter(Inlet !="Nitinat")
   }
   
-  if (exists("CU", where = wcvistocks)){
+  if (exists("CU", where = WAin)){
 # Caveat: CU's might be blank - meaning no aggregation
-  CUlnWA <- data.frame(wcvistocks) %>% 
+  CUlnWA <- data.frame(WAin) %>% 
     filter(Stock != "Cypre") %>% 
     group_by(CU) %>%
     summarize(CUlnWA = log(sum(WA)))
   
-  CUlnWAnoEnh <- data.frame(wcvistocks) %>% 
+  CUlnWAnoEnh <- data.frame(WAin) %>% 
     filter(Stock != "Cypre") %>% 
     filter(Enh==0) %>%
     group_by(CU) %>% 
@@ -323,16 +303,16 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # IF NOTHING
   # This will most likely work well as a IF, ELIF, ELSE statement
   
-  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = wcvistocks)))) { # Complete aggregation
+  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation
     if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
                                                      InletlnWAnoEnh$InletlnWA,
                                                      CUlnWAnoEnh$CUlnWA)
     if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
                                                       InletlnWA$InletlnWA,
                                                       CUlnWA$CUlnWA)
-    # (!exists("Inlet", where = wcvistocks)) 
-  } else if (all(sapply("CU", function(col) exists(col, where = wcvistocks)) &
-    !sapply("Inlet", function(col) exists(col, where = wcvistocks, inherits = FALSE)))) { # Just CU's
+    # (!exists("Inlet", where = WAin)) 
+  } else if (all(sapply("CU", function(col) exists(col, where = WAin)) &
+    !sapply("Inlet", function(col) exists(col, where = WAin, inherits = FALSE)))) { # Just CU's
     if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
                                                      # InletlnWAnoEnh$InletlnWA,
                                                      CUlnWAnoEnh$CUlnWA)
@@ -565,7 +545,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigma and prior WA regression sigma"
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
-    plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WA, pred_lnSMSY, 
+    plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
     
@@ -574,7 +554,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
-    plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WA, pred_lnSREP, 
+    plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
     #plotWAregression (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, pred_lnWA = data$pred_lnWA, 
@@ -633,25 +613,24 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   
   # Get watershed areas for synoptic data set to calculate PIs for stream and ocean
-  wa_stream <- WA %>% left_join(lifehist) %>% filter(lh == 0) %>% pull(WA)
-  wa_ocean <- WA %>% left_join(lifehist) %>% filter(lh == 1) %>% pull(WA)
+  wa_stream <- WAbase %>% left_join(lifehist) %>% filter(lh == 0) %>% pull(WA)
+  wa_ocean <- WAbase %>% left_join(lifehist) %>% filter(lh == 1) %>% pull(WA)
   
-  # Get names of WCVI stocks
-    # using wcvistocks instead of sn now
+  # Get names of *supplied* stocks
     # * Requires Inlet aggregation information **************************************************************************
   # Create another triple if, elif, else statment
-  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = wcvistocks)))) { # Complete aggregation
-    stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
-  } else if (all(sapply("CU", function(col) exists(col, where = wcvistocks)) &
-             !sapply("Inlet", function(col) exists(col, where = wcvistocks, inherits = FALSE)))) { # Just CU's
-    stocknames <- c(as.vector(wcvistocks$Stock), as.vector(CUlnWA$CU))
+  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation
+    stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+  } else if (all(sapply("CU", function(col) exists(col, where = WAin)) &
+             !sapply("Inlet", function(col) exists(col, where = WAin, inherits = FALSE)))) { # Just CU's
+    stocknames <- c(as.vector(WAin$Stock), as.vector(CUlnWA$CU))
   } else { # Just overwriting at this point - this is overkill
-    stocknames <- c(as.vector(wcvistocks$Stock))
+    stocknames <- c(as.vector(WAin$Stock))
   }
-  # stocknames <- c(as.vector(wcvistocks$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU)) # Original line
+  # stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU)) # Original line
     # *******************************************************************************************************************
   
-  # Get Predicted SMSY and SREP values for new "test/target" WCVI stocks and their Prediction Intervals
+  # Get Predicted SMSY and SREP values for the target stocks and their Prediction Intervals
   # For single life-history events (stream OR ocean targets)
   # targetSMSY <- data.frame() 
   # targetSREP <- data.frame()
@@ -758,8 +737,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   # Step 6: Final writing step for outputting targets
   # Write SMSY and SREP with PIs to file
-  if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"))
-  if(remove.EnhStocks) datain <- c("DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv")
+  if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
+  if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
   
   if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
   if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
@@ -802,7 +781,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
     # 95th percentiles
     SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
-    # stockNames <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv") %>% 
+  
     stockNames <- read.csv(here::here(datain)) %>% 
       filter(Stock != "Cypre") %>% pull(Stock)
     stockNames <- unique(stockNames)
@@ -842,24 +821,17 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
       mutate(lwr=signif(lwr,2)) %>% 
       mutate (upr=signif(upr,2))
     
-    write.csv(dfout, here::here("DataOut/1_FUNCTIONTEST_wcviCK-BootstrappedRPs.csv"))
+    # Add a function for IWAM_func to rename outputs?
+    write.csv(dfout, here::here("DataOut/getLRP-BootstrappedRPs.csv"))
 
   }
-  # print(dfout)
-  
-  
+
   
   #### Table outputs ####
-  
-  # Can you store kables as objects?
-    # Code taken from wcvi_workedexamples.Rmd
-  # SREP_out <- NULL
-  # SGEN_out <- NULL
-  # SMSY_out <- NULL
-  
   if (est.table == TRUE){
+    
     # Output locations
-      # These locations are specific to WCVI
+      # These locations are specific to WCVI case studies
     #locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 
     # SREP Store
@@ -888,17 +860,13 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
       rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
       mutate(RP = NULL) %>%
       relocate(Stock)
-
-    # SMSY_store <- SMSY_out
-    # storedtables <- list(SMSY_store, SREP_store, SGEN_store)
-    # return(storedtables)
   }
   
-  # Return function 
-  return(list(data_out_ocean, dfout, SREP_out, SGEN_out, SMSY_out)) # WORKING
-  #### End of IWAM_func ####
+  #### Return function ####
+  return(list(data_out_ocean, dfout, SREP_out, SGEN_out, SMSY_out))
 }
-
+  
+#### End of IWAM_func ####
 
 #### Ouput checks ####
 
@@ -910,7 +878,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 #                    # mod = "IWAM_Liermann", # TMB model name for .cpp
 #                    remove.EnhStocks = TRUE,
 #                    plot = FALSE, # whether or not to create plots stored in DataOut/
-#                    est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+#                    est.table = TRUE 
 #                    )
 # 
 # store_NoInlet <- IWAM_func(WAin = "DataIn/WCVIStocks_NoInlet.csv", # insert Watershed areas file location within the base repository
@@ -920,7 +888,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 #                          # mod = "IWAM_Liermann", # TMB model name for .cpp
 #                          remove.EnhStocks = TRUE,
 #                          plot = FALSE, # whether or not to create plots stored in DataOut/
-#                          est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+#                          est.table = TRUE 
 # )
 # 
 # store_AllStocks <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
@@ -930,5 +898,5 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 #                          # mod = "IWAM_Liermann", # TMB model name for .cpp
 #                          remove.EnhStocks = TRUE,
 #                          plot = FALSE, # whether or not to create plots stored in DataOut/
-#                          est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+#                          est.table = TRUE 
 # )

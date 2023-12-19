@@ -46,7 +46,7 @@ source (here::here("R/helperFunctions.R"))
 # Dataframe $CU_Status
 # Dataframe $SMU_ppn
 
-# Current wcvi example uses 
+# Current wcvi case study example uses 
 # remove.EnhStocks <- TRUE
 # Bern_logistic <- FALSE
 # prod <- "LifeStageModel"
@@ -65,36 +65,35 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #--------------------------------------------------------------------------- #
   # Read in watershed area-based reference points (SREP and SMSY) --------------
   #--------------------------------------------------------------------------- #
-  # Core data: 
-  # New files:
-  # NEEDS TO BE CHANGED SO THAT THE NAME OF THE CSV FILE's NAME IS AN INPUT
-  #if(remove.EnhStocks) wcviRPs_long <- read.csv(here::here("DataOut/dataout_target_ocean_noEnh.csv"))
-  if(remove.EnhStocks) wcviRPs_long <- read.csv(here::here(datain))
+  # *TOR*: updated all object naming to be non-specific with wcvi
+    # E.g.: wcviRPs_long to RPs_long, wcviRPs to RPs
   
-  #if(!remove.EnhStocks) wcviRPs_long<- read.csv(here::here("DataOut/dataout_target_ocean_wEnh.csv"))
+  # Core data: 
+  if(remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
+  #if(!remove.EnhStocks) RPs_long<- read.csv(here::here("DataOut/dataout_target_ocean_wEnh.csv"))
   # Old files:
-  # if (remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
-  # if (!remove.EnhStocks) wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
+  # if (remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
+  # if (!remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
   # Remove Cypre as it's not a core indicator (Diana McHugh, 22 Oct 2020)
-  stock_SMSY <- wcviRPs_long %>% filter(Stock != "Cypre") %>% 
+  stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>% 
     filter (Param == "SMSY") %>% 
     rename(SMSY=Estimate, SMSYLL=LL, SMSYUL=UL) %>% 
     dplyr::select (-Param, -X)#, -CU)
-  stock_SREP <- wcviRPs_long %>% filter(Stock != "Cypre") %>% 
+  stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% 
     filter (Param == "SREP") %>% 
     rename(SREP=Estimate, SREPLL=LL, SREPUL=UL) %>% 
     dplyr::select (-Param, -X)
-  wcviRPs <- stock_SMSY %>% left_join(stock_SREP, by="Stock")
+  RPs <- stock_SMSY %>% left_join(stock_SREP, by="Stock")
   
   # Calculate scale for each stock
   digits <- count.dig(stock_SMSY$SMSY)
   Scale <- 10^(digits)
   
-  #SREP_SE <- wcviRPs %>% mutate(SE = ((wcviRPs$SREP) - (wcviRPs$SREPLL)) / 1.96)
-  SREP_logSE <- wcviRPs %>% mutate(SE = (log(wcviRPs$SREP) - log(wcviRPs$SREPLL)) / 1.96)
+  #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96)
+  SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96)
   # The UpperLimit-MLE gives same answer
-  #SREP_logSE <- wcviRPs %>% mutate(SE = (log(wcviRPs$SREPUL) - log(wcviRPs$SREP)) / 1.96)
+  #SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREPUL) - log(RPs$SREP)) / 1.96)
   SREP_logSE <- SREP_logSE %>% dplyr::select(Stock, SE)
   
   #--------------------------------------------------------------------------- #
@@ -102,7 +101,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #--------------------------------------------------------------------------- #
   
   # 1.Use Watershed-area SMSY and SREP to estimate Sgen (assuming productivity
-  # SGENcalcs <- purrr::map2_dfr (wcviRPs$SMSY/Scale,wcviRPs$SREP/Scale, Sgen.fn) 
+  # SGENcalcs <- purrr::map2_dfr (RPs$SMSY/Scale,RPs$SREP/Scale, Sgen.fn) 
   
   # 2. Assume independent estimate of productivity and watershed-area 
   # estimate of SREP
@@ -145,22 +144,22 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
     if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
     
-    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP), SREP_logSE$SE))
-    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), wcviRPs$SREP, 
+    sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE))
+    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
                                          SREP_SE$SE))
-    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), wcviRPs$SREP, 
+    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
                                          SREP_SE$SE))
     
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
     
-    wcviRPs <- wcviRPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
+    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
       mutate(SGEN=round(SGEN*Scale,0))
-    wcviRPs <- wcviRPs %>% mutate (a.par = SGENcalcs$apar) %>% 
+    RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
       mutate(a.par=round(a.par,2))
-    wcviRPs <- wcviRPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
+    RPs <- RPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
       mutate(SMSY=round(SMSY*Scale,0))
     
-    wcviRPs <- wcviRPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
+    RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
                          "SREPLL", "SREPUL", "a.par")]#"CU"
     
   }#End of if(prod == "LifeStageModel")
@@ -173,33 +172,33 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha=alpha)
     lnalpha_nBC_inlet <- read.csv("DataIn/CUPars_nBC.csv") %>% 
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha_nBC=alpha)
-    WCVIStocks <- read.csv("DataIn/WCVIStocks.csv") %>% 
+    targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% # Previously WCVIStocks
       filter (Stock != "Cypre") %>% rename(inlets=Inlet)
-    Ric.A <- lnalpha_inlet %>% left_join(WCVIStocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
+    Ric.A <- lnalpha_inlet %>% left_join(targetstocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
     
-    wcviRPs <- wcviRPs %>% left_join(Ric.A) %>% mutate(a.RR=exp(lnalpha))
-    wcviRPs[wcviRPs$Stock=="Nitinat",]$a.RR <- exp(1)
-    wcviRPs[wcviRPs$Stock=="San Juan",]$a.RR <- exp(1)
-    wcviRPs[wcviRPs$Stock=="Nitinat",]$a.RR <- exp(1)
+    RPs <- RPs %>% left_join(Ric.A) %>% mutate(a.RR=exp(lnalpha))
+    RPs[RPs$Stock=="Nitinat",]$a.RR <- exp(1)
+    RPs[RPs$Stock=="San Juan",]$a.RR <- exp(1)
+    RPs[RPs$Stock=="Nitinat",]$a.RR <- exp(1)
     
-    wcviRPs[wcviRPs$Stock=="Barkley",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Barkley",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="Clayoquot",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Clayoquot",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="Kyuquot",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Kyuquot",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="Nootka/Esperanza",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Nootka/Esperanza",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="Quatsino",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Quatsino",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="WCVI South",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Barkley",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="WCVI Nootka & Kyuquot",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Nootka/Esperanza",]$a.RR[1]
-    wcviRPs[wcviRPs$Stock=="WCVI North",]$a.RR <- 
-      wcviRPs[wcviRPs$inlets=="Quatsino",]$a.RR[1]
+    RPs[RPs$Stock=="Barkley",]$a.RR <- 
+      RPs[RPs$inlets=="Barkley",]$a.RR[1]
+    RPs[RPs$Stock=="Clayoquot",]$a.RR <- 
+      RPs[RPs$inlets=="Clayoquot",]$a.RR[1]
+    RPs[RPs$Stock=="Kyuquot",]$a.RR <- 
+      RPs[RPs$inlets=="Kyuquot",]$a.RR[1]
+    RPs[RPs$Stock=="Nootka/Esperanza",]$a.RR <- 
+      RPs[RPs$inlets=="Nootka/Esperanza",]$a.RR[1]
+    RPs[RPs$Stock=="Quatsino",]$a.RR <- 
+      RPs[RPs$inlets=="Quatsino",]$a.RR[1]
+    RPs[RPs$Stock=="WCVI South",]$a.RR <- 
+      RPs[RPs$inlets=="Barkley",]$a.RR[1]
+    RPs[RPs$Stock=="WCVI Nootka & Kyuquot",]$a.RR <- 
+      RPs[RPs$inlets=="Nootka/Esperanza",]$a.RR[1]
+    RPs[RPs$Stock=="WCVI North",]$a.RR <- 
+      RPs[RPs$inlets=="Quatsino",]$a.RR[1]
     
-    wcviRPs <- wcviRPs %>% select(-c(inlets, CU, lnalpha)) %>% rename(a.par=a.RR)
+    RPs <- RPs %>% select(-c(inlets, CU, lnalpha)) %>% rename(a.par=a.RR)
     
     # When incorporating uncertainty in Ricker A:
     Sig.Ric.A <- 0.51 #0.255 for a narrower plausible bound
@@ -217,24 +216,24 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     
     
     
-    Ric.A.hi <- exp(rnorm(length(Scale), log(wcviRPs$a.par), Sig.Ric.A))
-    if(min(Ric.A.hi)<0) Ric.A <- exp(rnorm(length(Scale), wcviRPs$a.RR, Sig.Ric.A))
+    Ric.A.hi <- exp(rnorm(length(Scale), log(RPs$a.par), Sig.Ric.A))
+    if(min(Ric.A.hi)<0) Ric.A <- exp(rnorm(length(Scale), RPs$a.RR, Sig.Ric.A))
     
-    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP), SREP_logSE$SE))
-    if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), wcviRPs$SREP, 
+    sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE))
+    if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
                                         SREP_SE$SE))
     
     
     SGENcalcs <- purrr::map2_dfr (Ric.A.hi, sREP/Scale, Sgen.fn2)
     
-    wcviRPs <- wcviRPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
+    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
       mutate(SGEN=round(SGEN*Scale,0))
-    wcviRPs <- wcviRPs %>% mutate (a.par = SGENcalcs$apar) %>% 
+    RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
       mutate(a.par=round(a.par,2))
-    wcviRPs <- wcviRPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
+    RPs <- RPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
       mutate(SMSY=round(SMSY*Scale,0))
     
-    wcviRPs <- wcviRPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
+    RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
                          "SREPLL", "SREPUL", "a.par")]#"CU"
     
   } # if(prod == "RunReconstruction"){
@@ -242,14 +241,14 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   
   #--------------------------------------------------------------------------- #
-  # Add Sgen and revised SMSY to wcviRPs data frame ----------------------------
+  # Add Sgen and revised SMSY to RPs data frame ----------------------------
   #--------------------------------------------------------------------------- #
   
   
   
-  wcviRPs
+  RPs
   # # Write this to a csv file so that it can be called in plotting functions
-  # # write.csv(wcviRPs, "DataOut/wcviRPs.csv")
+  # # write.csv(RPs, "DataOut/wcviRPs.csv") # or "targetRPs"
   # if (remove.EnhStocks) write.csv(wcviRPs, "DataOut/wcviRPs_noEnh.csv")
   # if (!remove.EnhStocks) write.csv(wcviRPs, "DataOut/wcviRPs_wEnh.csv")
   
@@ -259,24 +258,24 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # (DFO 2014). NOT NEEDED
   #--------------------------------------------------------------------------- #
   # 
-  # SGENcalcsv2 <- map2_dfr (wcviRPs$SMSY/Scale,wcviRPs$SREP/Scale, 
+  # SGENcalcsv2 <- map2_dfr (RPs$SMSY/Scale,RPs$SREP/Scale, 
   #                          Sgen.fn, half.a = TRUE, const.SMAX = FALSE)
-  # wcviRPs <- wcviRPs %>% mutate (SGENha.cSREP = SGENcalcsv2$SGEN) %>% 
+  # RPs <- RPs %>% mutate (SGENha.cSREP = SGENcalcsv2$SGEN) %>% 
   #   mutate( SGENha.cSREP = round( SGENha.cSREP*Scale, 0 ) )
-  # wcviRPs <- wcviRPs %>% mutate (SMSYha.cSREP = SGENcalcsv2$SMSY) %>% 
+  # RPs <- RPs %>% mutate (SMSYha.cSREP = SGENcalcsv2$SMSY) %>% 
   #   mutate( SMSYha.cSREP = round( SMSYha.cSREP*Scale, 0 ) )
-  # wcviRPs <- wcviRPs %>% mutate (SREPha.cSREP = SGENcalcsv2$SREP) %>% 
+  # RPs <- RPs %>% mutate (SREPha.cSREP = SGENcalcsv2$SREP) %>% 
   #   mutate( SREPha.cSREP = round( SREPha.cSREP*Scale, 0 ) )
-  # ###wcviRPs <- wcviRPs %>% mutate (SMAXrev = 1/SGENcalcs$bpar) %>% 
+  # ###RPs <- RPs %>% mutate (SMAXrev = 1/SGENcalcs$bpar) %>% 
   # ###mutate(SMAXrev=round(SMAXrev,0))
   # 
-  # SGENcalcsv3 <- map2_dfr (wcviRPs$SMSY/Scale, wcviRPs$SREP/Scale, 
+  # SGENcalcsv3 <- map2_dfr (RPs$SMSY/Scale, RPs$SREP/Scale, 
   #                          Sgen.fn, half.a = TRUE, const.SMAX = TRUE)
-  # wcviRPs <- wcviRPs %>% mutate (SGENha.cSMAX = SGENcalcsv3$SGEN) %>% 
+  # RPs <- RPs %>% mutate (SGENha.cSMAX = SGENcalcsv3$SGEN) %>% 
   #   mutate( SGENha.cSMAX = round( SGENha.cSMAX*Scale, 0 ) )
-  # wcviRPs <- wcviRPs %>% mutate (SMSYha.cSMAX = SGENcalcsv3$SMSY) %>% 
+  # RPs <- RPs %>% mutate (SMSYha.cSMAX = SGENcalcsv3$SMSY) %>% 
   #   mutate( SMSYha.cSMAX = round( SMSYha.cSMAX*Scale, 0 ) )
-  # wcviRPs <- wcviRPs %>% mutate (SREPha.cSMAX = SGENcalcsv3$SREP) %>% 
+  # RPs <- RPs %>% mutate (SREPha.cSMAX = SGENcalcsv3$SREP) %>% 
   #   mutate( SREPha.cSMAX = round( SREPha.cSMAX*Scale, 0 ) )
   
   # run_logReg <- TRUE
@@ -317,21 +316,21 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #   
   #   # Get stock information for WCVI Chinook & Remove Cypre as it's not an 
   #   # indicator stocks
-  #   WCVIStocks <- read.csv("DataIn/WCVIStocks.csv") %>% 
+  #   targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% 
   #     filter (Stock != "Cypre")
-  #   if (remove.EnhStocks) WCVIStocks <- WCVIStocks %>% 
+  #   if (remove.EnhStocks) targetstocks <- targetstocks %>% 
   #     filter(Stock %not in% EnhStocks)
   #   
-  #   Inlet_Names <- unique(WCVIStocks$Inlet)
+  #   Inlet_Names <- unique(targetstocks$Inlet)
   #   Inlet_Sum <- matrix(NA, nrow=length(Years), ncol=length(Inlet_Names))
   #   colnames(Inlet_Sum) <- Inlet_Names
-  #   CU_Names <- unique(WCVIStocks$CU)
+  #   CU_Names <- unique(targetstocks$CU)
   #   
   #   
   #   # Sum escapements across stocks within inlets
   #   for (i in 1:length(Inlet_Names)) {
   #     # For each inlet, which are the component indicator stocks
-  #     Ins <- WCVIStocks %>% filter(Inlet==Inlet_Names[i]) %>% pull(Stock)
+  #     Ins <- targetstocks %>% filter(Inlet==Inlet_Names[i]) %>% pull(Stock)
   #     WCVIEsc_Inlets <- matrix(NA, nrow= length(Years), ncol= length(Ins))
   #     
   #     #  Make a matrix of escapements of component indicators
@@ -351,13 +350,13 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #   # Sum escapements across indicators within CUs -----------------------------
   #   #------------------------------------------------------------------------- #
   #   
-  #   nCU <- length(unique(WCVIStocks$CU))
+  #   nCU <- length(unique(targetstocks$CU))
   #   CU_Sum <- matrix(NA, nrow=length(Years), ncol=nCU)
   #   colnames(CU_Sum) <- CU_Names
   #   
   #   for (k in 1:length(CU_Names)) {
   #     # For each CU, which are the component indicators
-  #     CUss <- WCVIStocks %>% filter(CU==CU_Names[k]) %>% pull(Stock)
+  #     CUss <- targetstocks %>% filter(CU==CU_Names[k]) %>% pull(Stock)
   #     WCVIEsc_CUs <- matrix(NA, nrow= length(Years), ncol= length(CUss))
   #     
   #     #  Make a matrix of escapements of component indicators
@@ -389,7 +388,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #   
   #   for (i in 1:length(Inlet_Names)) {
   #     Inlet_Status[,i] <- (Inlet_Sum[,i] > 
-  #                            (wcviRPs %>% 
+  #                            (RPs %>% 
   #                               filter(Stock == as.character(Inlet_Names[i])) %>% 
   #                               pull(SGEN)) )
   #   }
@@ -410,7 +409,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #   if(stock.LRP){
   #     for (k in 1:length(CU_Names)) {
   #       # For each CU, which are the component indicators
-  #       CU_ins <- unique( WCVIStocks %>% filter(CU==CU_Names[k]) %>% pull(Inlet))
+  #       CU_ins <- unique( targetstocks %>% filter(CU==CU_Names[k]) %>% pull(Inlet))
   #       
   #       isAbove <- matrix(NA, nrow= length(Years), ncol= length(CU_ins))
   #       
@@ -435,7 +434,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #   if(CU.LRP){
   #     for (k in 1:length(CU_Names)){
   #       CU_Status[,k] <- (CU_Sum[,k] > 
-  #                           (wcviRPs %>% filter(Stock == 
+  #                           (RPs %>% filter(Stock == 
   #                                                 as.character(CU_Names[k])) %>% 
   #                              pull(SGEN)) )
   #     }

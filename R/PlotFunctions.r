@@ -261,14 +261,14 @@ Plotacf <- function(Preds){
 #------------------------------------------------------------------ #
 # Plot  WA regression ####
 
-plotWAregressionSMSY <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
+plotWAregressionSMSY <- function (pars, all_Deltas, srdat, lifehist, WAbase,  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
 
   SMSY <- pars %>% filter(Param=="SMSY") %>% mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
   # what is scale of SMSY?
   Sc <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
   SMSY <- SMSY %>% left_join(Sc, by="Stocknumber") %>% mutate(rawSMSY=Estimate*scale)
   lnSMSY <- log(SMSY$rawSMSY)
-  lnWA <- log(WA$WA)
+  lnWA <- log(WAbase$WA)
   
   par(cex=1.5)
   col.use <- NA
@@ -356,14 +356,14 @@ plotWAregressionSMSY <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_l
 }
 
 
-plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_lnSREP=NA, pred_lnWA, title1, mod) {
+plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WAbase,  pred_lnSREP=NA, pred_lnWA, title1, mod) {
   
   SREP <- pars %>% filter(Param=="SREP") %>% mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
   # what is scale of SREP?
   Sc <- srdat %>% select(Stocknumber, scale) %>% distinct()
   SREP <- SREP %>% left_join(Sc) %>% mutate(rawSREP=Estimate*scale)
   lnSREP <- log(SREP$rawSREP)
-  lnWA <- log(WA$WA)
+  lnWA <- log(WAbase$WA)
   
   par(cex=1.5)
   col.use <- NA
@@ -455,13 +455,13 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_l
 #   col.use <- NA
 #   Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
 #   for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
-#   plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
-#   points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
+#   plot(x=log(data$WAbase), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
+#   points(x=log(data$WAbase), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
 #   logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
 #   D2 <- all_Deltas %>% filter(Param=="Delta2_bounded") %>% dplyr::select(Estimate) %>% pull()
 #   abline(a=logD1, b=D2, col="maroon", lwd=2)
 #   
-#   #abline(lm(log(data$SMSY*data$scale) ~ log(data$WA)))
+#   #abline(lm(log(data$SMSY*data$scale) ~ log(data$WAbase)))
 #   #text(x=9, y=8,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
 #   text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(D2[1],2)), col="maroon", cex=0.8)
 #   
@@ -474,8 +474,8 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_l
 #   col.use <- NA
 #   Parken_data <- as.data.frame(read.csv(here::here("DataIn/WA_Parken.csv")))
 #   for(i in 1:length(Parken_data$lh)) {if (Parken_data$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
-#   plot(x=log(data$WA), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
-#   points(x=log(data$WA), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
+#   plot(x=log(data$WAbase), y=log(data$SMSY*data$scale),pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
+#   points(x=log(data$WAbase), y=log(data$SMSY*data$scale), pch=20, col=col.use, cex=1.5)
 #   logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
 #   logD1o <- all_Deltas %>% filter(Param=="logDelta1_ocean") %>% dplyr::select(Estimate) %>% pull() + logD1
 #   logD2 <- all_Deltas %>% filter(Param=="logDelta2") %>% dplyr::select(Estimate) %>% pull()
@@ -483,7 +483,7 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WA,  pred_l
 #   abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
 #   abline(a=logD1o, b=D2o, col="dodgerblue3", lwd=2)
 #   
-#   #abline(lm(log(data$SMSY*data$scale) ~ log(data$WA)))
+#   #abline(lm(log(data$SMSY*data$scale) ~ log(data$WAbase)))
 #   text(x=9, y=7,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
 #   text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1o[1],2), ", \nDelta2=", round(D2o[1],2)), col="dodgerblue3", cex=0.8)
 #   
@@ -671,6 +671,7 @@ plotWCVIBenchmarks <- function(data = WCVIEscQuant){
 #plotWCVIBenchmarks()
 #dev.off()
 
+# If you desire timeseries - make sure to update the below code with the CORRECT bootstrapped estimate csv
 plotWCVI_timeseries <- function(WCVIEsc=WCVIEsc, remove.EnhStocks=TRUE, 
                                 prod="LifeStageModel", boot=NULL){
   
