@@ -66,9 +66,9 @@ source(here::here("R/Get_LRP_bs.R"))
 #### Test wrapper function objects ----------------------------------------
 
 # Originally part of the main wrapper function stated outright
-# remove.EnhStocks <- TRUE
+remove.EnhStocks <- TRUE
 # WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-# WAin <- c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/WCVIStocks.csv")
 
 #### New Wrapper function ------------------------------------------------------
 
@@ -101,7 +101,6 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # First, remove any unused stocks using filter()
   # For e.g., two stocks not used in Parken et al, and not documented in Liermann
   srdatwna <- srdatwna %>% filter(Name != "Hoko" & Name != "Hoh") 
-  
   
   # Determine Which stocks have NAs? Below filter returns only stock numbers.
   stockwna <- srdatwna %>% filter (is.na(Rec) == TRUE) %>% 
@@ -355,6 +354,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   param$logMuA_ocean <- 0
   
   ## Liermann model
+    # There are no _stream params here - should there be?
   param$logDelta1 <- 3 
   param$logDelta1_ocean <- 0
   param$logDelta2 <- log(0.72) 
@@ -371,9 +371,17 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs ----------
   mod <- "IWAM_Liermann" 
   # Compile model if changed:
-  # dyn.unload(dynlib(paste("TMB_Files/", mod, sep="")))
+    # Run a detect - if file is exist statement - then unload
+  # if (file.exists(here::here("TMB_Files/"))){
+  #   # print("Files exist.")
+  #   dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+  # }
+  # dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   compile(here::here(paste("TMB_Files/", mod, ".cpp", sep="")))
     # Needs to be run to re-create the .dll and .o files from a new .cpp file
+    # Creates an error: "make: Nothing to be done for 'all'/
+      # Current assumed to mean that there were NO changes detected in the .cpp
+      # and thus the run continues WITHOUT compiling.
   dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   
   obj <- MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
@@ -491,16 +499,16 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # They are used in the plotting functions and scaled within
     # pred_lnSMSY_S and pred_lnSMSY_O don't occur anywhere ************************************************************
   pred_lnSMSY <- data.frame() 
-  pred_lnSMSY <- all_pars %>% filter (Param %in% c("pred_lnSMSY_stream", 
-                                                  "pred_lnSMSY_ocean", 
-                                                  "pred_lnSMSY_CI", 
+  pred_lnSMSY <- all_pars %>% filter (Param %in% c("pred_lnSMSY_stream", # not included
+                                                  "pred_lnSMSY_ocean", # not included
+                                                  "pred_lnSMSY_CI", # not included
                                                   "pred_lnSMSY_stream_CI", 
                                                   "pred_lnSMSY_ocean_CI"))
     # pred_lnSREP_S and pred_lnSREP_O don't occur elsewhere ***********************************************************
   pred_lnSREP <- data.frame() 
-  pred_lnSREP <- all_pars %>% filter (Param %in% c("pred_lnSREP_stream", 
-                                                  "pred_lnSREP_ocean", 
-                                                  "pred_lnSREP_CI", 
+  pred_lnSREP <- all_pars %>% filter (Param %in% c("pred_lnSREP_stream", # not included
+                                                  "pred_lnSREP_ocean", # not included
+                                                  "pred_lnSREP_CI", # not included
                                                   "pred_lnSREP_stream_CI", 
                                                   "pred_lnSREP_ocean_CI"))
   
@@ -642,9 +650,13 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   target_SMSY_stream <- data.frame()
   target_SREP_stream <- data.frame()
   
-  condition_target <- cbind("ocean","stream") # choose if you want ocean, stream, or both
+  # Re-write this to detect lh=0 or 1 within lifehist
+  # condition_target <- cbind("ocean","stream") # choose if you want ocean, stream, or both
+  # if (any(lifehist$lh == 0)){
+  #   print("lh is equal to zero.")
+  # }
   
-  if ("ocean" %in% condition_target) {
+  if (any(WAin$lh == 1)) {
     # Step 1
     target_SMSY_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames)
     target_SREP_ocean <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames)
@@ -664,7 +676,10 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # Step 5
     target_estimates_SMSY_ocean <- target_SMSY_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
     target_estimates_SREP_ocean <- target_SREP_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-  }
+  
+    data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
+    
+    }
   
   # WARNING
   length_check_params <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean"))
@@ -675,27 +690,30 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   }
   
   # Does not currently work * no data for stream
-  # if ("stream" %in% condition_target){
-  #   # Step 1
-  #   target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames)
-  #   target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames)
-  #   target_SMSY_pull_stream <- target_SMSY_stream %>% pull(Estimate)
-  #   target_SREP_pull_stream <- target_SREP_stream %>% pull(Estimate)
-  #   # Step 2
-  #   target_SMSY_pi_stream <- PredInt(x = log(wa_stream), y = obs_lSMSY_stream, Predy = target_SMSY_pull_stream, Newx = data$target_lnWA_stream)
-  #   target_SREP_pi_stream <- PredInt(x = log(wa_stream), y = obs_SREP_stream, Predy = target_SREP_pull_stream, Newx = data$target_lnWA_stream)
-  #   # Step 3
-  #   target_SMSY_stream <- target_SMSY_stream %>% add_column(LL = exp(target_SMSY_pi_stream$lwr), UL = exp(target_SMSY_pi_stream$upr))
-  #   target_SREP_stream <- target_SREP_stream %>% add_column(LL = exp(target_SREP_pi_stream$lwr), UL = exp(target_SREP_pi_stream$upr))
-  #   # Step 4
-  #   target_SMSY_stream <- target_SMSY_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
-  #     add_column(Param = "SMSY")
-  #   target_SREP_stream <- target_SREP_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
-  #     add_column(Param = "SREP")
-  #   # Step 5
-  #   target_estimates_SMSY_stream <- target_SMSY_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-  #   target_estimates_SREP_stream <- target_SREP_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-  # }
+  if (any(WAin$lh == 0)){
+    # Step 1
+    target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames)
+    target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames)
+    target_SMSY_pull_stream <- target_SMSY_stream %>% pull(Estimate)
+    target_SREP_pull_stream <- target_SREP_stream %>% pull(Estimate)
+    # Step 2
+    target_SMSY_pi_stream <- PredInt(x = log(wa_stream), y = obs_lSMSY_stream, Predy = target_SMSY_pull_stream, Newx = data$target_lnWA_stream)
+    target_SREP_pi_stream <- PredInt(x = log(wa_stream), y = obs_SREP_stream, Predy = target_SREP_pull_stream, Newx = data$target_lnWA_stream)
+    # Step 3
+    target_SMSY_stream <- target_SMSY_stream %>% add_column(LL = exp(target_SMSY_pi_stream$lwr), UL = exp(target_SMSY_pi_stream$upr))
+    target_SREP_stream <- target_SREP_stream %>% add_column(LL = exp(target_SREP_pi_stream$lwr), UL = exp(target_SREP_pi_stream$upr))
+    # Step 4
+    target_SMSY_stream <- target_SMSY_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>%
+      add_column(Param = "SMSY")
+    target_SREP_stream <- target_SREP_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>%
+      add_column(Param = "SREP")
+    # Step 5
+    target_estimates_SMSY_stream <- target_SMSY_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+    target_estimates_SREP_stream <- target_SREP_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+  
+    data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
+    
+    }
   
       # STEPS
   # For inclusion into if loops above
@@ -727,27 +745,102 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # target_estimates_SMSY <- targetSMSY %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0)) # OLD
   # target_estimates_SREP <- targetSREP %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0)) # OLD
   
-  # Final combination of SMSY and SREP estimates into final df
-  data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
-  # data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
   
+  # Final combination of SMSY and SREP estimates into final df
+    # if statement for stream or ocean presence
+  if (all(c(0, 1) %in% WAin$lh)) {
+    print("Both life histories are present and will be combined.")
+    data_out_combined <- data_out_ocean %>% bind_rows(data_out_stream)
+  } else {
+    print("Only one life history detected.")
+  }
+  
+  # Data Out combinations: now moved upwards into the conditional statements
+  # data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
+  # data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
   # data_out_combined <- data_out_ocean %>% bind_rows(data_out_stream)
   
   # data_out <- target_estimates_SMSY %>% bind_rows(target_estimates_SREP) # OLD
   
   # Step 6: Final writing step for outputting targets
   # Write SMSY and SREP with PIs to file
-  if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
-  if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
   
-  if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
-  if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
+    # Two separate if's: for remove, without remove
+      # Within each: for ocean, for stream, for combined
   
-  # if(remove.EnhStocks) write.csv(data_out_stream, "DataOut/dataout_target_stream_noEnh.csv")
-  # if(!remove.EnhStocks) write.csv(data_out_stream, "DataOut/dataout_target_stream_wEnh.csv")
+  # if (any(WAin$lh == 0)) {} # stream
+  # if (any(WAin$lh == 1)) {} # ocean
 
-  # if(remove.EnhStocks) write.csv(data_out, "DataOut/dataout_target_noEnh.csv")
-  # if(!remove.EnhStocks) write.csv(data_out, "DataOut/dataout_target_wEnh.csv")
+# For NO ENHANCEMENT datasets
+  if (remove.EnhStocks) {
+    if (all(WAin$lh == 0)) { # stream only
+      if(remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_noEnh.csv"))
+      if(remove.EnhStocks) datain <- c("DataOut/dataout_target_stream_noEnh.csv")
+      print("Stream life histories detected and moved forward.")
+      
+    }
+    if (all(WAin$lh == 1)) { # ocean only
+      if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
+      if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
+      print("Ocean life histories detected and moved forward.")
+      
+    }
+    if (all(c(0, 1) %in% WAin$lh)) { # stream and ocean 
+      if(remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_noEnh.csv"))
+      if(remove.EnhStocks) datain <- c("DataOut/dataout_target_noEnh.csv")
+      print("Stream and ocean life histories detected, combined, and moved forward.")
+      
+    }
+  }
+  
+# For ENHANCEMENT datasets
+  if (!remove.EnhStocks) {
+    if (all(WAin$lh == 0)) { # stream
+      if(!remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_wEnh.csv"))
+      if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_stream_wEnh.csv")
+      print("Stream life histories detected and moved forward.")
+      
+    } 
+    if (all(WAin$lh == 1)) { # ocean
+      if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
+      if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
+      print("Ocean life histories detected and moved forward.")
+      
+    }
+    if (all(c(0, 1) %in% WAin$lh)) { # combined
+      if(!remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_wEnh.csv"))
+      if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_wEnh.csv")
+      print("Stream and ocean life histories detected, combined, and moved forward.")
+      
+    } 
+  }
+  
+  # if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
+  # if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
+  # if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
+  # if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
+  
+  # if(remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_noEnh.csv"))
+  #if(remove.EnhStocks) datain_stream <- c("DataOut/dataout_target_stream_noEnh.csv")
+  
+  # if(!remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_wEnh.csv"))
+  #if(!remove.EnhStocks) datain_stream <- c("DataOut/dataout_target_stream_wEnh.csv")
+
+  # if(remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_noEnh.csv"))
+  # if(remove.EnhStocks) datain <- c("DataOut/dataout_target_noEnh.csv")
+  
+  # if(!remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_wEnh.csv"))
+  # if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_wEnh.csv")
+  
+  # ONLY ONE FILE CAN GO FORWARD
+    # STATEMENT MUST BE WRITTEN - SO ONLY ONE OF THE ABOVE EVENTS OCCURS DURING A RUN
+    
+    # y/n enhancement
+    # ocean only
+    # stream only
+    # combined
+  
+  
   
   #### End of IWAM Model ####
   
@@ -755,6 +848,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # Consider creating function objects for set.seed and for nBS
   # dfout <- NULL
   # dfout <- data.frame()
+  run.bootstraps = TRUE
+  bs_seed <- 1
+  bs_nBS <- 10
   
   if (run.bootstraps == TRUE){
     # set.seed(1) #10#12#13 (work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
@@ -891,12 +987,12 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 #                          est.table = TRUE 
 # )
 # 
-# store_AllStocks <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
-#                          run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
-#                          bs_seed = 1, # seed for bootstrapping
-#                          bs_nBS = 10, # trials for bootstrapping
-#                          # mod = "IWAM_Liermann", # TMB model name for .cpp
-#                          remove.EnhStocks = TRUE,
-#                          plot = FALSE, # whether or not to create plots stored in DataOut/
-#                          est.table = TRUE 
-# )
+store_AllStocks <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
+                         run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+                         bs_seed = 1, # seed for bootstrapping
+                         bs_nBS = 10, # trials for bootstrapping
+                         # mod = "IWAM_Liermann", # TMB model name for .cpp
+                         remove.EnhStocks = TRUE,
+                         plot = FALSE, # whether or not to create plots stored in DataOut/
+                         est.table = TRUE
+)

@@ -476,8 +476,8 @@ What data is output ...
 # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs ----------
 mod <- "IWAM_Liermann" 
 # Compile model if changed:
-# dyn.unload(dynlib(paste("TMB_Files/", mod, sep="")))
-# compile(paste("TMB_Files/", mod, ".cpp", sep=""))
+dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+compile(here::here(paste("TMB_Files/", mod, ".cpp", sep="")))
   # Needs to be run to re-create the .dll and .o files from a new .cpp file
 dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
 

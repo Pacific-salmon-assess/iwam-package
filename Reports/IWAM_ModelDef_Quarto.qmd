@@ -90,6 +90,8 @@ $$
 S_{REP} = \frac{\alpha}{\beta}
 $$
 
+## Bootstrapping
+
 ## IWAM Model Outline Reference
 
 This section provides a walk through the 6 sections of the IWAM code repository and provided references to possible areas that may require changes depending on your intended usage case. The sections are as listed:

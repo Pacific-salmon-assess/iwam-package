@@ -218,7 +218,7 @@ Type objective_function<Type>:: operator() ()
   
     // Get predicted values for plotting  WA regresssion with CIs
   int N_pred = pred_lnWA.size();
-  vector <Type> pred_lnSMSY_stream_CI(N_pred); //_stream/ocean corrections
+  vector <Type> pred_lnSMSY_stream_CI(N_pred);
   vector <Type> pred_lnSMSY_ocean_CI(N_pred);
   vector <Type> pred_lnSREP_stream_CI(N_pred);
   vector <Type> pred_lnSREP_ocean_CI(N_pred);
@@ -252,7 +252,6 @@ Type objective_function<Type>:: operator() ()
     target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
   }
 
-  
   
   vector <Type> lnSMSY = log(SMSY*scale);
   vector <Type> lnSREP = log(SREP*scale);

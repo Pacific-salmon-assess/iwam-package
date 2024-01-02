@@ -93,6 +93,10 @@ IWAM_WCVI <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
                        plot = FALSE, # print plots to DataOut/
                        est.table = TRUE # store tables - NOT FUNCTIONING
 )
+
+# "make: Nothing to be done for 'all' - where is this error coming from?
+# "Lengths checked passed." - from an internal function test for lengths after joins
+
 ```
 ``` {r iwam function dummy data, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
 # This is a test function run on dummy data with NO AGGREGATIONS
@@ -139,49 +143,47 @@ The following tables (1-3) have been prepared for comparison to Holt et al. (202
   # Divide them into different tables by SGEN, SREP, and SMSY
   # Re-name Value to the given esimate name per table
   # Output the tables
-# locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
+locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 ```
 
 ```{r SREP, echo=FALSE, message=FALSE}
-kable(IWAM_WCVI[[2]])
+SREP <- IWAM_WCVI[[3]] %>% # Already SREP
+  # filter(RP=='SREP') %>%
+  filter(Stock %in% locations) # %>%
+  # rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
+  # mutate(RP = NULL) %>%
+  # relocate(Stock)
 
-# SREP <- dfout %>%
-#   filter(RP=='SREP') %>%
-#   filter(Stock %in% locations) %>%
-#   rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
-#   mutate(RP = NULL) %>%
-#   relocate(Stock)
-# 
-# kable(SREP)
+kable(SREP)
 ```
 
 *Table 1. SREP estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
 ```{r SGEN, echo=FALSE, message=FALSE}
-kable(IWAM_WCVI[[3]])
+# kable(IWAM_WCVI[[3]])
 
-# SGEN <- dfout %>%
-#   filter(RP=='SGEN') %>%
-#   filter(Stock %in% locations) %>%
-#   rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
-#   mutate(RP = NULL) %>%
-#   relocate(Stock)
-# 
-# kable(SGEN)
+SGEN <- IWAM_WCVI[[4]] %>%
+  # filter(RP=='SGEN') %>%
+  filter(Stock %in% locations) # %>%
+  # rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
+  # mutate(RP = NULL) %>%
+  # relocate(Stock)
+
+kable(SGEN)
 ```
 
 *Table 2. SGEN estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
 ```{r SMSY, echo=FALSE, message=FALSE}
-kable(IWAM_WCVI[[4]])
+# kable(IWAM_WCVI[[4]])
 
-# SMSY <- dfout %>%
-#   filter(RP=='SMSY') %>%
-#   filter(Stock %in% locations) %>%
-#   rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
-#   mutate(RP = NULL) %>%
-#   relocate(Stock)
-# 
-# kable(SMSY)
+SMSY <- IWAM_WCVI[[5]] %>%
+  # filter(RP=='SMSY') %>%
+  filter(Stock %in% locations) # %>%
+  # rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
+  # mutate(RP = NULL) %>%
+  # relocate(Stock)
+
+kable(SMSY)
 ```
 *Table 3. SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
