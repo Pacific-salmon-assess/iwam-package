@@ -63,16 +63,24 @@ source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
 source(here::here("R/Get_LRP_bs.R"))
 
-#### Test wrapper function objects ----------------------------------------
+#### Test wrapper function objects for internal usage  ----------------------------------------
 
 # Originally part of the main wrapper function stated outright
-remove.EnhStocks <- TRUE
+# remove.EnhStocks <- FALSE # TRUE
+
 # WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-WAin <- c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/WCVIStocks.csv")
+
+# WAin <- c("DataIn/Backcalc_targetstocks_NoAgg.csv") # RUNS
+  # Nothing - just Stock, WA, and lh
+# WAin <- c("DataIn/Backcalc_targetstocks_CU.csv") # 
+  # added CU - NOW ADDED BLANK Enh column
+# WAin <- c("DataIn/Backcalc_targetstocks.csv")
+  # added CU, Inlet (only some stocks), and Enh (only some stocks)
 
 #### New Wrapper function ------------------------------------------------------
 
-IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
+IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
                         # NEEDS RENAMING to _____
                       remove.EnhStocks = TRUE,
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
@@ -233,6 +241,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   data$SigNu_mean <- 0.84 # See KFrun.R,
   data$SigNu_sig <- 0.275 # See KFrun.R,
   
+  
   # Read in log(watershed area) for additional stocks
   # Predicted lnWA for plottig CIs:
   data$pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
@@ -255,34 +264,42 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 
   if (exists("Inlet", where = WAin)){
 # Make sure that this runs if BLANK
-  InletlnWA <- data.frame(WAin) %>%
+  InletlnWA <- data.frame(WAin) %>% # Complete set
     filter(Stock != "Cypre") %>% 
     group_by(Inlet) %>%
-    summarize(InletlnWA = log(sum(WA))) %>% 
+    summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
     filter(Inlet !="Nitinat")
   
-  InletlnWAnoEnh <- data.frame(WAin) %>% 
+  # IF no Enh column - don't run
+  InletlnWAnoEnh <- data.frame(WAin) %>% # Just keep the rows without enhancement
     filter(Stock != "Cypre") %>% filter(Enh==0) %>%
     group_by(Inlet) %>% 
-    summarize(InletlnWA = log(sum(WA))) %>% 
+    summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
     filter(Inlet !="Nitinat")
   }
   
   if (exists("CU", where = WAin)){
-# Caveat: CU's might be blank - meaning no aggregation
+    # GIVES AN ERROR IF "Enh" column is not present
+    # Tested with a blank Enh column and it runs
+    # Caveat: CU's might be blank - meaning no aggregation
+    
+    # Add in LH specifications? ***********************************************
   CUlnWA <- data.frame(WAin) %>% 
     filter(Stock != "Cypre") %>% 
     group_by(CU) %>%
-    summarize(CUlnWA = log(sum(WA)))
+    summarize(CUlnWA = log(sum(WA)), lh = mean(lh)) # %>% 
+    # add the unique LH value for each CU back into the new df
   
+  # IF Enh column is blank just creates a table with no data
   CUlnWAnoEnh <- data.frame(WAin) %>% 
     filter(Stock != "Cypre") %>% 
     filter(Enh==0) %>%
     group_by(CU) %>% 
-    summarize(CUlnWA = log(sum(WA)))
+    summarize(CUlnWA = log(sum(WA)), lh = mean(lh))
   }
+  
   # Remove aggregation of populations into inlets
     # This code WILL BE REMOVED FROM MAIN REPOSITORY
     # Function: set watershed areas at various spatial scales included
@@ -302,31 +319,41 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # IF NOTHING
   # This will most likely work well as a IF, ELIF, ELSE statement
   
+  # When adding CU and Inlet lists - only apply the columns that apply for either ocean or stream
+    # e.g. ocean when lh == 1, stream lh == 0
+  
   if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation
-    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
-                                                     InletlnWAnoEnh$InletlnWA,
-                                                     CUlnWAnoEnh$CUlnWA)
+    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, # already subset for ocean/stream
+                                                     InletlnWAnoEnh$InletlnWA[InletlnWAnoEnh$lh == 1],
+                                                     CUlnWAnoEnh$CUlnWA[CUlnWAnoEnh$lh == 1])
     if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
-                                                      InletlnWA$InletlnWA,
-                                                      CUlnWA$CUlnWA)
+                                                      InletlnWA$InletlnWA[InletlnWA$lh == 1],
+                                                      CUlnWA$CUlnWA[CUlnWA$lh == 1])
+    
+    if(remove.EnhStocks) data$target_lnWA_stream <- c(data$target_lnWA_stream, 
+                                                     InletlnWAnoEnh$InletlnWA[InletlnWAnoEnh$lh == 0],
+                                                     CUlnWAnoEnh$CUlnWA[CUlnWAnoEnh$lh == 0])
+    if(!remove.EnhStocks) data$target_lnWA_stream <- c(data$target_lnWA_stream, 
+                                                      InletlnWA$InletlnWA[InletlnWA$lh == 0],
+                                                      CUlnWA$CUlnWA[CUlnWA$lh == 0])
     # (!exists("Inlet", where = WAin)) 
   } else if (all(sapply("CU", function(col) exists(col, where = WAin)) &
     !sapply("Inlet", function(col) exists(col, where = WAin, inherits = FALSE)))) { # Just CU's
     if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
-                                                     # InletlnWAnoEnh$InletlnWA,
-                                                     CUlnWAnoEnh$CUlnWA)
+                                                     CUlnWAnoEnh$CUlnWA[CUlnWAnoEnh$lh == 1])
     if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean, 
-                                                      # InletlnWA$InletlnWA,
-                                                      CUlnWA$CUlnWA)
+                                                      CUlnWA$CUlnWA[CUlnWA$lh == 1])
+    
+    if(remove.EnhStocks) data$target_lnWA_stream <- c(data$target_lnWA_stream, 
+                                                     CUlnWAnoEnh$CUlnWA[CUlnWAnoEnh == 0])
+    if(!remove.EnhStocks) data$target_lnWA_stream <- c(data$target_lnWA_stream, 
+                                                      CUlnWA$CUlnWA[CUlnWA$lh == 0])
   } else { # Just overwriting at this point - this is overkill
-    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean # , 
-                                                     # InletlnWAnoEnh$InletlnWA,
-                                                     # CUlnWAnoEnh$CUlnWA
-                                                     )
-    if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean # , 
-                                                      # InletlnWA$InletlnWA,
-                                                      # CUlnWA$CUlnWA
-                                                      )
+    if(remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean)
+    if(!remove.EnhStocks) data$target_lnWA_ocean <- c(data$target_lnWA_ocean)
+    
+    if(remove.EnhStocks) data$target_lnWA_stream <- c(data$target_lnWA_stream)
+    if(!remove.EnhStocks) data$target_lnWA_stream <- c(data$target_lnWA_stream)
   }
   
   # data$target_lnWA_ocean
@@ -627,15 +654,45 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # Get names of *supplied* stocks
     # * Requires Inlet aggregation information **************************************************************************
   # Create another triple if, elif, else statment
-  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation
-    stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
-  } else if (all(sapply("CU", function(col) exists(col, where = WAin)) &
-             !sapply("Inlet", function(col) exists(col, where = WAin, inherits = FALSE)))) { # Just CU's
-    stocknames <- c(as.vector(WAin$Stock), as.vector(CUlnWA$CU))
-  } else { # Just overwriting at this point - this is overkill
-    stocknames <- c(as.vector(WAin$Stock))
-  }
+  # if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation
+  #   stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
+  # } else if (all(sapply("CU", function(col) exists(col, where = WAin)) &
+  #            !sapply("Inlet", function(col) exists(col, where = WAin, inherits = FALSE)))) { # Just CU's
+  #   stocknames <- c(as.vector(WAin$Stock), as.vector(CUlnWA$CU))
+  # } else {
+  #   stocknames <- c(as.vector(WAin$Stock))
+  # }
   # stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU)) # Original line
+  
+  # When dealing with datasets that have BOTH lh ocean/stream
+    # Consider making two stocknames to ocean and stream
+    # Can I make them embedded?
+    # Or make a conditional where: stocknames <- WAin$Stock per vector(CU/Inlet etc.) WHEN WAin$Stock matching lh column == 0
+    # e.g. dat2 = dat1[dat1$col ==2,]
+    # WAin$Stock[WAin$lh == 0] (stream)
+    # WAin$Stock[WAin$lh == 1] (ocean)
+  
+  # PER CU and PER INLET - ONLY ONE LH WILL BE PRESENT
+  if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation # remains to best tested
+    stocknames_stream <- c(as.vector(WAin$Stock[WAin$lh == 0]), 
+                           as.vector(InletlnWA$Inlet[InletlnWA$lh == 0]), 
+                           as.vector(CUlnWA$CU[CUlnWA$lh == 0]))
+    stocknames_ocean <- c(as.vector(WAin$Stock[WAin$lh == 1]), 
+                          as.vector(InletlnWA$Inlet[InletlnWA$lh == 1]), 
+                          as.vector(CUlnWA$CU[CUlnWA$lh == 1]))
+    
+  } else if (all(sapply("CU", function(col) exists(col, where = WAin)) & # remains to be tested
+                 !sapply("Inlet", function(col) exists(col, where = WAin, inherits = FALSE)))) { # Just CU's
+    stocknames_stream <- c(as.vector(WAin$Stock[WAin$lh == 0]), 
+                           as.vector(CUlnWA$CU[CUlnWA$lh == 0]))
+    stocknames_ocean <- c(as.vector(WAin$Stock[WAin$lh == 1]), 
+                          as.vector(CUlnWA$CU[CUlnWA$lh == 1]))
+    
+  } else { # atleast this section is working
+    stocknames_stream <- c(as.vector(WAin$Stock[WAin$lh == 0]))
+    stocknames_ocean <- c(as.vector(WAin$Stock[WAin$lh == 1]))
+  }
+   
     # *******************************************************************************************************************
   
   # Get Predicted SMSY and SREP values for the target stocks and their Prediction Intervals
@@ -658,8 +715,12 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   
   if (any(WAin$lh == 1)) {
     # Step 1
-    target_SMSY_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames)
-    target_SREP_ocean <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames)
+    target_SMSY_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames_ocean)
+      # with latest dataset -> backcalced:
+      # stocknames has 116 values - of these 116 values, 85 are ocean, and 32 are stream
+      # need to make sure that this difference is understood
+      # consider making a stocknames_ocean and _stream?
+    target_SREP_ocean <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames_ocean)
     target_SMSY_pull_ocean <- target_SMSY_ocean %>% pull(Estimate)
     target_SREP_pull_ocean <- target_SREP_ocean %>% pull(Estimate)
     # Step 2
@@ -682,9 +743,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     }
   
   # WARNING
-  length_check_params <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean"))
-  if (length(stocknames) == length(length_check_params$Estimate)) {
-    print("Lengths checked passed.")
+  length_check_params_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean"))
+  if (length(stocknames_ocean) == length(length_check_params_ocean$Estimate)) { # originally this checked the full stocknames list
+    print("Lengths checked passed - Ocean life histories.")
   } else {
     print("WARNING: The output and inputs are not the same length.")
   }
@@ -692,8 +753,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   # Does not currently work * no data for stream
   if (any(WAin$lh == 0)){
     # Step 1
-    target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames)
-    target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames)
+    target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames_stream)
+    target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames_stream)
     target_SMSY_pull_stream <- target_SMSY_stream %>% pull(Estimate)
     target_SREP_pull_stream <- target_SREP_stream %>% pull(Estimate)
     # Step 2
@@ -714,6 +775,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
     
     }
+  
+  # WARNING
+  length_check_params_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream"))
+  if (length(stocknames_stream) == length(length_check_params_stream$Estimate)) { # originally this checked the full stocknames list
+    print("Lengths checked passed - Stream life histories.")
+  } else {
+    print("WARNING: The output and inputs are not the same length.")
+  }
   
       # STEPS
   # For inclusion into if loops above
@@ -777,18 +846,21 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
       if(remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_noEnh.csv"))
       if(remove.EnhStocks) datain <- c("DataOut/dataout_target_stream_noEnh.csv")
       print("Stream life histories detected and moved forward.")
+      print("DataOut: dataout_target_stream_noEnh")
       
     }
     if (all(WAin$lh == 1)) { # ocean only
       if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
       if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
       print("Ocean life histories detected and moved forward.")
+      print("DataOut: dataout_target_ocean_noEnh")
       
     }
     if (all(c(0, 1) %in% WAin$lh)) { # stream and ocean 
-      if(remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_noEnh.csv"))
+      if(remove.EnhStocks) write.csv(data_out_combined, here::here("DataOut/dataout_target_noEnh.csv"))
       if(remove.EnhStocks) datain <- c("DataOut/dataout_target_noEnh.csv")
       print("Stream and ocean life histories detected, combined, and moved forward.")
+      print("DataOut: dataout_target_noEnh")
       
     }
   }
@@ -799,18 +871,21 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
       if(!remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_wEnh.csv"))
       if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_stream_wEnh.csv")
       print("Stream life histories detected and moved forward.")
+      print("DataOut: dataout_target_stream_wEnh")
       
     } 
     if (all(WAin$lh == 1)) { # ocean
       if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
       if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
       print("Ocean life histories detected and moved forward.")
+      print("DataOut: dataout_target_ocean_wEnh")
       
     }
     if (all(c(0, 1) %in% WAin$lh)) { # combined
-      if(!remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_wEnh.csv"))
+      if(!remove.EnhStocks) write.csv(data_out_combined, here::here("DataOut/dataout_target_wEnh.csv"))
       if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_wEnh.csv")
       print("Stream and ocean life histories detected, combined, and moved forward.")
+      print("DataOut: dataout_target_wEnh")
       
     } 
   }
@@ -848,9 +923,12 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
     # Consider creating function objects for set.seed and for nBS
   # dfout <- NULL
   # dfout <- data.frame()
-  run.bootstraps = TRUE
-  bs_seed <- 1
-  bs_nBS <- 10
+  
+  # datain <- datain <- c("DataOut/dataout_target_noEnh.csv") # RUNS
+  # datain <- datain <- c("DataOut/dataout_target_wEnh.csv") # ERROR - matching rows
+  # run.bootstraps = TRUE
+  # bs_seed <- 1
+  # bs_nBS <- 10
   
   if (run.bootstraps == TRUE){
     # set.seed(1) #10#12#13 (work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
@@ -863,11 +941,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
       # datain must match the above Step 6 for writing output target estimates
       out <- Get.LRP.bs(datain = datain, # "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
                         Bern_logistic=FALSE, 
-                        prod="LifeStageModel", 
+                        prod="LifeStageModel",
                         LOO = NA, 
                         run_logReg=FALSE) 
       outBench[[k]] <- out$bench
     }
+      # Get.LRP.bs has WCVIstocks cooked in
+      # need to set it so there is an input dataset
+      # datain is not enough - or maybe certain loops just need re-objectification
     
     # # Is 200 enough trials? Yes
     # running.mean <- cumsum(LRP.bs$fit) / seq_along(LRP.bs$fit) 
@@ -959,10 +1040,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
   }
   
   #### Return function ####
-  return(list(data_out_ocean, dfout, SREP_out, SGEN_out, SMSY_out))
+  return(list(datain, dfout))
+  # used to contain SREP_out, SGEN_out, SMSY_out
 }
-  
+
 #### End of IWAM_func ####
+
+
+
 
 #### Ouput checks ####
 
@@ -976,23 +1061,3 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed a
 #                    plot = FALSE, # whether or not to create plots stored in DataOut/
 #                    est.table = TRUE 
 #                    )
-# 
-# store_NoInlet <- IWAM_func(WAin = "DataIn/WCVIStocks_NoInlet.csv", # insert Watershed areas file location within the base repository
-#                          run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
-#                          bs_seed = 1, # seed for bootstrapping
-#                          bs_nBS = 10, # trials for bootstrapping
-#                          # mod = "IWAM_Liermann", # TMB model name for .cpp
-#                          remove.EnhStocks = TRUE,
-#                          plot = FALSE, # whether or not to create plots stored in DataOut/
-#                          est.table = TRUE 
-# )
-# 
-store_AllStocks <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
-                         run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
-                         bs_seed = 1, # seed for bootstrapping
-                         bs_nBS = 10, # trials for bootstrapping
-                         # mod = "IWAM_Liermann", # TMB model name for .cpp
-                         remove.EnhStocks = TRUE,
-                         plot = FALSE, # whether or not to create plots stored in DataOut/
-                         est.table = TRUE
-)

@@ -1,0 +1,117 @@
+﻿CU,Inlet,Stock,WA,lh,Enh
+CU Nootka-Kyuquot,Kyuquot,Artlish,63.55,1,0
+CU Southwest Vancouver Island,Clayoquot,Bedwell/Ursus,99.36,1,0
+CU Nootka-Kyuquot,Nootka/Esperanza,Burman,69.89,1,1
+CU Northwest Vancouver Island,Quatsino,Cayeghle,49.42,1,0
+CU Nootka-Kyuquot,Nootka/Esperanza,Conuma,19.71,1,1
+CU Southwest Vancouver Island,Clayoquot,Cypre,39.03,1,0
+CU Nootka-Kyuquot,Nootka/Esperanza,Gold,856.34,1,1
+CU Nootka-Kyuquot,Kyuquot,Kaouk,100.51,1,0
+CU Nootka-Kyuquot,Nootka/Esperanza,Leiner,109.25,1,1
+CU Northwest Vancouver Island,Quatsino,Marble,167.51,1,0
+CU Southwest Vancouver Island,Clayoquot,Megin,245.34,1,0
+CU Southwest Vancouver Island,Clayoquot,Moyeha,115.68,1,0
+CU Southwest Vancouver Island,Barkley,Nahmint,41.74,1,0
+CU Southwest Vancouver Island,Nitinat,Nitinat,356.62,1,1
+CU Southwest Vancouver Island,San Juan,San Juan,330,1,1
+CU Southwest Vancouver Island,Barkley,Sarita,84.22,1,1
+CU Southwest Vancouver Island,Barkley,Somass,1056.84,1,1
+CU Nootka-Kyuquot,Nootka/Esperanza,Tahsis,76.93,1,0
+CU Nootka-Kyuquot,Kyuquot,Tahsish,171.97,1,0
+CU Southwest Vancouver Island,Clayoquot,Tranquil,12.22,1,1
+CU Nootka-Kyuquot,Nootka/Esperanza,Zeballos,193.85,1,1
+CU South Thompson CU (ocean-type),,"All (lower Thompson, South Thompson, Little, Lower Adams)",29565.40842,1,
+CU Shuswap,,Lower Shuswap,2663.142562,1,
+CU Shuswap,,Middle Shuswap,639.7864321,1,
+CU Shuswap,,Wap,19.77537433,1,
+CU Northwest Vancouver Island,,East,46.1876646,1,
+CU Northwest Vancouver Island,,Goodspeed,14.50187742,1,
+CU Northwest Vancouver Island,,Keith,55.83291043,1,
+CU Northwest Vancouver Island,,Klaskish,40.62470017,1,
+CU Northwest Vancouver Island,,Mahatta,113.6622678,1,
+CU Northwest Vancouver Island,,Washlawlis,23.01882869,1,
+CU Northwest Vancouver Island,,Colonial&Cayeagle,78.57117308,1,
+CU Northeast Vancouver Island,,Adam,279.0229766,1,
+CU Northeast Vancouver Island,,Amor de Cosmos,14.50187742,1,
+CU Northeast Vancouver Island,,Cluxewe,89.51941912,1,
+CU Northeast Vancouver Island,,Kokish,103.7253183,1,
+CU Northeast Vancouver Island,,Quatse,79.58163742,1,
+CU Northeast Vancouver Island,,Nimpkish (above Lake),400.2062663,1,
+CU Northeast Vancouver Island,,Salmon,911.6572586,1,
+CU Northeast Vancouver Island,,Quinsam-Campbell,170.5152599,1,
+CU Nootka-Kyuquot,,Amai,13.63191732,1,
+CU Nootka-Kyuquot,,Canton,35.1216783,1,
+CU Nootka-Kyuquot,,Espinosa,25.36209182,1,
+CU Nootka-Kyuquot,,Hoiss,13.49331751,1,
+CU Nootka-Kyuquot,,Kauwinch,74.71701896,1,
+CU Nootka-Kyuquot,,Kleeptee,49.01430567,1,
+CU Nootka-Kyuquot,,Little Zeballos River,40.02017772,1,
+CU Nootka-Kyuquot,,Malksope,32.61926878,1,
+CU Nootka-Kyuquot,,Mckay,13.26969841,1,
+CU Nootka-Kyuquot,,Mooyah,35.26326994,1,
+CU Nootka-Kyuquot,,Ououkinsh,35.40911441,1,
+CU Nootka-Kyuquot,,Power,50.9607687,1,
+CU Nootka-Kyuquot,,Sucwoa,41.15311954,1,
+CU Nootka-Kyuquot,,Tlupana,96.12473656,1,
+CU Nootka-Kyuquot,,Tsowwin,33.08513252,1,
+CU EVI-Qualicum Puntledge - fall,,Puntledge Falls,560.2454578,1,
+CU EVI-Qualicum Puntledge - fall,,Englishman,298.8025471,1,
+CU EVI-Qualicum Puntledge - fall,,Big Qualicum,136.8720777,1,
+CU EVI-Qualicum Puntledge - fall,,Little Qualicum,94.63079783,1,
+CU EVI - summer,,Puntledge Summers,432.7602266,1,
+CU EVI- Nanaimo Chemainus - fall,,Nanaimo Falls,545.2196866,1,
+CU Klinaklini,,Klinaklini (includes devereaux and other tribs),1475.318501,1,
+CU Lower Thompson 1.2,,Deadman,754.459182,0,
+CU Lower Thompson 1.2,,Nicola,6225.100696,0,
+CU Lower Thompson 1.2,,Spius,613.7463388,0,
+CU Lower Thompson 1.2,,Coldwater,254.8923516,0,
+CU Lower Thompson 1.2,,Louis,438.4178736,0,
+CU Lower Thompson 1.2,,Bonaparte,3001.854142,0,
+CU Bessette,,Bessette,231.8779014,0,
+CU Portage,,Portage,454.1895004,0,
+CU Middle Fraser Summers,,Chilko,2102.563218,0,
+CU Middle Fraser Summers,,Quesnel System (Cariboo),3997.852941,0,
+CU Middle Fraser Summers,,"Nechako System (Stuart, Stellako)",15673.66027,0,
+CU Middle Fraser Summers,,Taseko,2218.539321,0,
+CU Middle Fraser Summers,,Bridge,350.9381836,0,
+CU North Thompson Summers,,"North Thompson and tribs (Clearwater, Mahood, Raft, Barriere, Lemieux)",5909.991814,0,
+CU Upper Fraser River - Spring Timing,,Upper Fraser Spring (all tribs and mainstem from Salmon River upstream),33078.74639,0,
+CU Maria Slough,,Maria Slough,30.54565188,1,
+CU LFR-spring,,Birkenhead,462.4660493,0,
+CU South Thompson Summer 1.3,,Eagle,594.1618092,0,
+CU South Thompson Summer 1.3,,Salmon @ Salmon Arm,638.3781821,0,
+CU South Thompson Summer 1.3,,Seymour - South Thompson Summer 1.3,79.00677097,0,
+CU Homathko,,Homathko,286.3011437,1,
+CU Middle Fraser River-Spring Timing,,Endako,690.1047235,0,
+CU Middle Fraser River-Spring Timing,,Chilako,1908.393017,0,
+CU Middle Fraser River-Spring Timing,,Horsefly,486.6201118,0,
+CU Middle Fraser River-Spring Timing,,"Westroad, Baker, Naver, Narcosli, Cottonwood",8680.933419,0,
+CU Middle Fraser River-Spring Timing,,Chilcotin (upper and lower),1993.225096,0,
+CU Middle Fraser River-Spring Timing,,Driftwood,708.0676713,0,
+CU Middle Fraser River-Spring Timing,,Nadina,918.7057862,0,
+CU Middle Fraser River-Spring Timing,,Upper Cariboo,553.9219058,0,
+CU Middle Fraser River-Spring Timing,,"Taseko (Taseko, Elkin, Beece, Lord, Yohetta, Tchaikazan)",2218.486093,0,
+CU Fraser Canyon - Nahatlatch,,Nahatlatch,246.3397738,0,
+CU Lower Fraser River - Upper Pitt,,Upper Pitt,287.3747473,0,
+CU Okanagan,,Okanagan,610.8119923,1,
+CU South Coast-southern fjords,,Ahnuhati,103.2150776,1,
+CU South Coast-southern fjords,,Apple,104.1804156,1,
+CU South Coast-southern fjords,,Sim,24.35324437,1,
+CU South Coast-southern fjords,,Franklin,120.4444619,1,
+CU South Coast-southern fjords,,Southgate,178.6599016,1,
+CU South Coast-southern fjords,,Kakweiken,51.02930054,1,
+CU South Coast-southern fjords,,Wakeman,304.8571273,1,
+CU South Coast-southern fjords,,Kingcome,281.9969356,1,
+CU South Coast-southern fjords,,Orford,37.75911239,1,
+CU South Coast-southern fjords,,Stafford,21.06489104,1,
+CU South Coast-southern fjords,,Phillips,192.7718712,1,
+CU South Coast-Georgia Strait,,Brem,220.5816314,1,
+CU South Coast-Georgia Strait,,Indian,177.3282531,1,
+CU South Coast-Georgia Strait,,Quatam,146.6783215,1,
+CU South Coast-Georgia Strait,,Seymour - South Coast-Georgia Strait,55.30104059,1,
+CU South Coast-Georgia Strait,,Theodosia,54.68208327,1,
+CU South Coast-Georgia Strait,,Toba,449.9014256,1,
+CU South Coast-Georgia Strait,,Squamish,831.7055632,1,
+CU East Vancouver Island-Goldstream_FA_0.x,,Goldstream,41.9632168,1,
+CU Lower Fraser River - Summer Timing,,Big Silver,420.6987341,0,
+CU North Thompson River - Spring Timing - Age 1.3,,includes mainstem and trib u/s of Avola,2086.058926,0,

@@ -9,10 +9,11 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="Tor Kitching" />
 
-<meta name="date" content="2023-12-01" />
+<meta name="date" content="2024-01-03" />
 
-<title>IWAM Function Vignette</title>
+<title>Back-calculated WA Test</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -349,43 +350,20 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">IWAM Function Vignette</h1>
-<h4 class="date">2023-12-01</h4>
+<h1 class="title toc-ignore">Back-calculated WA Test</h1>
+<h4 class="author">Tor Kitching</h4>
+<h4 class="date">2024-01-03</h4>
 
 </div>
 
 
-<div id="source-files" class="section level3">
-<h3>Source Files</h3>
+<div id="check-for-back-calculated-watershed-areas" class="section level2">
+<h2>Check for Back-Calculated Watershed Areas</h2>
+<p>The purpose of this document is to test the back-calculated watershed
+areas. All code will be drawn from the IWAM function vignette.</p>
 </div>
-<div id="iwam-function-vignette" class="section level1">
-<h1>IWAM Function Vignette</h1>
-<p>Authors: Carrie Holt (1), Kendra Holt (1), and Brooke Davis (1)</p>
-<ol style="list-style-type: decimal">
-<li>Department of Fisheries and Oceans (DFO), Canada</li>
-</ol>
-<div id="document-contents" class="section level2">
-<h2>Document Contents</h2>
-<ol style="list-style-type: decimal">
-<li>Summary</li>
-<li>Data Map</li>
-<li>Function</li>
-<li>Outputs</li>
-</ol>
-</div>
-<div id="s1.-summary" class="section level2">
-<h2>S1. Summary</h2>
-<p>The purpose of the IWAM function is to provide estimates for SREP,
-SGEN, and SMSY, using habitat-based assessments methods (the Integrated
-Watershed Area model) in a streamlined process. This function is based
-upon the work of (insert history). This function is maintained by Carrie
-Holt (1) and Tor Kitching (1).</p>
-<ol style="list-style-type: decimal">
-<li>Department of Fisheries and Oceans (DFO), Canada</li>
-</ol>
-</div>
-<div id="s2.-data-map" class="section level2">
-<h2>S2. Data Map</h2>
+<div id="s1.-data-map" class="section level2">
+<h2>S1. Data Map</h2>
 <p>The following function vignette/example is from the IWAM Package Repo
 hosted publicly through the Pacific Salmon Assess organization available
 at <a href="https://github.com/Pacific-salmon-assess/iwam-package">this
@@ -413,40 +391,9 @@ identification, and stock name. Aggregation within the IWAM function can
 be done with both CU and Inlet scales.</li>
 </ul>
 </div>
-<div id="s3.-function-run-example" class="section level2">
-<h2>S3. Function Run Example</h2>
-<p>The IWAM function is defined by two sets of parameters, the
-inputs;</p>
-<ul>
-<li><code>WAin</code>: a string containing the file path to your
-watershed area data.</li>
-<li><code>remove.EnhStocks</code>: a TRUE/FALSE statement of whether or
-not to remove enhanced stock populations from analysis.</li>
-</ul>
-<p>and the run specifications;</p>
-<ul>
-<li><code>run.bootstrap</code>: a TRUE/FALSE statement of whether to run
-the bootstrapping internal process.</li>
-<li><code>bs_seed</code>: a NUMERIC value for your desired bootstrapping
-seed.</li>
-<li><code>bs_nBS</code>: a NUMERIC value for your desired number of
-trials.</li>
-<li><code>plot</code>: a TRUE/FALSE statement of whether to print out
-plots to your DataOut folder.</li>
-<li><code>est.table</code>: a TRUE/FALSE statement of whether to store
-final SREP, SGEN, and SMSY tables. Please see Section 4 for
-examples.</li>
-</ul>
-<p>The IWAM function is divided into two major sections.</p>
-<ol style="list-style-type: decimal">
-<li>The IWAM model; which estimates SREP and SMSY. This model is based
-upon the work of Parken et al. 2006 and Liermann et al. as a
-modification to the Ricker model.</li>
-<li>Model bootstrapping; which takes the estimates of the IWAM model and
-runs them through an iterative bootstrap to re-estimate SREP, SMSY, and
-SGEN based on an updated set of priors (CITATION).</li>
-</ol>
-<pre class="r"><code>IWAM_WCVI &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks.csv&quot;, # INPUT Data
+<div id="s2.-initialize-function" class="section level2">
+<h2>S2. Initialize function</h2>
+<pre class="r"><code>IWAM_backcalc &lt;- IWAM_func(WAin = &quot;DataIn/Backcalc_targetstocks.csv&quot;, # INPUT Data
                        remove.EnhStocks = FALSE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # change the internal seed for the bootstrap
@@ -455,29 +402,12 @@ SGEN based on an updated set of priors (CITATION).</li>
                        est.table = TRUE # store tables - NOT FUNCTIONING
 )
 
-# &quot;make: Nothing to be done for &#39;all&#39; - where is this error coming from?
+# &quot;make: Nothing to be done for &#39;all&#39; - this means that re-compiling the TMB model is NOT necessary
 # &quot;Lengths checked passed.&quot; - from an internal function test for lengths after joins</code></pre>
-<pre class="r"><code># This is a test function run on dummy data with NO AGGREGATIONS
-IWAM_NoInlet &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks_NoInlet.csv&quot;, # INPUT Data
-                          remove.EnhStocks = TRUE, # Enhancement INPUT
-                          run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                          bs_seed = 1, # change the internal seed for the bootstrap
-                          bs_nBS = 10, # change the internal number of trials for the bootstrap
-                          plot = FALSE, # print plots to DataOut/
-                          est.table = TRUE # store tables - NOT FUNCTIONING
-)</code></pre>
-<pre class="r"><code># This is a test function run on dummy data with NO AGGREGATIONS
-IWAM_NoAgg &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks_NoAgg.csv&quot;, # INPUT Data
-                        remove.EnhStocks = TRUE, # Enhancement INPUT
-                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                        bs_seed = 1, # change the internal seed for the bootstrap
-                        bs_nBS = 10, # change the internal number of trials for the bootstrap
-                        plot = FALSE, # print plots to DataOut/
-                        est.table = TRUE # store tables - NOT FUNCTIONING
-)</code></pre>
 </div>
-<div id="s4.-outputs-example" class="section level2">
-<h2>S4. Outputs Example</h2>
+<div id="s3.-check-outputs" class="section level2">
+<h2>S3. Check outputs</h2>
+<p>This code is a direct lift from the IWAM function vignette.</p>
 <p>Once the model and bootstrapping has completed, the function will
 store the following objects:</p>
 <ul>
@@ -507,32 +437,32 @@ et al. (2023) (Table 9).</p>
 <tr class="odd">
 <td align="left">Barkley</td>
 <td align="right">17000</td>
-<td align="right">14000</td>
-<td align="right">25000</td>
+<td align="right">12000</td>
+<td align="right">38000</td>
 </tr>
 <tr class="even">
 <td align="left">Clayoquot</td>
-<td align="right">8200</td>
-<td align="right">5200</td>
-<td align="right">16000</td>
+<td align="right">7200</td>
+<td align="right">3900</td>
+<td align="right">10000</td>
 </tr>
 <tr class="odd">
 <td align="left">Kyuquot</td>
-<td align="right">5900</td>
-<td align="right">3200</td>
-<td align="right">8200</td>
+<td align="right">4400</td>
+<td align="right">3600</td>
+<td align="right">5400</td>
 </tr>
 <tr class="even">
 <td align="left">Nootka/Esperanza</td>
-<td align="right">22000</td>
+<td align="right">21000</td>
 <td align="right">14000</td>
-<td align="right">29000</td>
+<td align="right">35000</td>
 </tr>
 <tr class="odd">
 <td align="left">Quatsino</td>
-<td align="right">2900</td>
-<td align="right">1600</td>
-<td align="right">3800</td>
+<td align="right">4400</td>
+<td align="right">2700</td>
+<td align="right">6900</td>
 </tr>
 </tbody>
 </table>
@@ -550,33 +480,33 @@ Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
 <tbody>
 <tr class="odd">
 <td align="left">Barkley</td>
-<td align="right">2300</td>
-<td align="right">1400</td>
-<td align="right">8400</td>
+<td align="right">3600</td>
+<td align="right">1500</td>
+<td align="right">10000</td>
 </tr>
 <tr class="even">
 <td align="left">Clayoquot</td>
-<td align="right">2700</td>
-<td align="right">660</td>
-<td align="right">7200</td>
+<td align="right">1100</td>
+<td align="right">270</td>
+<td align="right">3200</td>
 </tr>
 <tr class="odd">
 <td align="left">Kyuquot</td>
-<td align="right">1400</td>
-<td align="right">450</td>
-<td align="right">1800</td>
+<td align="right">870</td>
+<td align="right">520</td>
+<td align="right">1900</td>
 </tr>
 <tr class="even">
 <td align="left">Nootka/Esperanza</td>
-<td align="right">5800</td>
-<td align="right">1900</td>
-<td align="right">11000</td>
+<td align="right">4100</td>
+<td align="right">1200</td>
+<td align="right">6700</td>
 </tr>
 <tr class="odd">
 <td align="left">Quatsino</td>
-<td align="right">530</td>
-<td align="right">200</td>
-<td align="right">1000</td>
+<td align="right">980</td>
+<td align="right">240</td>
+<td align="right">1800</td>
 </tr>
 </tbody>
 </table>
@@ -594,39 +524,38 @@ Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
 <tbody>
 <tr class="odd">
 <td align="left">Barkley</td>
-<td align="right">7200</td>
-<td align="right">5800</td>
-<td align="right">12000</td>
+<td align="right">7500</td>
+<td align="right">5200</td>
+<td align="right">17000</td>
 </tr>
 <tr class="even">
 <td align="left">Clayoquot</td>
-<td align="right">3600</td>
-<td align="right">2200</td>
-<td align="right">7700</td>
+<td align="right">2900</td>
+<td align="right">1500</td>
+<td align="right">4600</td>
 </tr>
 <tr class="odd">
 <td align="left">Kyuquot</td>
-<td align="right">2600</td>
-<td align="right">1400</td>
-<td align="right">3600</td>
+<td align="right">2000</td>
+<td align="right">1600</td>
+<td align="right">2300</td>
 </tr>
 <tr class="even">
 <td align="left">Nootka/Esperanza</td>
-<td align="right">9600</td>
-<td align="right">6200</td>
-<td align="right">13000</td>
+<td align="right">8900</td>
+<td align="right">5600</td>
+<td align="right">15000</td>
 </tr>
 <tr class="odd">
 <td align="left">Quatsino</td>
-<td align="right">1200</td>
-<td align="right">670</td>
-<td align="right">1700</td>
+<td align="right">1900</td>
+<td align="right">1000</td>
+<td align="right">3100</td>
 </tr>
 </tbody>
 </table>
 <p><em>Table 3. SMSY Estimates including 0.25% and 97.5% quantiles for
 Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
-</div>
 </div>
 
 

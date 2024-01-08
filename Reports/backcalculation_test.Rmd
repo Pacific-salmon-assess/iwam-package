@@ -1,12 +1,9 @@
 ---
-title: "IWAM Function Vignette"
+title: "Back-calculated WA Test"
+author: "Tor Kitching"
+date: "2024-01-03"
 output: html_document
-date: "2023-12-01"
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ```{r libraries, include=FALSE, echo=FALSE, message=FALSE}
 library(rsample)
@@ -24,35 +21,17 @@ library(knitr)
 # library(kableExtra)
 ```
 
-### Source Files
-
 ```{r source files, include=FALSE, echo=FALSE, message=FALSE}
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
-source(here::here("R/IWAM_model.R")) # Will itself source the bootstrap code through the function Get.LRP.bs()
+source(here::here("R/IWAM_model.R"))
 ```
 
+## Check for Back-Calculated Watershed Areas
 
-# IWAM Function Vignette
+The purpose of this document is to test the back-calculated watershed areas. All code will be drawn from the IWAM function vignette.
 
-Authors: Carrie Holt (1), Kendra Holt (1), and Brooke Davis (1)
-
-(1) Department of Fisheries and Oceans (DFO), Canada
-
-## Document Contents
-
-1.  Summary
-2.  Data Map
-3.  Function
-4.  Outputs
-
-## S1. Summary
-
-The purpose of the IWAM function is to provide estimates for SREP, SGEN, and SMSY, using habitat-based assessments methods (the Integrated Watershed Area model) in a streamlined process. This function is based upon the work of (insert history). This function is maintained by Carrie Holt (1) and Tor Kitching (1).
-
-(1) Department of Fisheries and Oceans (DFO), Canada
-
-## S2. Data Map
+## S1. Data Map
 
 The following function vignette/example is from the IWAM Package Repo hosted publicly through the Pacific Salmon Assess organization available at [this link.](https://github.com/Pacific-salmon-assess/iwam-package)
 
@@ -64,28 +43,10 @@ The package currently utilizes the following data sets:
 -   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
 -   *WCVIStocks (Public)*: User watershed area input file. Must contain watershed areas, life history identification, enhancement identification, and stock name. Aggregation within the IWAM function can be done with both CU and Inlet scales.
 
-## S3. Function Run Example
-
-The IWAM function is defined by two sets of parameters, the inputs;
-
--  ```WAin```: a string containing the file path to your watershed area data.
--  ```remove.EnhStocks```: a TRUE/FALSE statement of whether or not to remove enhanced stock populations from analysis.
-
-and the run specifications;
-
--  ```run.bootstrap```: a TRUE/FALSE statement of whether to run the bootstrapping internal process.
--  ```bs_seed```: a NUMERIC value for your desired bootstrapping seed.
--  ```bs_nBS```: a NUMERIC value for your desired number of trials.
--  ```plot```: a TRUE/FALSE statement of whether to print out plots to your DataOut folder.
--  ```est.table```: a TRUE/FALSE statement of whether to store final SREP, SGEN, and SMSY tables. Please see Section 4 for examples.
-
-The IWAM function is divided into two major sections. 
-
-1. The IWAM model; which estimates SREP and SMSY. This model is based upon the work of Parken et al. 2006 and Liermann et al. as a modification to the Ricker model.
-2. Model bootstrapping; which takes the estimates of the IWAM model and runs them through an iterative bootstrap to re-estimate SREP, SMSY, and SGEN based on an updated set of priors (CITATION).
+## S2. Initialize function
 
 ``` {r iwam function, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
-IWAM_WCVI <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
+IWAM_backcalc <- IWAM_func(WAin = "DataIn/Backcalc_targetstocks.csv", # INPUT Data
                        remove.EnhStocks = FALSE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # change the internal seed for the bootstrap
@@ -94,35 +55,13 @@ IWAM_WCVI <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
                        est.table = TRUE # store tables - NOT FUNCTIONING
 )
 
-# "make: Nothing to be done for 'all' - where is this error coming from?
+# "make: Nothing to be done for 'all' - this means that re-compiling the TMB model is NOT necessary
 # "Lengths checked passed." - from an internal function test for lengths after joins
-
-```
-``` {r iwam function dummy data, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
-# This is a test function run on dummy data with NO AGGREGATIONS
-IWAM_NoInlet <- IWAM_func(WAin = "DataIn/WCVIStocks_NoInlet.csv", # INPUT Data
-                          remove.EnhStocks = TRUE, # Enhancement INPUT
-                          run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                          bs_seed = 1, # change the internal seed for the bootstrap
-                          bs_nBS = 10, # change the internal number of trials for the bootstrap
-                          plot = FALSE, # print plots to DataOut/
-                          est.table = TRUE # store tables - NOT FUNCTIONING
-)
 ```
 
-``` {r iwam function dummy data 2, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
-# This is a test function run on dummy data with NO AGGREGATIONS
-IWAM_NoAgg <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # INPUT Data
-                        remove.EnhStocks = TRUE, # Enhancement INPUT
-                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                        bs_seed = 1, # change the internal seed for the bootstrap
-                        bs_nBS = 10, # change the internal number of trials for the bootstrap
-                        plot = FALSE, # print plots to DataOut/
-                        est.table = TRUE # store tables - NOT FUNCTIONING
-)
-```
+## S3. Check outputs
 
-## S4. Outputs Example
+This code is a direct lift from the IWAM function vignette. 
 
 Once the model and bootstrapping has completed, the function will store the following objects:
 
@@ -147,7 +86,7 @@ locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Espera
 ```
 
 ```{r SREP, echo=FALSE, message=FALSE}
-SREP <- IWAM_WCVI[[2]] %>% # Already SREP
+SREP <- IWAM_backcalc[[2]] %>%
   filter(RP=='SREP') %>%
   filter(Stock %in% locations) %>%
   rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
@@ -162,7 +101,7 @@ kable(SREP)
 ```{r SGEN, echo=FALSE, message=FALSE}
 # kable(IWAM_WCVI[[3]])
 
-SGEN <- IWAM_WCVI[[2]] %>%
+SGEN <- IWAM_backcalc[[2]] %>%
   filter(RP=='SGEN') %>%
   filter(Stock %in% locations) %>%
   rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
@@ -177,7 +116,7 @@ kable(SGEN)
 ```{r SMSY, echo=FALSE, message=FALSE}
 # kable(IWAM_WCVI[[4]])
 
-SMSY <- IWAM_WCVI[[2]] %>%
+SMSY <- IWAM_backcalc[[2]] %>%
   filter(RP=='SMSY') %>%
   filter(Stock %in% locations) %>%
   rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%

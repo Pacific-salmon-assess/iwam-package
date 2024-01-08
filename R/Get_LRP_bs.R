@@ -47,13 +47,15 @@ source (here::here("R/helperFunctions.R"))
 # Dataframe $SMU_ppn
 
 # Current wcvi case study example uses 
-# remove.EnhStocks <- TRUE
+# remove.EnhStocks <- FALSE
 # Bern_logistic <- FALSE
 # prod <- "LifeStageModel"
 # LOO <- NA
 # run_logReg <- FALSE
 # run.bootstraps <- TRUE
-# datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
+
+# datain <- c("DataOut/dataout_target_ocean_noEnh.csv") # RUNS CLEAN because NO CU INFORMATION to overlap
+# datain <- c("DataOut/dataout_target_wEnh.csv") # ERRORS BECAUSE CU DUPLICATES CAUSED BY TWO LH's
 
 Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file name/path of output of IWAM Model
                        remove.EnhStocks = TRUE,  
@@ -70,6 +72,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   # Core data: 
   if(remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
+  if(!remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
   #if(!remove.EnhStocks) RPs_long<- read.csv(here::here("DataOut/dataout_target_ocean_wEnh.csv"))
   # Old files:
   # if (remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
@@ -79,16 +82,28 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>% 
     filter (Param == "SMSY") %>% 
     rename(SMSY=Estimate, SMSYLL=LL, SMSYUL=UL) %>% 
-    dplyr::select (-Param, -X)#, -CU)
+    dplyr::select (-Param, -X) #, -CU)
   stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% 
     filter (Param == "SREP") %>% 
     rename(SREP=Estimate, SREPLL=LL, SREPUL=UL) %>% 
     dplyr::select (-Param, -X)
-  RPs <- stock_SMSY %>% left_join(stock_SREP, by="Stock")
+  
+  # Different cleaning tech
+  RPs_short <- RPs_long %>% 
+    filter(Stock != "Cypre") %>% 
+    mutate(LH = case_when(grepl("ocean", X) ~ "ocean", grepl("stream", X) ~ "stream", TRUE ~ "other")) %>% 
+    pivot_wider(id_cols = c(Stock, LH), names_from = c(Param), values_from = c(Estimate, LL, UL)) %>%
+    rename(SMSY=Estimate_SMSY, SREP=Estimate_SREP, SMSYLL=LL_SMSY, SMSYUL=UL_SMSY, SREPLL=LL_SREP, SREPUL=UL_SREP)
+  
+  # RPs <- RPs_short - for testing
+  
+  # **********************************************************************************************
+  RPs <- stock_SMSY %>% left_join(stock_SREP, by="Stock") # ERROR CAUSED BY DUPLICATES AFTER SPLIT
+  # **********************************************************************************************
   
   # Calculate scale for each stock
   digits <- count.dig(stock_SMSY$SMSY)
-  Scale <- 10^(digits)
+  Scale <- 10^(digits) # Not the same as what is used for the IWAM model?
   
   #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96)
   SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96)
@@ -119,15 +134,14 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # Lower estimate of Ricker a derived from life-stage model (Luedke pers.
   # comm.) 
   # DEFAULT
-  # prod <-  "LifeStageModel"
+  prod <-  "LifeStageModel"
   if(prod == "LifeStageModel"){
     Mean.Ric.A <- 1 # Derived from life-history model (Luedke pers.comm.) and 
     # WCVI CK run reconstruction SR analysis (Dobson pers. comm.)
     Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, 0))
     
-    
     # When incorporating uncertainty in Ricker A:
-    Sig.Ric.A <- 0.51#0.255 #0.51 for a wider plausible bound
+    Sig.Ric.A <- 0.51 #0.255 #0.51 for a wider plausible bound
     # Sig.Ric.A derived from 95% CL of lower and upper plausible limits = 
     # 0.5 logA - 1.5 logA (Luedke pers. comm. Dec 2020)
     # See distribution below:
@@ -152,7 +166,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
     
-    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
+    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% # ERROR LINE CONFIRMED
       mutate(SGEN=round(SGEN*Scale,0))
     RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
       mutate(a.par=round(a.par,2))
@@ -160,7 +174,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       mutate(SMSY=round(SMSY*Scale,0))
     
     RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
-                         "SREPLL", "SREPUL", "a.par")]#"CU"
+                         "SREPLL", "SREPUL", "a.par")] #"CU"
     
   }#End of if(prod == "LifeStageModel")
   
@@ -172,7 +186,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha=alpha)
     lnalpha_nBC_inlet <- read.csv("DataIn/CUPars_nBC.csv") %>% 
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha_nBC=alpha)
-    targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% # Previously WCVIStocks
+    targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% # Previously WCVIStocks - should this be the same as "datain"?
       filter (Stock != "Cypre") %>% rename(inlets=Inlet)
     Ric.A <- lnalpha_inlet %>% left_join(targetstocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
     
@@ -226,7 +240,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     
     SGENcalcs <- purrr::map2_dfr (Ric.A.hi, sREP/Scale, Sgen.fn2)
     
-    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
+    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% # POSSIBLE ERROR
       mutate(SGEN=round(SGEN*Scale,0))
     RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
       mutate(a.par=round(a.par,2))
@@ -278,7 +292,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # RPs <- RPs %>% mutate (SREPha.cSMAX = SGENcalcsv3$SREP) %>% 
   #   mutate( SREPha.cSMAX = round( SREPha.cSMAX*Scale, 0 ) )
   
-  # run_logReg <- TRUE
+  run_logReg <- FALSE
   if(run_logReg==FALSE){
     return(list(bench= select(SGENcalcs,-apar, -bpar)*Scale))
     
