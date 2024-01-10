@@ -134,7 +134,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # Lower estimate of Ricker a derived from life-stage model (Luedke pers.
   # comm.) 
   # DEFAULT
-  prod <-  "LifeStageModel"
+  # prod <-  "LifeStageModel"
   if(prod == "LifeStageModel"){
     Mean.Ric.A <- 1 # Derived from life-history model (Luedke pers.comm.) and 
     # WCVI CK run reconstruction SR analysis (Dobson pers. comm.)
