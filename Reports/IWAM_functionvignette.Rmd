@@ -17,13 +17,12 @@ library(viridis)
 library(hrbrthemes)
 library(gsl)
 library(knitr)
-# library(kableExtra)
 ```
 
 ### Source Files
 
 ```{r source files, include=FALSE, echo=FALSE, message=FALSE}
-source (here::here("R/helperFunctions.R"))
+source(here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
 source(here::here("R/IWAM_model.R")) # Will itself source the bootstrap code through the function Get.LRP.bs()
 ```
@@ -80,7 +79,7 @@ The IWAM function is divided into two major sections.
 1. The IWAM model; which estimates SREP and SMSY. This model is based upon the work of Parken et al. 2006 and Liermann et al. as a modification to the Ricker model.
 2. Model bootstrapping; which takes the estimates of the IWAM model and runs them through an iterative bootstrap to re-estimate SREP, SMSY, and SGEN based on an updated set of priors (CITATION).
 
-``` {r iwam function noenh, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
+``` {r iwam function wenh, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
 IWAM_WCVI_wEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
                        remove.EnhStocks = FALSE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
@@ -94,7 +93,7 @@ IWAM_WCVI_wEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
 # "Lengths checked passed." - from an internal function test for lengths after joins
 
 ```
-``` {r iwam function wenh, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
+``` {r iwam function noenh, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
 IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
                        remove.EnhStocks = TRUE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
@@ -108,31 +107,6 @@ IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
 # "Lengths checked passed." - from an internal function test for lengths after joins
 
 ```
-
-``` {r iwam function dummy data, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
-# This is a test function run on dummy data with NO AGGREGATIONS
-IWAM_NoInlet <- IWAM_func(WAin = "DataIn/WCVIStocks_NoInlet.csv", # INPUT Data
-                          remove.EnhStocks = TRUE, # Enhancement INPUT
-                          run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                          bs_seed = 1, # change the internal seed for the bootstrap
-                          bs_nBS = 10, # change the internal number of trials for the bootstrap
-                          plot = FALSE, # print plots to DataOut/
-                          est.table = TRUE # store tables - NOT FUNCTIONING
-)
-```
-
-``` {r iwam function dummy data 2, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
-# This is a test function run on dummy data with NO AGGREGATIONS
-IWAM_NoAgg <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # INPUT Data
-                        remove.EnhStocks = TRUE, # Enhancement INPUT
-                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                        bs_seed = 1, # change the internal seed for the bootstrap
-                        bs_nBS = 10, # change the internal number of trials for the bootstrap
-                        plot = FALSE, # print plots to DataOut/
-                        est.table = TRUE # store tables - NOT FUNCTIONING
-)
-```
-
 ## S4. Outputs Example
 
 Once the model and bootstrapping has completed, the function will store the following objects:
@@ -157,7 +131,7 @@ The following tables (1-3: Inclusion of enhanced stocks) and (4-6: Exclusion of 
 locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 ```
 
-```{r SREP noenh, echo=FALSE, message=FALSE}
+```{r SREP wenh, eval=FALSE, echo=FALSE, message=FALSE}
 SREP_wenh <- IWAM_WCVI_wEnh[[2]] %>% # Already SREP
   filter(RP=='SREP') %>%
   filter(Stock %in% locations) %>%
@@ -169,7 +143,7 @@ kable(SREP_wenh, caption = "Estimated SREP w/ Enh")
 ```
 *Table 1. SREP estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
-```{r SGEN noenh, echo=FALSE, message=FALSE}
+```{r SGEN wenh, eval=FALSE, echo=FALSE, message=FALSE}
 SGEN_wenh <- IWAM_WCVI_wEnh[[2]] %>%
   filter(RP=='SGEN') %>%
   filter(Stock %in% locations) %>%
@@ -181,7 +155,7 @@ kable(SGEN_wenh, caption = "Estimated SGEN w/ Enh")
 ```
 *Table 2. SGEN estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
-```{r SMSY noenh, echo=FALSE, message=FALSE}
+```{r SMSY wenh, eval=FALSE, echo=FALSE, message=FALSE}
 SMSY_wenh <- IWAM_WCVI_wEnh[[2]] %>%
   filter(RP=='SMSY') %>%
   filter(Stock %in% locations) %>%
@@ -193,7 +167,7 @@ kable(SMSY_wenh, caption = "Estimated SMSY w/ Enh")
 ```
 *Table 3. SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
-```{r SREP wenh, include=FALSE, echo=FALSE, message=FALSE}
+```{r SREP noenh, include=FALSE, echo=FALSE, message=FALSE}
 SREP_noenh <- IWAM_WCVI_noEnh[[2]] %>%
   filter(RP=='SREP') %>%
   filter(Stock %in% locations) %>%
@@ -201,12 +175,11 @@ SREP_noenh <- IWAM_WCVI_noEnh[[2]] %>%
   mutate(RP = NULL) %>%
   relocate(Stock)
 
-kable(SREP_noenh, caption = "Estimated SREP w/no Enh")
-
+# kable(SREP_noenh, caption = "Estimated SREP w/no Enh")
 # *Table 4. SREP Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 ```
 
-```{r SGEN wenh, include=FALSE, echo=FALSE, message=FALSE}
+```{r SGEN noenh, include=FALSE, echo=FALSE, message=FALSE}
 SGEN_noenh <- IWAM_WCVI_noEnh[[2]] %>%
   filter(RP=='SGEN') %>%
   filter(Stock %in% locations) %>%
@@ -214,11 +187,11 @@ SGEN_noenh <- IWAM_WCVI_noEnh[[2]] %>%
   mutate(RP = NULL) %>%
   relocate(Stock)
 
-kable(SGEN_noenh, caption = "Estimated SGEN w/no Enh")
+# kable(SGEN_noenh, caption = "Estimated SGEN w/no Enh")
 # *Table 5. SGEN Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 ```
 
-```{r SMSY wenh, include=FALSE, echo=FALSE, message=FALSE}
+```{r SMSY noenh, eval=FALSE, include=FALSE, echo=FALSE, message=FALSE}
 SMSY_noenh <- IWAM_WCVI_noEnh[[2]] %>%
   filter(RP=='SMSY') %>%
   filter(Stock %in% locations) %>%
@@ -226,20 +199,22 @@ SMSY_noenh <- IWAM_WCVI_noEnh[[2]] %>%
   mutate(RP = NULL) %>%
   relocate(Stock)
 
-kable(SMSY_noenh, caption = "Estimated SMSY w/no Enh")
+# kable(SMSY_noenh, caption = "Estimated SMSY w/no Enh")
 # *Table 6. SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 ```
 
-``` {r combo wenh, echo=FALSE, message=FALSE}
-combo <- data.frame(SGEN_noenh, SREP_noenh, SMSY_noenh)
+``` {r combo noenh, echo=FALSE, message=FALSE}
+combo <- data.frame(SGEN_noenh, SREP_noenh)
 combo <- combo %>% 
-  select(-Stock.1,-Stock.2)
+  select(-Stock.1) %>%
+  rename("SGEN LQ" = Lower.Quantile, "SGEN UQ" = Upper.Quantile,
+  "SREP LQ" = Lower.Quantile.1, "SREP UQ" = Upper.Quantile.1)
 # print(head(combo))
 kable(combo, caption = "Estimated SREP, SGEN, and SMSY with Enhanced Stocks")
 ```
 *Table 4. SGEN, SREP, and SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
-``` {r CSAS, echo=FALSE, message=FALSE}
+``` {r CSAS table, echo=FALSE, message=FALSE}
 # I think you will have to build the CSAS table from scratch
 Population_csas <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 
