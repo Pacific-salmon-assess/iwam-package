@@ -93,6 +93,12 @@ kable(complete, caption = "SGEN, SREP, and SMSY Estimates for All Stocks")
 ```
 *Table 1. SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of WCVI stocks.*
 
+``` {r Table output, echo=FALSE, message=FALSE}
+# output the above kable table into a csv in DataOut
+  # Call it: Backcalculation_stockestimates_table.csv
+write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
+```
+
 ```{r example summary, include=FALSE, eval=FALSE}
 # Bootstrap ouputs e.g. Table 9 in Case Study 2 Page 53:
   # Benchmarks and approximate 95% confidence limits for five inlets, not enhanced
