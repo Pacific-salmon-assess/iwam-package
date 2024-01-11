@@ -47,15 +47,15 @@ source (here::here("R/helperFunctions.R"))
 # Dataframe $SMU_ppn
 
 # Current wcvi case study example uses 
-# remove.EnhStocks <- FALSE
-# Bern_logistic <- FALSE
-# prod <- "LifeStageModel"
-# LOO <- NA
-# run_logReg <- FALSE
-# run.bootstraps <- TRUE
+remove.EnhStocks <- FALSE
+Bern_logistic <- FALSE
+prod <- "LifeStageModel"
+LOO <- NA
+run_logReg <- FALSE
+run.bootstraps <- TRUE
 
 # datain <- c("DataOut/dataout_target_ocean_noEnh.csv") # RUNS CLEAN because NO CU INFORMATION to overlap
-# datain <- c("DataOut/dataout_target_wEnh.csv") # ERRORS BECAUSE CU DUPLICATES CAUSED BY TWO LH's
+datain <- c("DataOut/dataout_target_wEnh.csv") # ERRORS BECAUSE CU DUPLICATES CAUSED BY TWO LH's
 
 Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file name/path of output of IWAM Model
                        remove.EnhStocks = TRUE,  
@@ -103,7 +103,9 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   # Calculate scale for each stock
   digits <- count.dig(stock_SMSY$SMSY)
-  Scale <- 10^(digits) # Not the same as what is used for the IWAM model?
+  # Scale <- 10^(digits) # Not the same as what is used for the IWAM model?
+  Scale <- 10^(digits-1)
+    # IWAM USES: 10^(maxdigits-1)
   
   #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96)
   SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96)

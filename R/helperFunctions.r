@@ -9,7 +9,7 @@ logit <- function(x){
 
 # Scaling by digits
 # Calculate scale for each stock as a tibble (tidyverse df)
-digit_scaling <- function(input_data){
+digit_scaling <- function(input_data){ # THIS input_data IS SPECIFICALLY FOR SRDAT - with many years of data that need to be grouped
   digits <- input_data %>% group_by(Stocknumber) %>% 
     summarize(maxDigits = count.dig(max(Sp)))
   # count.dig() Creates a count [numeric] of the max number of digits 
