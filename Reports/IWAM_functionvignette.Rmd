@@ -84,7 +84,7 @@ IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
                        remove.EnhStocks = TRUE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # change the internal seed for the bootstrap
-                       bs_nBS = 10, # change the internal number of trials for the bootstrap - 20000
+                       bs_nBS = 20000, # change the internal number of trials for the bootstrap - 20000
                        plot = FALSE, # print plots to DataOut/
                        est.table = FALSE # store tables - NOT FUNCTIONING
 )
@@ -143,6 +143,7 @@ SMSY_noenh <- IWAM_WCVI_noEnh[[2]] %>%
 # *Table 6. SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 ```
 
+*Table 1. SGEN, SREP, and SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 ``` {r combo noenh, echo=FALSE, message=FALSE}
 combo <- data.frame(SGEN_noenh, SREP_noenh)
 combo <- combo %>% 
@@ -152,8 +153,8 @@ combo <- combo %>%
 # print(head(combo))
 kable(combo, caption = "Estimated SREP, SGEN, and SMSY with Enhanced Stocks")
 ```
-*Table 1. SGEN, SREP, and SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
 
+*Table 2. Benchmarks (in units of number of spawners) and approximate 95% confdence limits, CL (labelled to the right of each benchmark) for fve inlets, including only escapement indicator populations that are not highly enhanced. Holt, K. et al. 2023 Res Doc*
 ``` {r CSAS table, echo=FALSE, message=FALSE}
 # I think you will have to build the CSAS table from scratch
 Population_csas <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
@@ -174,4 +175,3 @@ CSAS <- CSAS %>%
 
 kable(CSAS, caption = "CSAS SREP AND SGEN Estimates")
 ```
-*Table 2. CSAS Comparison - drawn from [CITE] Table 9..*

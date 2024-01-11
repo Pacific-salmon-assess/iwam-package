@@ -446,24 +446,13 @@ modification to the Ricker model.</li>
 runs them through an iterative bootstrap to re-estimate SREP, SMSY, and
 SGEN based on an updated set of priors (CITATION).</li>
 </ol>
-<pre class="r"><code>IWAM_WCVI_wEnh &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks.csv&quot;, # INPUT Data
-                       remove.EnhStocks = FALSE, # Enhancement INPUT
-                       run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
-                       bs_seed = 1, # change the internal seed for the bootstrap
-                       bs_nBS = 10, # change the internal number of trials for the bootstrap
-                       plot = FALSE, # print plots to DataOut/
-                       est.table = TRUE # store tables - NOT FUNCTIONING
-)
-
-# &quot;make: Nothing to be done for &#39;all&#39; - where is this error coming from?
-# &quot;Lengths checked passed.&quot; - from an internal function test for lengths after joins</code></pre>
 <pre class="r"><code>IWAM_WCVI_noEnh &lt;- IWAM_func(WAin = &quot;DataIn/WCVIStocks.csv&quot;, # INPUT Data
                        remove.EnhStocks = TRUE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # change the internal seed for the bootstrap
-                       bs_nBS = 10, # change the internal number of trials for the bootstrap
+                       bs_nBS = 20000, # change the internal number of trials for the bootstrap - 20000
                        plot = FALSE, # print plots to DataOut/
-                       est.table = TRUE # store tables - NOT FUNCTIONING
+                       est.table = FALSE # store tables - NOT FUNCTIONING
 )
 
 # &quot;make: Nothing to be done for &#39;all&#39; - where is this error coming from?
@@ -477,23 +466,12 @@ store the following objects:</p>
 <li><code>dfout</code>: A complete data frame containing the SGEN, SREP,
 and SMSY estimates for each stock and their upper and lower
 quantiles.</li>
-<li><code>SREP</code>: A subset of only SREP estimates for a comparative
-subset of WCVI stocks.</li>
-<li><code>SGEN</code>: A subset of only SGEN estimates for a comparative
-subset of WCVI stocks.</li>
-<li><code>SMSY</code>: A subset of only SMSY estimates for a comparative
-subset of WCVI stocks.</li>
-<li><code>TBD</code>: …</li>
 </ul>
-<p>The following tables (1-3: Inclusion of enhanced stocks) and (4-6:
-Exclusion of enhanced stocks) have been prepared for comparison to Holt
-et al. (2023) (Table 9 - shown here Table 7).</p>
-<p><em>Table 1. SREP estimates including 0.25% and 97.5% quantiles for
-Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
-<p><em>Table 2. SGEN estimates including 0.25% and 97.5% quantiles for
-Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
-<p><em>Table 3. SMSY Estimates including 0.25% and 97.5% quantiles for
-Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
+<p>Table 1, SGEN, SREP, and SMSY estimates, have been prepared for
+comparison to Holt et al. (2023) (Table 9 - shown here Table 2).</p>
+<p><em>Table 1. SGEN, SREP, and SMSY Estimates including 0.25% and 97.5%
+quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza,
+Quatsino.</em></p>
 <table>
 <caption>Estimated SREP, SGEN, and SMSY with Enhanced Stocks</caption>
 <thead>
@@ -510,54 +488,56 @@ Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.</em></p>
 <tbody>
 <tr class="odd">
 <td align="left">Barkley</td>
-<td align="right">73</td>
-<td align="right">43</td>
-<td align="right">320</td>
-<td align="right">550</td>
-<td align="right">420</td>
-<td align="right">950</td>
+<td align="right">120</td>
+<td align="right">28</td>
+<td align="right">430</td>
+<td align="right">640</td>
+<td align="right">290</td>
+<td align="right">1400</td>
 </tr>
 <tr class="even">
 <td align="left">Clayoquot</td>
-<td align="right">2600</td>
-<td align="right">640</td>
-<td align="right">7000</td>
-<td align="right">8000</td>
-<td align="right">5000</td>
-<td align="right">15000</td>
+<td align="right">1400</td>
+<td align="right">350</td>
+<td align="right">4300</td>
+<td align="right">7300</td>
+<td align="right">4100</td>
+<td align="right">13000</td>
 </tr>
 <tr class="odd">
 <td align="left">Kyuquot</td>
-<td align="right">1400</td>
-<td align="right">450</td>
-<td align="right">1800</td>
-<td align="right">5900</td>
+<td align="right">1000</td>
+<td align="right">240</td>
 <td align="right">3200</td>
-<td align="right">8200</td>
+<td align="right">5300</td>
+<td align="right">2900</td>
+<td align="right">9600</td>
 </tr>
 <tr class="even">
 <td align="left">Nootka/Esperanza</td>
-<td align="right">340</td>
-<td align="right">100</td>
-<td align="right">650</td>
-<td align="right">1300</td>
-<td align="right">710</td>
-<td align="right">1800</td>
+<td align="right">220</td>
+<td align="right">55</td>
+<td align="right">760</td>
+<td align="right">1200</td>
+<td align="right">570</td>
+<td align="right">2400</td>
 </tr>
 <tr class="odd">
 <td align="left">Quatsino</td>
-<td align="right">530</td>
-<td align="right">200</td>
-<td align="right">1000</td>
-<td align="right">2900</td>
-<td align="right">1600</td>
-<td align="right">3800</td>
+<td align="right">650</td>
+<td align="right">160</td>
+<td align="right">2100</td>
+<td align="right">3400</td>
+<td align="right">1800</td>
+<td align="right">6300</td>
 </tr>
 </tbody>
 </table>
-<p><em>Table 4. SGEN, SREP, and SMSY Estimates including 0.25% and 97.5%
-quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza,
-Quatsino.</em></p>
+<p><em>Table 2. Benchmarks (in units of number of spawners) and
+approximate 95% confdence limits, CL (labelled to the right of each
+benchmark) for fve inlets, including only escapement indicator
+populations that are not highly enhanced. Holt, K. et al. 2023 Res
+Doc</em></p>
 <table>
 <caption>CSAS SREP AND SGEN Estimates</caption>
 <colgroup>
@@ -628,7 +608,6 @@ Quatsino.</em></p>
 </tr>
 </tbody>
 </table>
-<p><em>Table 5. CSAS Comparison - drawn from [CITE] Table 9..</em></p>
 </div>
 </div>
 
