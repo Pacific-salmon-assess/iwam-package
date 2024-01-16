@@ -26,6 +26,10 @@ source(here::here("R/PlotFunctions.R"))
 source(here::here("R/IWAM_model.R"))
 ```
 
+``` {r options, include=FALSE}
+options(scipen=999)
+```
+
 ## Check for Back-Calculated Watershed Areas
 
 The purpose of this document is to test the back-calculated watershed areas. All code will be drawn from the IWAM function vignette.
@@ -40,7 +44,7 @@ The package currently utilizes the following data sets:
 -   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
 -   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s without bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
 -   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
--   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan.
+-   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use watershed areas with input from WCVI Staff: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.
 
 ## S2. Initialize function
 
@@ -58,13 +62,11 @@ IWAM_backcalc <- IWAM_func(WAin = "DataIn/Backcalc_targetstocks_NoAgg.csv", # Da
 
 ## S3. Check outputs
 
-This code is a direct lift from the IWAM function vignette. 
-
-Once the model and bootstrapping has completed, the function will store the following objects:
+This code is a direct lift from the IWAM function vignette. Once the model and bootstrapping has completed, the function will store the following objects:
 
 - ```dfout```: A complete data frame containing the SGEN, SREP, and SMSY estimates for each stock and their upper and lower quantiles.
 
-The following tables (1-3) have been prepared for comparison to Holt et al. (2023) (Table 9).
+The following tables (1-3) have been prepared for comparison to Holt et al. (2023) Res Doc (Table 9).
 
 ```{r Complete table, echo=FALSE, message=FALSE}
 SREP <- IWAM_backcalc[[2]] %>%
@@ -86,12 +88,15 @@ SGEN <- IWAM_backcalc[[2]] %>%
 
 ``` {r read in WA, echo=FALSE, message=FALSE}
 WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>% 
-  filter(Stock != "Cypre") %>% # remove Cypre - see Get_LRP_bs.R
+  # filter(Stock != "Cypre") %>% # remove Cypre - see Get_LRP_bs.R
   mutate(WA = round(WA,0)) 
 ```
 
-*Table 1. SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan.*
+
+*Table 1. SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.*
 ``` {r kable table, echo=FALSE, message=FALSE}
+options(scipen=999)
+
 complete <- data.frame(SGEN, SREP, SMSY) %>% 
   # confirm that all stocks line-up
   select(-Stock.1, -Stock.2) %>% 
@@ -100,7 +105,8 @@ complete <- data.frame(SGEN, SREP, SMSY) %>%
 
 complete <- complete %>% left_join(WAin, by=join_by(Stock)) %>% 
   select(-lh)  %>% # remove life histories ID's
-  relocate(WA, .after=Stock)
+  relocate(WA, .after=Stock) %>% 
+  arrange(Stock)
   
 kable(complete, caption = "SGEN, SREP, and SMSY Estimates for All Stocks")
 ```

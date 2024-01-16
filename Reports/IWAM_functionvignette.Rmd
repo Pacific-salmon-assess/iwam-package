@@ -175,3 +175,53 @@ CSAS <- CSAS %>%
 
 kable(CSAS, caption = "CSAS SREP AND SGEN Estimates")
 ```
+
+## S.5 Relationship Figure Comparisons
+
+The following includes a series of figures illustrating the relationship between the Parken (INSERT CITATION) estimates and those derived through the IWAM model used here. There is a comparison between using the same watershed areas with different parameterization, and showing the difference between the WCVI sample watershed area's and our own back-calculated watershed areas based on Parken's SMSY and SREP estimates (INSERT CITATION).
+
+```{r figure setup, echo=FALSE, message=FALSE}
+# load in iwam_model estimates for SREP and SMSY as two separate objects
+SMSY <- IWAM_WCVI_noEnh[[2]] %>%
+  filter(RP=='SMSY')
+SREP <-IWAM_WCVI_noEnh[[2]] %>%
+  filter(RP=='SREP')
+# SREP_noenh
+# load in Parken estimates for SREP and SMSY as two separate objects
+Parken <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+
+data <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>% 
+  rename("SMSY" = Value, "UL SMSY" = upr, "LL SMSY" = lwr) %>%
+  select(-RP) %>% 
+  left_join(SREP, by=join_by(Stock)) %>%
+  rename("SREP" = Value, "UL SREP" = upr, "LL SREP" = lwr) %>%
+  select(-RP)
+```
+
+``` {r SMSY comparison fig, echo=FALSE, message=FALSE, fig.align = 'center'}
+ggplot(data, aes(x=PA_SMSY, y=SMSY, size=WA)) +
+  geom_point() +
+  geom_abline(slope=1, intercept=0, linetype='dashed', color = 'grey') +
+  xlab("Parken SMSY Estimate") +
+  ylab("IWAM Model SMSY Estimate") +
+  theme_classic()
+
+# consider adjusting size of point by WA?
+# find a cb color palette
+```
+
+*Figure 1. X - Parken values, Y - New estimates: SREP*
+
+``` {r SREP comparison fig, echo=FALSE, message=FALSE, fig.align = 'center'}
+ggplot(data, aes(x=PA_SREP, y=SREP, size=WA)) +
+    geom_point() +
+  geom_abline(slope=1, intercept=0, linetype='dashed', color='grey') +
+  xlab("Parken SREP Estimate") +
+  ylab("IWAM Model SREP Estimate") +
+  theme_classic()
+
+# consider adjusting size of point by WA?
+# find a cb color palette
+```
+
+*Figure 1. X - Parken values, Y - New estimates: SMSY*

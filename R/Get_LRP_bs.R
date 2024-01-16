@@ -79,21 +79,23 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # if (!remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
   # Remove Cypre as it's not a core indicator (Diana McHugh, 22 Oct 2020)
-  stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>% 
+  stock_SMSY <- RPs_long %>% # filter(Stock != "Cypre") %>% 
     filter (Param == "SMSY") %>% 
     rename(SMSY=Estimate, SMSYLL=LL, SMSYUL=UL) %>% 
     dplyr::select (-Param, -X) #, -CU)
-  stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% 
+  stock_SREP <- RPs_long %>% # filter(Stock != "Cypre") %>% 
     filter (Param == "SREP") %>% 
     rename(SREP=Estimate, SREPLL=LL, SREPUL=UL) %>% 
     dplyr::select (-Param, -X)
   
-  # Different cleaning tech
-  RPs_short <- RPs_long %>% 
-    filter(Stock != "Cypre") %>% 
-    mutate(LH = case_when(grepl("ocean", X) ~ "ocean", grepl("stream", X) ~ "stream", TRUE ~ "other")) %>% 
-    pivot_wider(id_cols = c(Stock, LH), names_from = c(Param), values_from = c(Estimate, LL, UL)) %>%
-    rename(SMSY=Estimate_SMSY, SREP=Estimate_SREP, SMSYLL=LL_SMSY, SMSYUL=UL_SMSY, SREPLL=LL_SREP, SREPUL=UL_SREP)
+  # Different cleaning tech - Is this still needed?
+    # *TOR*: I think the issue here was fixed through a change to IWAM_model
+    # to eliminate duplicate CU's with both life histories.
+  # RPs_short <- RPs_long %>% 
+  #   # filter(Stock != "Cypre") %>% 
+  #   mutate(LH = case_when(grepl("ocean", X) ~ "ocean", grepl("stream", X) ~ "stream", TRUE ~ "other")) %>% 
+  #   pivot_wider(id_cols = c(Stock, LH), names_from = c(Param), values_from = c(Estimate, LL, UL)) %>%
+  #   rename(SMSY=Estimate_SMSY, SREP=Estimate_SREP, SMSYLL=LL_SMSY, SMSYUL=UL_SMSY, SREPLL=LL_SREP, SREPUL=UL_SREP)
   
   # RPs <- RPs_short - for testing
   
@@ -189,7 +191,8 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     lnalpha_nBC_inlet <- read.csv("DataIn/CUPars_nBC.csv") %>% 
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha_nBC=alpha)
     targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% # Previously WCVIStocks - should this be the same as "datain"?
-      filter (Stock != "Cypre") %>% rename(inlets=Inlet)
+      # filter (Stock != "Cypre") %>% 
+      rename(inlets=Inlet)
     Ric.A <- lnalpha_inlet %>% left_join(targetstocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
     
     RPs <- RPs %>% left_join(Ric.A) %>% mutate(a.RR=exp(lnalpha))

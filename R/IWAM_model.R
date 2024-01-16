@@ -265,7 +265,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   if (exists("Inlet", where = WAin)){
 # Make sure that this runs if BLANK
   InletlnWA <- data.frame(WAin) %>% # Complete set
-    filter(Stock != "Cypre") %>% 
+    # filter(Stock != "Cypre") %>% 
     group_by(Inlet) %>%
     summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
@@ -273,7 +273,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   
   # IF no Enh column - don't run
   InletlnWAnoEnh <- data.frame(WAin) %>% # Just keep the rows without enhancement
-    filter(Stock != "Cypre") %>% filter(Enh==0) %>%
+    # filter(Stock != "Cypre") %>% 
+    filter(Enh==0) %>%
     group_by(Inlet) %>% 
     summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
@@ -287,14 +288,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     
     # Add in LH specifications? ***********************************************
   CUlnWA <- data.frame(WAin) %>% 
-    filter(Stock != "Cypre") %>% 
+    # filter(Stock != "Cypre") %>% 
     group_by(CU) %>%
     summarize(CUlnWA = log(sum(WA)), lh = mean(lh)) # %>% 
     # add the unique LH value for each CU back into the new df
   
   # IF Enh column is blank just creates a table with no data
   CUlnWAnoEnh <- data.frame(WAin) %>% 
-    filter(Stock != "Cypre") %>% 
+    # filter(Stock != "Cypre") %>% 
     filter(Enh==0) %>%
     group_by(CU) %>% 
     summarize(CUlnWA = log(sum(WA)), lh = mean(lh))
@@ -960,7 +961,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   
     stockNames <- read.csv(here::here(datain)) %>% 
-      filter(Stock != "Cypre") %>% pull(Stock)
+      #  filter(Stock != "Cypre") %>% 
+      pull(Stock)
     stockNames <- unique(stockNames)
     
     rownames(SGEN.bs) <- stockNames
