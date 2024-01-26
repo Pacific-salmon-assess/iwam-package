@@ -1,0 +1,166 @@
+---
+title: "Parken_comparison"
+author: "Tor Kitching"
+date: "2024-01-22"
+output: html_document
+---
+
+
+```{r libraries, include=FALSE, echo=FALSE, message=FALSE}
+library(rsample)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(reshape2)
+library(TMB)
+library(zoo)
+library(viridis)
+library(hrbrthemes)
+library(gsl)
+library(knitr)
+```
+
+### Source Files
+
+```{r source files, include=FALSE, echo=FALSE, message=FALSE}
+source(here::here("R/helperFunctions.R"))
+source(here::here("R/PlotFunctions.R"))
+source(here::here("R/IWAM_model.R")) # Will itself source the bootstrap code through the function Get.LRP.bs()
+```
+
+### Model run
+``` {r iwam function noenh, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
+IWAM_peval <- IWAM_func(WAin = "DataIn/Parken_evalstocks.csv", # INPUT Data
+                       remove.EnhStocks = FALSE, # Enhancement INPUT
+                       run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
+                       bs_seed = 1, # change the internal seed for the bootstrap
+                       bs_nBS = 10, # change the internal number of trials for the bootstrap - 20000
+                       plot = FALSE, # print plots to DataOut/
+                       est.table = FALSE # store tables - NOT FUNCTIONING
+)
+
+# "make: Nothing to be done for 'all' - where is this error coming from?
+# "Lengths checked passed." - from an internal function test for lengths after joins
+```
+
+```{r SREP noenh, include=FALSE, echo=FALSE, message=FALSE}
+SREP <- IWAM_peval[[2]] %>%
+  filter(RP=='SREP') %>%
+  # filter(Stock %in% locations) %>%
+  rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
+  mutate(RP = NULL) %>%
+  relocate(Stock)
+
+# kable(SREP_noenh, caption = "Estimated SREP w/no Enh")
+# *Table 4. SREP Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
+```
+
+```{r SMSY noenh, include=FALSE, echo=FALSE, message=FALSE}
+SMSY <- IWAM_peval[[2]] %>%
+  filter(RP=='SMSY') %>%
+  # filter(Stock %in% locations) %>%
+  rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
+  mutate(RP = NULL) %>%
+  relocate(Stock)
+
+# kable(SMSY_noenh, caption = "Estimated SMSY w/no Enh")
+# *Table 6. SMSY Estimates including 0.25% and 97.5% quantiles for Barkley, Clayoquot, Kyuquot, Nootka/Esperanza, Quatsino.*
+```
+
+*Table 1. IWAM Estimated SREP and SMSY for Evaluation Stocks including upper and lower quantiles.*
+``` {r combo noenh, echo=FALSE, message=FALSE}
+combo <- data.frame(SMSY, SREP)
+combo <- combo %>%
+  select(-Stock.1) %>%
+  rename("SMSY LQ" = Lower.Quantile, "SMSY UQ" = Upper.Quantile,
+  "SREP LQ" = Lower.Quantile.1, "SREP UQ" = Upper.Quantile.1)
+# print(head(combo))
+kable(combo, caption = "IWAM Estimated SREP and SMSY for Evaluation Stocks")
+```
+
+
+``` {r eval table, echo=FALSE, message=FALSE}
+Parken_eval <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
+
+peval <- Parken_eval %>% 
+  select(-WA, -lh)
+kable(peval, caption = "Parken Estimated SREP and SMSY for Evaluation Stocks including upper and lower quantiles")
+```
+
+## Comparison Plots
+
+``` {r figure setup, include=FALSE, echo=FALSE, message=FALSE}
+# combo - IWAM estimates
+# peval - Parken estimates
+```
+
+``` {r Parken stockwise SMSY, echo=FALSE, message=FALSE, fig.align = 'centre'}
+# fig.width = 16, fig.height = 9
+
+SMSY_pl <- ggplot(combo, aes(x=Stock, y = SMSY)) +
+  geom_errorbar(aes(ymax = `SMSY UQ`, ymin = `SMSY LQ`), 
+                width = 0.2, 
+                color='red', 
+                position = position_nudge(0.2)) +
+  geom_point(color = 'red', position = position_nudge(0.2)) +
+  theme_classic() + 
+  ylab("SMSY Estimate") + 
+  xlab("") +
+  # coord_cartesian(ylim = c(0,25000)) +
+  # coord_flip() +
+  # scale_x_discrete(expand = c(0,0)) +
+  # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
+  #                    labels = function(x) stringr::str_wrap(x, width = 20)) +
+  # scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  # scale_x_discrete(guide = guide_axis(n.dodge=2)) + # labels = abbreviate
+  # scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1))
+
+# SMSY_pl
+
+SMSY_parken <- SMSY_pl + 
+  geom_point(peval, mapping = aes(x = Stock, y = SMSY), 
+             position = position_nudge(-0.1)) + 
+  geom_errorbar(peval, mapping = aes(x = Stock, ymax = SMSY_95 , ymin = SMSY_5), 
+                width = 0.2,                     
+                position = position_nudge(-0.1), 
+                inherit.aes = FALSE) 
+ 
+SMSY_parken
+```
+
+``` {r Parken stockwise SREP, echo=FALSE, message=FALSE, fig.align = 'centre'}
+# fig.width = 16, fig.height = 9
+
+SREP_pl <- ggplot(combo, aes(x=Stock, y = SREP)) +
+  geom_errorbar(aes(ymax = `SREP UQ`, ymin = `SREP LQ`), 
+                width = 0.2, 
+                color='red', 
+                position = position_nudge(0.2)) +
+  geom_point(color = 'red', position = position_nudge(0.2)) +
+  theme_classic() + 
+  ylab("SREP Estimate") + 
+  xlab("") +
+  # coord_cartesian(ylim = c(0,25000)) +
+  # coord_flip() +
+  # scale_x_discrete(expand = c(0,0)) +
+  # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
+  #                    labels = function(x) stringr::str_wrap(x, width = 20)) +
+  # scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  # scale_x_discrete(guide = guide_axis(n.dodge=2)) + # labels = abbreviate
+  # scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1))
+
+# SREP_pl
+
+SREP_parken <- SREP_pl + 
+  geom_point(peval, mapping = aes(x = Stock, y = SREP), 
+             position = position_nudge(-0.1)) + 
+  geom_errorbar(peval, mapping = aes(x = Stock, ymax = SREP_95 , ymin = SREP_5), 
+                width = 0.2,                     
+                position = position_nudge(-0.1), 
+                inherit.aes = FALSE) 
+ 
+SREP_parken
+```

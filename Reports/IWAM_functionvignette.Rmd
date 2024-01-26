@@ -190,15 +190,63 @@ SREP <-IWAM_WCVI_noEnh[[2]] %>%
 # load in Parken estimates for SREP and SMSY as two separate objects
 Parken <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
 
-data <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>% 
+eval_dat <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>% 
   rename("SMSY" = Value, "UL SMSY" = upr, "LL SMSY" = lwr) %>%
   select(-RP) %>% 
   left_join(SREP, by=join_by(Stock)) %>%
   rename("SREP" = Value, "UL SREP" = upr, "LL SREP" = lwr) %>%
-  select(-RP)
+  select(-RP) %>% 
+  mutate(PA_UL_SMSY = PA_SMSY + (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_LL_SMSY = PA_SMSY - (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
+  mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
 ```
 
-``` {r SMSY comparison fig, echo=FALSE, message=FALSE, fig.align = 'center'}
+``` {r Parken stockwise SMSY, echo=FALSE, message=FALSE, fig.align = 'centre'}
+SMSY_pl <- ggplot(eval_dat, aes(x=Stock, y = SMSY)) +
+  geom_errorbar(aes(ymax = `UL SMSY`, ymin = `LL SMSY`), width = 0.2, color='red', position = position_nudge(0.1)) +
+  geom_point(color = 'red', position = position_nudge(0.1)) +
+  
+  theme_classic() + 
+  ylab("SMSY Estimate") + 
+  ylim(0,25000) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+
+# SMSY_pl
+
+SMSY_parken <- SMSY_pl + 
+  geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SMSY), position = position_nudge(-0.1)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY), width = 0.2, position = position_nudge(-0.1), 
+                inherit.aes = FALSE)
+
+SMSY_parken
+```
+
+*Figure 1. Comparison of SMSY Estimates between the IWAM (red) and Parken model (black points). [Insert CI details].* 
+
+``` {r Parken stockwise SREP, echo=FALSE, message=FALSE, fig.align = 'centre'}
+SREP_pl <- ggplot(eval_dat, aes(x=Stock, y = SREP)) +
+  geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`), width = 0.2, color='red', position = position_nudge(0.1)) +
+  geom_point(color = 'red', position = position_nudge(0.1)) +
+  
+  theme_classic() + 
+  ylab("SREP Estimate") + 
+  ylim(0,25000) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+
+# SREP_pl
+
+SREP_parken <- SREP_pl + 
+  geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SREP), position = position_nudge(-0.1)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_UL_SREP, ymin = PA_LL_SREP), width = 0.2, position = position_nudge(-0.1), 
+                inherit.aes = FALSE)
+
+SREP_parken
+```
+
+*Figure 2. Comparison of SREP Estimates between the IWAM (red) and Parken model (black points). [Insert CI details].* 
+
+``` {r SMSY comparison fig, eval=FALSE, echo=FALSE, message=FALSE, fig.align = 'center'}
 ggplot(data, aes(x=PA_SMSY, y=SMSY, size=WA)) +
   geom_point() +
   geom_abline(slope=1, intercept=0, linetype='dashed', color = 'grey') +
@@ -206,13 +254,15 @@ ggplot(data, aes(x=PA_SMSY, y=SMSY, size=WA)) +
   ylab("IWAM Model SMSY Estimate") +
   theme_classic()
 
+# make axes a box so that the 1:1 line makes more sense visually
+
 # consider adjusting size of point by WA?
 # find a cb color palette
+
+# *Figure 1. X - Parken values, Y - New estimates: SREP*
 ```
 
-*Figure 1. X - Parken values, Y - New estimates: SREP*
-
-``` {r SREP comparison fig, echo=FALSE, message=FALSE, fig.align = 'center'}
+``` {r SREP comparison fig, eval=FALSE, echo=FALSE, message=FALSE, fig.align = 'center'}
 ggplot(data, aes(x=PA_SREP, y=SREP, size=WA)) +
     geom_point() +
   geom_abline(slope=1, intercept=0, linetype='dashed', color='grey') +
@@ -220,8 +270,10 @@ ggplot(data, aes(x=PA_SREP, y=SREP, size=WA)) +
   ylab("IWAM Model SREP Estimate") +
   theme_classic()
 
+# make axes a box so that the 1:1 line makes more sense visually
+
 # consider adjusting size of point by WA?
 # find a cb color palette
-```
 
-*Figure 1. X - Parken values, Y - New estimates: SMSY*
+# *Figure 1. X - Parken values, Y - New estimates: SMSY*
+```

@@ -28,6 +28,7 @@ source(here::here("R/IWAM_model.R"))
 
 ``` {r options, include=FALSE}
 options(scipen=999)
+# opts_chunk$set(out.width='750px', dpi=200)
 ```
 
 ## Check for Back-Calculated Watershed Areas
@@ -44,16 +45,18 @@ The package currently utilizes the following data sets:
 -   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
 -   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s without bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
 -   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
--   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use watershed areas with input from WCVI Staff: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.
+-   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use watershed areas with input from WCVI Staff: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River. PLEASE NOTE: duplicate stock/river names are no acceptable for example in the case of Seymour river - please specify their difference - Georgia Strait vs. South Thompson origins in the river name itself. Duplicate river names will result in a invalid object lengths error when running the IWAM function.
 
 ## S2. Initialize function
 
 ``` {r iwam function, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
-IWAM_backcalc <- IWAM_func(WAin = "DataIn/Backcalc_targetstocks_NoAgg.csv", # Data (INPUT)
+IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # Data (INPUT)
+                       # Ordered_backcalculated_noagg - ordered corrected to original input file
+                       # Backcalc_targetstocks_NoAgg.csv - broken due to alphabetical ordering
                        remove.EnhStocks = FALSE, # Remove Enhancement stocks (INPUT)
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # Change the internal seed for the bootstrap (INPUT)
-                       bs_nBS = 20000, # Change the internal number of trials for the bootstrap (INPUT)
+                       bs_nBS = 10, # Change the internal number of trials for the bootstrap (INPUT)
                        # Run 10 for testing purposes - otherwise 20000
                        plot = FALSE, # Print plots to DataOut/
                        est.table = FALSE # Store tables
@@ -87,7 +90,8 @@ SGEN <- IWAM_backcalc[[2]] %>%
 ```
 
 ``` {r read in WA, echo=FALSE, message=FALSE}
-WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>% 
+# WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>% 
+WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv")) %>% 
   # filter(Stock != "Cypre") %>% # remove Cypre - see Get_LRP_bs.R
   mutate(WA = round(WA,0)) 
 ```
@@ -95,8 +99,6 @@ WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>%
 
 *Table 1. SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.*
 ``` {r kable table, echo=FALSE, message=FALSE}
-options(scipen=999)
-
 complete <- data.frame(SGEN, SREP, SMSY) %>% 
   # confirm that all stocks line-up
   select(-Stock.1, -Stock.2) %>% 
@@ -104,9 +106,9 @@ complete <- data.frame(SGEN, SREP, SMSY) %>%
          "SMSY LQ" = Lower.Quantile.2, "SMSY UQ" = Upper.Quantile.2)
 
 complete <- complete %>% left_join(WAin, by=join_by(Stock)) %>% 
-  select(-lh)  %>% # remove life histories ID's
-  relocate(WA, .after=Stock) %>% 
-  arrange(Stock)
+  select(-lh, -CU_INDEX, -PA_SMSY, -PA_SE_SMSY, -PA_SREP, -PA_SE_SREP, -Comments)  %>% # remove life histories ID's
+  relocate(WA, .after=Stock) # %>% 
+  # arrange(Stock)
   
 kable(complete, caption = "SGEN, SREP, and SMSY Estimates for All Stocks")
 ```
@@ -116,3 +118,96 @@ kable(complete, caption = "SGEN, SREP, and SMSY Estimates for All Stocks")
   # Call it: Backcalculation_stockestimates_table.csv
 write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
 ```
+
+
+## S4. Comparative Plotting
+
+The objective of this section is to provide comparison figures between the IWAM function's estimates of SMSY and SREP to the Parken model estimates.
+
+```{r figure setup, echo=FALSE, message=FALSE}
+# load in iwam_model estimates for SREP and SMSY as two separate objects
+# SMSY and SGEN already loaded
+
+# load in Parken estimates
+Parken_eval <- data.frame(SGEN, SREP, SMSY) %>% 
+  # confirm that all stocks line-up
+  select(-Stock.1, -Stock.2) %>% 
+  rename("SGEN LQ" = Lower.Quantile, "SGEN UQ" = Upper.Quantile, "SREP LQ" = Lower.Quantile.1, "SREP UQ" = Upper.Quantile.1, 
+         "SMSY LQ" = Lower.Quantile.2, "SMSY UQ" = Upper.Quantile.2)
+
+Parken_eval <- Parken_eval %>% left_join(WAin, by=join_by(Stock))
+
+eval_data <- Parken_eval %>% 
+  mutate(PA_UL_SMSY = PA_SMSY + (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_LL_SMSY = PA_SMSY - (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
+  mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
+```
+
+``` {r Parken stockwise SMSY, echo=FALSE, message=FALSE, fig.align = 'centre', fig.width = 16, fig.height = 9}
+# out.width="100%"
+SMSY_pl <- ggplot(eval_data, aes(x=Stock, y = SMSY)) +
+  geom_errorbar(aes(ymax = `SMSY UQ`, ymin = `SMSY LQ`), 
+                width = 0.2, 
+                color='red', 
+                position = position_nudge(0.2)) +
+  geom_point(color = 'red', position = position_nudge(0.2)) +
+  theme_classic() + 
+  ylab("SMSY Estimate") + 
+  xlab("") +
+  coord_cartesian(ylim = c(0,25000)) +
+  # coord_flip() +
+  # scale_x_discrete(expand = c(0,0)) +
+  # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
+  #                    labels = function(x) stringr::str_wrap(x, width = 20)) +
+  # scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  # scale_x_discrete(guide = guide_axis(n.dodge=2)) + # labels = abbreviate
+  # scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1))
+
+# SMSY_pl
+
+SMSY_parken <- SMSY_pl + 
+  geom_point(eval_data, mapping = aes(x = Stock, y = PA_SMSY), 
+             position = position_nudge(-0.1)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_SMSY + (1.96 * PA_SE_SMSY) , ymin = PA_SMSY - (1.96 * PA_SE_SMSY)), 
+                width = 0.2,                     
+                position = position_nudge(-0.1), 
+                inherit.aes = FALSE) 
+ 
+SMSY_parken
+```
+``` {r Parken stockwise SREP, echo=FALSE, message=FALSE, fig.align = 'centre', fig.width = 16, fig.height = 9}
+# out.width="100%"
+SREP_pl <- ggplot(eval_data, aes(x=Stock, y = SREP)) +
+  geom_errorbar(aes(ymax = `SREP UQ`, ymin = `SREP LQ`), 
+                width = 0.2, 
+                color='red', 
+                position = position_nudge(0.2)) +
+  geom_point(color = 'red', position = position_nudge(0.2)) +
+  theme_classic() + 
+  ylab("SREP Estimate") + 
+  xlab("") +
+  coord_cartesian(ylim = c(0,25000)) +
+  # coord_flip() +
+  # scale_x_discrete(expand = c(0,0)) +
+  # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
+  #                    labels = function(x) stringr::str_wrap(x, width = 20)) +
+  # scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  # scale_x_discrete(guide = guide_axis(n.dodge=2)) + # labels = abbreviate
+  # scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1))
+
+# SREP_pl
+
+SREP_parken <- SREP_pl + 
+  geom_point(eval_data, mapping = aes(x = Stock, y = PA_SREP), 
+             position = position_nudge(-0.1)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_SREP + (1.96 * PA_SE_SREP) , ymin = PA_SREP - (1.96 * PA_SE_SREP)), 
+                width = 0.2,                     
+                position = position_nudge(-0.1), 
+                inherit.aes = FALSE) 
+ 
+SREP_parken
+
+

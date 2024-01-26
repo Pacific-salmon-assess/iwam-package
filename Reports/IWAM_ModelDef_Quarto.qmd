@@ -1,6 +1,6 @@
 ---
 title: "IWAM_ModelDef"
-format: pdf
+format: html
 editor: visual
 ---
 

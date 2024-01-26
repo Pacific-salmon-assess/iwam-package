@@ -127,7 +127,7 @@ Type objective_function<Type>:: operator() ()
     nLL(i) = -dnorm(logRS_pred(i), logRS(i),  sigma(stk(i)), true);
   }
   
-  // Add hierarchical structure to A ==============
+  // Add hierarchical structure to A:
   for(int i=0; i<N_stks; i++){
     // add prior on logA, 
     ans += -dnorm(logA(i), logMuA_stream + logMuA_ocean * lifehist(i), sigmaA, true );
@@ -147,7 +147,7 @@ Type objective_function<Type>:: operator() ()
     }
   }
   
-  // Add priors for hyperpars ====================
+  // Add priors for hyperpars:
   // MuA prior for stream type
   ans += -dnorm(logMuA_stream, logMuA_stream_mean, logMuA_stream_sig, true);
   // MuA prior for ocean type
@@ -179,7 +179,7 @@ Type objective_function<Type>:: operator() ()
   SREP = logA / exp(logB);
   
   
-  //Liermann's model with both stream and ocean type=================
+  // Liermann's model with both stream and ocean type=================
   vector <Type> pred_lnSMSY(N_stks);
   vector <Type> pred_lnSREP(N_stks);
   Type sigma_delta = exp(logDeltaSigma);

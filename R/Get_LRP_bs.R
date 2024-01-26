@@ -15,7 +15,6 @@ library(viridis)
 # Functions
 source (here::here("R/helperFunctions.R"))
 
-
 # Function to estimate LRPs for WCVI CK ----------------------------------------
 # Arguments; 
 # remove.EnhStocks = A logical reflecting if enhanced stock are to be 

@@ -224,6 +224,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   data$lifehist <- lifehist$lh
   data$scale <- srdat_scale # Ordered by Stocknumber
   
+  # Priors
   data$SigRicPriorNorm <- as.numeric(F)
   data$SigRicPriorGamma <- as.numeric(T)
   data$SigRicPriorCauchy <- as.numeric(F)
@@ -231,8 +232,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   data$SigDeltaPriorNorm <- as.numeric(F)
   data$SigDeltaPriorGamma <- as.numeric(T)
   data$SigDeltaPriorCauchy <- as.numeric(F)
-  data$Tau_dist <- 0.1
-  data$Tau_D_dist <- 1
+  data$Tau_dist <- 0.1 # Consider changing to 0.01
+  data$Tau_D_dist <- 1 # *******************************************************************************************
   # logDeltaSigma # currently listed as param in R, but data_scalar in TMB
   # logNuSigma # currently listed as param in R, but data_scalar in TMB
   
