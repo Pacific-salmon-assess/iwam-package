@@ -18,6 +18,7 @@ library(viridis)
 library(hrbrthemes)
 library(gsl)
 library(knitr)
+library(plotly)
 ```
 
 ```{r source files, include=FALSE, echo=FALSE, message=FALSE}
@@ -56,7 +57,7 @@ IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # D
                        remove.EnhStocks = FALSE, # Remove Enhancement stocks (INPUT)
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # Change the internal seed for the bootstrap (INPUT)
-                       bs_nBS = 10, # Change the internal number of trials for the bootstrap (INPUT)
+                       bs_nBS = 20000, # Change the internal number of trials for the bootstrap (INPUT)
                        # Run 10 for testing purposes - otherwise 20000
                        plot = FALSE, # Print plots to DataOut/
                        est.table = FALSE # Store tables
@@ -69,7 +70,7 @@ This code is a direct lift from the IWAM function vignette. Once the model and b
 
 - ```dfout```: A complete data frame containing the SGEN, SREP, and SMSY estimates for each stock and their upper and lower quantiles.
 
-The following tables (1-3) have been prepared for comparison to Holt et al. (2023) Res Doc (Table 9).
+The following tables (1-3) have been prepared for comparison to Holt et al. (2023) Res Doc (Table 9). The table will also be stored in your repository folder under the name of "Backcalculation_stockestimates_table.csv".
 
 ```{r Complete table, echo=FALSE, message=FALSE}
 SREP <- IWAM_backcalc[[2]] %>%
@@ -122,7 +123,7 @@ write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv
 
 ## S4. Comparative Plotting
 
-The objective of this section is to provide comparison figures between the IWAM function's estimates of SMSY and SREP to the Parken model estimates.
+The objective of this section is to provide comparison figures between the IWAM function's estimates of SMSY and SREP to the Parken model estimates. The following plots have been limited to a maximum Smsy and Srep value of 25,000 in order to match those of the technical working group presentations. 
 
 ```{r figure setup, echo=FALSE, message=FALSE}
 # load in iwam_model estimates for SREP and SMSY as two separate objects
@@ -155,7 +156,7 @@ SMSY_pl <- ggplot(eval_data, aes(x=Stock, y = SMSY)) +
   theme_classic() + 
   ylab("SMSY Estimate") + 
   xlab("") +
-  coord_cartesian(ylim = c(0,25000)) +
+  # coord_cartesian(ylim = c(0,25000)) +
   # coord_flip() +
   # scale_x_discrete(expand = c(0,0)) +
   # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
@@ -188,7 +189,7 @@ SREP_pl <- ggplot(eval_data, aes(x=Stock, y = SREP)) +
   theme_classic() + 
   ylab("SREP Estimate") + 
   xlab("") +
-  coord_cartesian(ylim = c(0,25000)) +
+  # coord_cartesian(ylim = c(0,25000)) +
   # coord_flip() +
   # scale_x_discrete(expand = c(0,0)) +
   # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
@@ -209,5 +210,38 @@ SREP_parken <- SREP_pl +
                 inherit.aes = FALSE) 
  
 SREP_parken
+# ggplotly(p)
+```
+
+``` {r srep plotly, include=FALSE, echo=FALSE, message=FALSE, fig.align = 'centre'}
+ggplotly(SREP_parken)
+```
+
+```{r plotly test, include=FALSE, echo=FALSE, message=FALSE}
+# Plotly test for SREP_pl test plot to allow for zooming
+# Example:
+# fig <- plot_ly(data = iris, x = ~Sepal.Length, y = ~Petal.Length, color = ~Species)
+# fig
+
+SREP_plotly <- plot_ly(data = eval_data, 
+                   x = ~Stock, 
+                   y = ~SREP, 
+                   name = "IWAM Estimate",
+                   error_y = list(array = ~((`SREP UQ` - SREP)/1.96)),
+                   type = 'scatter')
+
+# UL = PA_SREP + (1.96 * PA_SE_SREP)
+# UL - PA_SREP = (1.96 * PA_SE_SREP)
+# (UL - PA_SREP) / 1.96 = PA_SE_SREP
+
+fig <- SREP_plotly %>% 
+  add_markers(data = eval_data, 
+                   x = ~Stock, 
+                   y = ~PA_SREP, 
+                   name = "Parken Estimate",
+                   error_y = list(array=~(PA_SE_SREP)),
+                   type = 'scatter')
 
 
+fig
+```

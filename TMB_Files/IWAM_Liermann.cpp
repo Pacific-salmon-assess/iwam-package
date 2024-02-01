@@ -179,7 +179,7 @@ Type objective_function<Type>:: operator() ()
   SREP = logA / exp(logB);
   
   
-  // Liermann's model with both stream and ocean type=================
+  // Liermann's model with both stream and ocean type =================
   vector <Type> pred_lnSMSY(N_stks);
   vector <Type> pred_lnSREP(N_stks);
   Type sigma_delta = exp(logDeltaSigma);

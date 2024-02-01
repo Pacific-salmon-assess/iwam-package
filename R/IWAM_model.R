@@ -66,10 +66,10 @@ source(here::here("R/Get_LRP_bs.R"))
 #### Test wrapper function objects for internal usage  ----------------------------------------
 
 # Originally part of the main wrapper function stated outright
-# remove.EnhStocks <- FALSE # TRUE
+remove.EnhStocks <- FALSE # TRUE
 
 # WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-# WAin <- c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/WCVIStocks.csv")
 
 # WAin <- c("DataIn/Backcalc_targetstocks_NoAgg.csv") # RUNS
   # Nothing - just Stock, WA, and lh
