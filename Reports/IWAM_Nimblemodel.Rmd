@@ -1,0 +1,677 @@
+---
+title: "Nimble Model Test"
+author: "Tor Kitching"
+date: "2024-02-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+
+# Always remember to add a line between file structures for clean knitting.
+```
+
+```{r libraries, echo=FALSE}
+library(tidyverse)
+library(nimble)
+library(coda)
+library(dplyr)
+
+library(rsample)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(reshape2)
+library(TMB)
+library(zoo)
+library(viridis)
+library(hrbrthemes)
+library(gsl)
+library(knitr)
+```
+
+```{r custom library, echo=FALSE}
+source(here::here("R/helperFunctions.R"))
+source(here::here("R/PlotFunctions.R"))
+source(here::here("R/Get_LRP_bs.R"))
+source(here::here("R/IWAM_model.R"))
+```
+
+```{r LW nimble replicate, echo=FALSE}
+## Make lambertW function.
+## Use Newton's Method with precision 1e-9 
+LambertW <- nimbleFunction(
+  # setup = function(){}, ## To run in a nimble model can't have setup code.
+  run = function(x = double(), log = integer(0, default = 0)){ 
+    if(log == 1) {
+      logx <- x
+    }else{
+        logx <- log(x)
+    }
+    ## Choose a positive starting value.
+    y <- logx
+    if(logx < 0) y <- 0
+    done <- 0L
+    for (i in 1:100) {
+      if(done == 0){
+        if ( abs( logx - log(y) - y) < 1e-9) {done <- 1}
+        y <- y - (y - exp(logx - y)) / (1 + y);                  
+      }
+    }
+    if (done == 0) print("W: failed convergence");
+    returnType(double())
+    return(y)
+  },
+  ## Turn this on to build locally and check AD.
+  # methods = list(
+  #   gr_lambertW = function(x = double(), log = integer(0, default=1)){
+  #       ans <- derivs(run(x, log), wrt=1, order=0:2)
+  #       returnType(ADNimbleList())
+  #       return(ans)
+  #     }
+  # ),
+  buildDerivs = list(run = list(ignore = c('i', 'done')))
+)
+```
+
+
+
+## S1. Report Introduction
+
+The following model is based upon the Parken et al. 2006, Liermann et al. 2011 model, and Holt el al. 2023, and has been adapted by Paul Van-dan Bates and Tor Kitching. The purpose of this adaptation the following:
+
+1.  Parameterize the Ricker model for SREP (E), based on the Liermann et al. 2011 formulation.
+2.  Move away from creating multiple regression models (e.g. between SMSY-WA and SREP-WA), which share inherent information.
+3.  Move towards a fully Bayesian approach.
+4.  ...
+
+
+
+## S2. Datamap
+
+The following function vignette/example is from the IWAM Package Repo hosted publicly through the Pacific Salmon Assess organization available at [this link.](https://github.com/Pacific-salmon-assess/iwam-package)
+
+The package currently utilizes the following data sets:
+
+-   *SRinputfile (Private)*: Private data-sets developed by Parken et al. (2006). Required to run the complete function and is available upon request. To be updated with publicly available data. Life histories are included: 1 = ocean type, 0 = stream type. Contains stock names, year, spawners, recruits, and life history identification.
+-   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
+-   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s without bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *WCVIStocks (Public)*: User watershed area input file. Must contain watershed areas, life history identification, enhancement identification, and stock name. Aggregation within the IWAM function can be done with both CU and Inlet scales.
+
+
+
+## S3. Model Description
+
+
+
+### S3.a Ricker Model
+
+The following model is based off of Liermann et al. 2011. Who supplies the following relationship equations. Equation (\@ref(eq:rickersbase)) shows the parameterization of the Ricker model that ...
+
+
+
+\begin{equation}
+  R=Se^{\alpha(1-\frac{S}{S_{rep}})}
+  (\#eq:rickersbase)
+\end{equation}
+
+where $R$ is the number of recruits,
+
+$S$ is the number of spawners,
+
+and, $S_{rep}$ is the point on the curve where $R = S$.
+
+\begin{equation}
+  R_{ij}=S_{ij}exp[r_j(1-\frac{S_{ij}}{E_j})+w_{ij}]
+  (\#eq:rickersparameterized)
+\end{equation}
+
+where $i$ is year class, 
+
+$j$ is population,
+
+$r_j$ is the $log(slope)$ where $S_{ij} = 0$,
+
+$E_{ij}$ is equivalent to $S_{rep}$, when $S_{rep} = R_{ij} = S_{ij}$,
+
+and, $w_{ij}$ is the normally distributed independent random variable with mean 0 and population specific standard deviation.
+
+This parameterization of the Ricker's model can be simplified into the following expression. It is important to note that this version exlcudes the previously defined $w_{ij}$ because [INSERT REASONING].
+
+\begin{equation}
+  log(R/S) = log\alpha_i(1 - \frac{S_i}{E_i})
+  (\#eq:nimblericker)
+\end{equation}
+
+where $\alpha$ has a prior of:
+
+$$
+log\alpha \sim dnorm(log\alpha_0, log\alpha_{SD})
+$$
+
+$$
+log\alpha_0 \sim N(1.5, 2.5)
+$$
+
+$$
+log\alpha_{SD} \sim Uniform(0, 100)
+$$
+
+To avoid confusion, please kepe in mind that Liermann substitutes $\alpha$ for $r_j$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation.
+
+
+
+### S3.b Liermann Model Variations
+
+This formulation of the Ricker model is then used to evaluate the parameters to then build a regression relationship between $E_{ij}$ and watershed area $(WA)$, as follows:
+
+\begin{equation}
+  log(E_j) = a + a_DL+j + (b = b_DL_j)logW_j + k_j
+  (\#eq:Liermannwaregression)
+\end{equation}
+
+which we have modified to read:
+
+\begin{equation}
+  log(E_j) = b0 + b_{WA} \cdot logWA_j + logE0_j
+  (\#eq:Nimblewaregression)
+\end{equation}
+
+where $j$ is population,
+
+$E_{ij}$ is equivalent to $S_{rep}$ (as following with Liermann et al. 2011's formulation),
+
+$b0$ is the intercept of the regression,
+
+$b_{WA}$ is the slope term of the regression,
+
+$logWA_j$ are the logged watershed areas from the synoptic (baseline) data-set,
+
+and, $logE0_j$ is the random error term composed of the following hierarchical priors:
+
+$$
+logE0_j \sim N(0,E_{SD})
+$$
+$$
+E_{SD} \sim Uniform(0, 100)
+$$
+
+*Insert explanation of stream vs. ocean type calculations.*
+
+This same $logE0_j$ equation is then used to calculate the predicted WA's. 
+
+
+
+## S4. Data Setup
+
+The data cleaning and setup approach mirrors that described in the IWAM function vignette and worked example. No changes were made to the data or its structure.
+
+```{r data setup}
+# Setup data:
+srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
+WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
+
+# Constants:
+  # e.g. Enh = True, ...
+# remove.EnhStocks <- FALSE
+  # Only matters if we do aggregations e.g. by CU or by Inlet
+  # In which case just import the IWAM_model code loops into this code chunk starting line 327
+
+srdatwna <- srdatwna %>% filter(Name != "Hoko" & Name != "Hoh") 
+
+stockwna <- srdatwna %>% filter (is.na(Rec) == TRUE) %>% 
+  dplyr::select (Stocknumber) %>%  unique() %>% unlist() 
+
+# Remove years with NAs
+srdat <- srdatwna %>% filter(Rec != "NA") 
+order_test_1 <- srdat %>% filter(Stocknumber == stockwna[1] | 
+                             Stocknumber == stockwna[2])
+if(max(srdat$Stocknumber) >= stockwna[1]) { # if the max stock number (24)
+  for (i in 1:length(stockwna)) { # for  stocks identified with NAs (2)
+    len <- length (srdat[which (srdat$Stocknumber == stockwna[i]), ]$yr_num) - 1
+    srdat [which (srdat$Stocknumber == stockwna[i]), ]$yr_num <- c (0:len)
+  }
+}
+order_test_2 <- srdat %>% filter(Stocknumber == stockwna[1] | 
+                             Stocknumber == stockwna[2])
+srdat <- digit_scaling(srdat)
+srdat_scale <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
+srdat_scale <- srdat_scale$scale 
+srdat_cow <- srdat %>% filter(Name == "Cowichan" & 
+                                Yr >= 1985 & 
+                                Yr !=1986 & 
+                                Yr != 1987) # length = 10
+n_cow <- length(srdat_cow$Yr)
+srdat_cow$yr_num <- 0:(n_cow-1)
+srdat <- srdat %>%  filter(Name != "Cowichan") %>% bind_rows(srdat_cow) %>%
+  arrange(Stocknumber)
+names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
+WAbase <- WAbase %>% full_join(names, by="Name") %>% arrange(Stocknumber)
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+  group_by(Stocknumber) %>% 
+  summarize(lh=max(Stream)) %>% 
+  arrange (Stocknumber)
+
+data <- list(
+  logRS = log(srdat$Rec) - log(srdat$Sp)  
+)
+```
+
+```{r model inits, echo=FALSE}
+inits <- function(){
+  list(b0 = c(2.11, 2.11),
+    bWA = c(0.1, 0.1),
+    logAlpha0 = 1.5,
+    logESD = 1,
+    logAlphaSD = 1)
+}
+```
+
+```{r predicted WA, echo=FALSE}
+# Insert predictive WA's
+WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+# WAin <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+  # Could just use WCVI_Parken from the beginning here - then I don't have to do this join below
+
+nPred <- length(WAin$WA) # length of predicted watershed areas
+logWAPred <-  log(WAin$WA) # predicted watershed areas takes a vector 
+# NOTE: these will be ORDERED - this order must be maintained in order to bind them back in at the end
+```
+
+```{r model constants pred, echo=FALSE}
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+    group_by(Stocknumber) %>% 
+    summarize(lh=max(Stream))
+
+constants <- list(
+  N_Stk = max(srdat$Stocknumber + 1),
+  stk = srdat$Stocknumber + 1,
+  N_Obs = nrow(srdat),
+  logWAbase = log(WAbase$WA),
+  S = srdat$Sp,
+  type = lifehist$lh + 1, # Figure out after which one is which
+    # one value per stock in ordering
+    # 1 = stream, 2 = ocean
+  nPred = nPred, # length of predicted watersheds
+  logWAPred = logWAPred # put in the predicted watersheds  
+  # takes a vector - have to match by order after - cbind it back onto a table
+)
+```
+
+
+
+### S4.a Nimble Model
+
+```{r model stock_recruit_srep_biasCor, echo=FALSE}
+stock_recruit_srep_biasCor <- nimbleCode({
+
+  ## priors
+  logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
+  logAlphaSD ~ dunif(0, 100)
+  logESD ~ dunif(0, 100)
+    # Can we create regional mean alpha's?
+    # Can we use the distribution's used by Diane Dobson - see bootstrap
+
+  ## Based on Parken et al. 2006 (log ( 1/beta ) has a linear relationship with log Watershed Area.
+  b0[1] ~ dflat() # dnorm(0, tau = 10)  ## Flat intercept for stream
+  b0[2] ~ dflat() ## Flat intercept for ocean
+
+  bWA[1] ~ dnorm(0, tau = 1)  ## log Watershed area slope for stream
+  bWA[2] ~ dnorm(0, tau = 1)  ## log Watershed area slope for ocean
+
+  sigma ~ dunif(0, 100)
+
+  for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
+    logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
+    logE0[i] ~ dnorm(mean=0, sd = logESD) ## Stock level random effect 
+
+    log_E[i] <- b0[type[i]] + bWA[type[i]]*logWAbase[i] + logE0[i] ## Stock level regression
+    # according to Liermann there should be something like:
+      # E <- a + a*lifehist[i] + (b + b*lifehist[i])*logWAbase[i] + logE0[i]
+    # log_E[i] <- b0 + b0_stream*type[i] + (bWA + bWA_stream*type[i])*logWAbase[i] + logE0[i]
+    # where Here lifehist[i] is the life history type (Lj = 0 for stream-type and Lj = 1 for ocean-type).
+
+    E[i] <- exp(log_E[i])
+  }
+
+  ## Model and residuals:  
+  for(i in 1:N_Obs){ # 501 iterations - number of base observations
+    logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # - sigma^2/2
+      # remove - sigma^2/2 otherwise the estimations are too big - makes it difficult to interpret the variables
+
+    logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
+      # where is this used?
+  }
+
+  ## predWA
+  for ( j in 1:2 ){
+    for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
+    log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
+    # logE_re[i] ~ dnorm(mean=0, sd = logESD)
+
+    ## Pred Srep
+    # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
+    log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
+      # Stick without logE_re for now
+      # remove logE_re - assumes that there is no random effect for a new site prediction - "conditional mean"
+    
+    # If you just want to predict individual sites
+      # Would need to repeat pattern for every iter of j
+    # log(E_pred[i]) <- b0[pred_type[i]] + bWA[pred_type[i]]*logWAPred[i]
+      # E_pred is equal to alpha/beta
+
+    ## Pred Smsy
+    beta_pred[i,j] <- log_alpha[i,j]/E_pred[i,j] # Pred beta
+    predSmsy[i,j] <- (1 - LambertW(1-log_alpha[i,j], 1))/beta_pred[i,j]
+    # predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))*E_pred[i]/log_alpha[i]
+  }
+  }
+
+})
+```
+
+*Notes for Tor: ORIGINAL: take out own alpha distributions - Liermann takes the hierarchical alpha - We know that alpha's differ regionally - so we can either have regional hierarchical means. Want to be able to adjust alpha for Sgen.*
+
+
+
+## S5. Model run
+
+Lorem ipsum. ...
+
+```{r model run, echo=FALSE}
+RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = constants, 
+  inits = inits(), buildDerivs=TRUE) # Build derivs if you want MLE
+
+# Running calculate on model
+#   [Note] Any error reports that follow may simply reflect missing values in model variables.
+# Checking model sizes and dimensions
+#   [Note] This model is not fully initialized. This is not an error.
+#          To see which variables are not initialized, use model$initializeInfo().
+#          For more information on model initialization, see help(modelInitialization).
+
+# conf2 <- configureMCMC(RmodelSrep)
+conf2 <- configureMCMC(RmodelSrep, control = list(adaptFactorExponent = 0.25))
+
+conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", 
+                    "logAlphaSD", "logESD", "logE0", "E_pred", "beta_pred",
+                    "predSmsy"))
+Rmcmc2 <- buildMCMC(conf2)
+Cmodel2 <- compileNimble(RmodelSrep)
+
+Cmcmc2 <- compileNimble(Rmcmc2, project = RmodelSrep)
+# Cmcmc2$run(niter = 50000)	# Run chain directly on object
+# mvSamples <- Cmcmc2$mvSamples
+# samples <- as.matrix(mvSamples)
+# outc <- mcmc(samples[-c(1:10000),])	# Burn in
+mcmc.out <- runMCMC(Cmcmc2, niter=100000, nburnin=1000, nchains=4, samplesAsCodaMCMC = TRUE)
+```
+
+
+
+## S6. Model evaluation and plotting
+
+What plots do I want to show:
+
+1.  Table of WCVI CSAS comparison values for SREP.
+2.  Stock-wise comparison of SREP calculations for WCVI stocks between IWAM, Parken, and Nimble? Include confidence intervals/etc..
+
+-   Including:
+    a)  Nimble estimates,
+    b)  Parken estimates,
+    c)  IWAM model estimates.
+-   Missing:
+    -   Nimble SMSY estimates
+    -   Check that Enhanced is removed on Nimble data
+    -   Parken estimates for Enh removed
+    -   ...
+
+3.  WA regression w/ equation in comment box.
+
+-   For Nimble estimates:
+    -   log(WA) vs log(SREP)
+    -   log(WA) vs log(SMSY)
+
+```{r mcmc data retrieval, echo=FALSE, message=FALSE, warning=FALSE}
+#sum.outc <- summary(outc) # ****
+sum.outc <- summary(mcmc.out)
+sum.dfc <- data.frame(do.call("cbind", sum.outc))
+Ec <- sum.dfc[substr(rownames(sum.dfc), 1,5) == "log_E",]
+Ec <- cbind(Ec, WAbase)
+
+# # cbind back E_pred to the WAin df to get back those predicted SREP'S and CI's
+Epred <- sum.dfc[substr(rownames(sum.dfc), 1,6) == "E_pred",] # 6 refers to the number of characters in the string to search for?
+Epred <- cbind(Epred, WAin)
+# Mutate in a column for exp(E_pred) to get the final SREP values?
+  # Confirm that E_pred is the log form?
+
+# Within Ep (SREP predicted estimates)
+  # Pull out rows by index for ocean and stream life history and then bind them back together
+  # Remove all the columns we don't need
+  # Pipe all the above
+# ** FOR WCVI TEST STOCKS - THERE ARE ONLY lh=1 type stocks = ocean **
+  # Within the nimble code that means = 2
+  # Because it is lh + 1 in the data-setup
+Srep_pred <- Epred[22:42,]
+Srep_pred <- Srep_pred %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+   %>% ('srep2.5.'= X2.5., 'mean_srep'= Mean, 'srep97.5.'= X97.5., 
+         'srepSD' = SD, 'srep50.' = X50., 'srep25.' = X25., 'srep75.' = X75.)
+
+# cbind out the SMSY_pred
+ESmsy <- sum.dfc[substr(rownames(sum.dfc), 1,8) == "predSmsy",] # CHANGE INDEXING
+
+Smsy_pred <- ESmsy[22:42,] # CHANGE INDEXING
+Smsy_pred <- Smsy_pred %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+   %>% ('smsy2.5.'= X2.5., 'mean_smsy'= Mean, 'smsy97.5.'= X97.5., 
+         'smsySD' = SD, 'smsy50.' = X50., 'smsy25.' = X25., 'smsy75.' = X75.)
+
+# Now I will have the mean, median, CI's (ALL PREDICTED) and the base WAin dataframe bound together
+
+# Bind Srep and Smsy preds together into preds
+preds <- cbind(Srep_pred,Smsy_pred)
+# preds
+```
+
+```{r iwam and parken model setup, echo=FALSE, message=FALSE, warning=FALSE}
+IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
+                       remove.EnhStocks = TRUE, # Enhancement INPUT
+                       run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
+                       bs_seed = 1, # change the internal seed for the bootstrap
+                       bs_nBS = 10, # change the internal number of trials for the bootstrap - 20000
+                       plot = FALSE, # print plots to DataOut/
+                       est.table = FALSE # store tables - NOT FUNCTIONING
+)
+
+SMSY <- IWAM_WCVI_noEnh[[2]] %>%
+  filter(RP=='SMSY')
+SREP <-IWAM_WCVI_noEnh[[2]] %>%
+  filter(RP=='SREP')
+
+Parken <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+  # Could just use WCVI_Parken from the beginning here - then I don't have to do this join below
+
+eval_dat <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>% 
+  rename("SMSY" = Value, "UL SMSY" = upr, "LL SMSY" = lwr) %>%
+  select(-RP) %>% 
+  left_join(SREP, by=join_by(Stock)) %>%
+  rename("SREP" = Value, "UL SREP" = upr, "LL SREP" = lwr) %>%
+  select(-RP) %>% 
+  mutate(PA_UL_SMSY = PA_SMSY + (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_LL_SMSY = PA_SMSY - (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
+  mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
+```
+
+
+
+### S6.a Stock-wise comparisons of SREP Plots
+
+```{r unused plotting}
+
+```
+
+```{r stockwise SREP, echo=FALSE, message=FALSE}
+# config options: fig.align = 'centre'
+
+# DOUBLE CHECK NEW OBJECT NAMING
+
+# Init plot and add geom for IWAM estimates as baselines
+SREP_i <- ggplot(eval_dat, aes(x=Stock, y = SREP)) +
+  geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`), width = 0.2, color='red', position = position_nudge(0.2)) +
+  geom_point(color = 'red', position = position_nudge(0.2)) +
+  
+  theme_classic() + 
+  ylab("SREP Estimate") + 
+  # ylim(0,25000) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+
+# SREP_i
+
+# Add geom for Parken estimates
+SREP_p <- SREP_i + 
+  geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SREP), position = position_nudge(-0.2)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_UL_SREP, ymin = PA_LL_SREP), width = 0.2, position = position_nudge(-0.2), 
+                inherit.aes = FALSE)
+
+# SREP_p
+
+SREP_f <- SREP_p + 
+  geom_point(preds, mapping = aes(x = Stock, y = srep50.), color='orange') + # mean_srep or srep50. (median)
+  geom_errorbar(data = preds, aes(x = Stock, ymax = `srep97.5.`, ymin = `srep2.5.`), color='orange', width = 0.2, 
+                inherit.aes = FALSE)
+
+SREP_f
+```
+
+```{r stockwise SMSY, echo=FALSE, message=FALSE}
+# config options: fig.align = 'centre'
+
+# DOUBLE CHECK NEW OBJECT NAMING
+
+# Init plot and add geom for IWAM estimates as baselines
+SMSY_i <- ggplot(eval_dat, aes(x=Stock, y = SMSY)) +
+  geom_errorbar(aes(ymax = `UL SMSY`, ymin = `LL SMSY`), width = 0.2, color='red', position = position_nudge(0.2)) +
+  geom_point(color = 'red', position = position_nudge(0.2)) +
+  
+  theme_classic() + 
+  ylab("SMSY Estimate") + 
+  # ylim(0,25000) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+
+# SMSY_i
+
+# Add geom for Parken estimates
+SMSY_p <- SMSY_i + 
+  geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SMSY), position = position_nudge(-0.2)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY), width = 0.2, position = position_nudge(-0.2), 
+                inherit.aes = FALSE)
+
+SMSY_p
+
+# Add final geom for nimble estimates
+# SMSY_f <- SMSY_p +
+#     geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SMSY), color='orange', position = position_nudge(-0.1)) +
+#     geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY), width = 0.2, position = position_nudge(-0.1),
+#                 inherit.aes = FALSE)
+SMSY_f <- SMSY_p + 
+  geom_point(preds, mapping = aes(x = Stock, y = smsy50.), color='orange') + 
+  geom_errorbar(data = preds, aes(x = Stock, ymax = `smsy97.5.`, ymin = `smsy2.5.`), color='orange', width = 0.2, 
+                inherit.aes = FALSE)
+
+SMSY_f
+```
+
+
+
+### S6.b WA Regression Plots
+
+Important to note that because there is no error on the prediction terms - one is essentially drawing from the regression line created. This can best be seen by plotting log predicted 'mean' Srep against log watershed area - which produces a straight line. This line is controlled by the slope and intercept estimated by the model posterior.
+
+```{r baseline WA, echo=FALSE, message=FALSE}
+# Regression of WAbase and Srep
+ggplot(data = Ec, aes(x = log(WA), y = Mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = X2.5., ymax = X97.5. )) +
+  theme_classic() +
+  geom_abline(intercept = sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"],
+    slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
+  ylab("Log Srep") +
+  xlab("Log Watershed Area")
+
+# How does it look with the logE_re term
+```
+
+```{r logWA regression plots, echo=FALSE, message=FALSE}
+reg_mean <- ggplot(data = preds, aes(x = log(WA), y = log(mean_srep))) +
+  geom_point() +
+  geom_errorbar(aes(ymin = log(srep2.5.), ymax = log(srep97.5.) )) +
+  theme_classic() +
+  # geom_abline(intercept = sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"],
+  #   slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
+  ylab("Log Srep") +
+  xlab("Log Watershed Area")
+
+reg_mean
+
+reg_f <- reg_mean + 
+  geom_point(data = preds, mapping = aes(x = log(WA), y = log(srep50.)), color='orange') # +
+  # geom_errorbar(aes(ymin = log(srep2.5.), ymax = log(srep97.5.) ))
+
+reg_f
+```
+
+```{r pauls plots, echo=FALSE}
+# ggplot(data = Ec, aes(x = log(WA), y = Mean)) +
+#   geom_point() + 
+#   geom_errorbar(aes(ymin = X2.5., ymax = X97.5. )) + 
+#   theme_classic() + 
+#   geom_abline(intercept = sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"], 
+#     slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) + 
+#   ylab("Log Srep") + 
+#   xlab("Log Watershed Area")
+# 
+# alphac <- sum.dfc[substr(rownames(sum.dfc), 1,9) == "logAlpha[",]
+# alphac <- cbind(alphac, WAbase)
+# 
+# hist(alphac$Mean)
+# 
+# plot(outc[, "logAlpha[1]"])
+# plot(outc[, "logAlpha[1]"])
+```
+
+
+
+### S6.c CSAS Table comparisons
+
+```{r nimble table, echo=FALSE, message=FALSE}
+# NON FUNCTION - change the object names
+# combo <- data.frame(SGEN_noenh, SREP_noenh)
+# combo <- combo %>% 
+#   select(-Stock.1) %>%
+#   rename("SGEN LQ" = Lower.Quantile, "SGEN UQ" = Upper.Quantile,
+#   "SREP LQ" = Lower.Quantile.1, "SREP UQ" = Upper.Quantile.1)
+# # print(head(combo))
+# kable(combo, caption = "Estimated SREP, SGEN, and SMSY with Enhanced Stocks")
+```
+
+```{r CSAS table, echo=FALSE, message=FALSE}
+# Population_csas <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
+# 
+# SGEN_csas <- c(120, 1400, 1000, 220, 650)
+# SGEN_ul_csas <- c(28, 350, 240, 55, 160)
+# SGEN_ll_csas <- c(430, 4300, 3200, 760, 2100)
+# 
+# SREP_csas <- c(640, 7300, 5300, 1200, 3400)
+# SREP_ul_csas <- c(290, 4100, 2900, 570, 1800)
+# SREP_ll_csas <- c(1400, 13000, 9600, 2400, 6300)
+# 
+# CSAS <- data.frame(Population_csas, SGEN_csas, SGEN_ul_csas, SGEN_ll_csas, SREP_csas, SREP_ul_csas, SREP_ll_csas)
+# CSAS <- CSAS %>% 
+#   rename('Population'=Population_csas, 
+#          'SGEN'=SGEN_csas, 'SGEN Upper 95% CL'=SGEN_ul_csas, 'SGEN Lower 95% CL'=SGEN_ll_csas, 
+#          'SREP'=SREP_csas, 'SREP Upper 95% CL'=SREP_ul_csas, 'SREP Lower 95% CL'=SREP_ll_csas)
+# 
+# kable(CSAS, caption = "CSAS SREP AND SGEN Estimates")
+```

@@ -36,7 +36,7 @@ Which is then linearized by log transformation into the form:
 
 $$
 log(\frac{R_i}{S_i}) = log(\alpha_i)-\beta_i \cdot S_i + \tau_i
-$$
+$$ {#eq-*}
 
 Where $\tau \sim Normal(0, \sigma_\tau)$
 

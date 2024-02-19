@@ -131,7 +131,7 @@ Type objective_function<Type>:: operator() ()
   for(int i=0; i<N_stks; i++){
     // add prior on logA, 
     ans += -dnorm(logA(i), logMuA_stream + logMuA_ocean * lifehist(i), sigmaA, true );
-     // add prior on sigma 
+     // add prior on sigma, 
     if (SigRicPriorGamma == 1) {
        ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true);
     }
@@ -174,10 +174,10 @@ Type objective_function<Type>:: operator() ()
   
   //For SMSY calculation, 
   for(int i=0; i<N_stks; i++){
-    SMSY(i) =  (1 - LambertW( exp (1- logA(i)) ) ) / exp(logB(i)) ;
+    SMSY(i) =  (1 - LambertW( exp (1- logA(i)) ) ) / exp(logB(i)) ; //
   }
   SREP = logA / exp(logB);
-  
+ // SMSY(i) =  (1 - LambertW( exp (1- logA(i) - sigma^2/2) ) ) / exp(logB(i)) ; // non-bias correction version
   
   // Liermann's model with both stream and ocean type =================
   vector <Type> pred_lnSMSY(N_stks);

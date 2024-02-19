@@ -66,10 +66,10 @@ source(here::here("R/Get_LRP_bs.R"))
 #### Test wrapper function objects for internal usage  ----------------------------------------
 
 # Originally part of the main wrapper function stated outright
-remove.EnhStocks <- FALSE # TRUE
+# remove.EnhStocks <- FALSE # TRUE
 
 # WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-WAin <- c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/WCVIStocks.csv")
 
 # WAin <- c("DataIn/Backcalc_targetstocks_NoAgg.csv") # RUNS
   # Nothing - just Stock, WA, and lh
@@ -395,7 +395,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   param$logNu2 <- log(0.72)
   param$Nu2_ocean <- 0
   param$logNuSigma <- -0.412 #from Parken et al. 2006 where sig=0.66
-  
+
   
   # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs ----------
   mod <- "IWAM_Liermann" 
