@@ -169,7 +169,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
     
-    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% # ERROR LINE CONFIRMED
+    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>%
       mutate(SGEN=round(SGEN*Scale,0))
     RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
       mutate(a.par=round(a.par,2))

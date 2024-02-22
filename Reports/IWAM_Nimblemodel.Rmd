@@ -103,16 +103,17 @@ The package currently utilizes the following data sets:
 
 ## S3. Model Description
 
+Lorem ipsum ...
+
+
 
 
 ### S3.a Ricker Model
 
-The following model is based off of Liermann et al. 2011. Who supplies the following relationship equations. Equation (\@ref(eq:rickersbase)) shows the parameterization of the Ricker model that ...
-
-
+The following model is based off of Liermann et al. 2011. who supplies the following relationship equations. Equation (\@ref(eq:rickersbase)) shows the baseline Ricker model.
 
 \begin{equation}
-  R=Se^{\alpha(1-\frac{S}{S_{rep}})}
+  R=Se^{\alpha(1-\frac{S}{S_{REP}})}
   (\#eq:rickersbase)
 \end{equation}
 
@@ -120,7 +121,7 @@ where $R$ is the number of recruits,
 
 $S$ is the number of spawners,
 
-and, $S_{rep}$ is the point on the curve where $R = S$.
+and, $S_{REP}$ is the point on the curve where $R = S$.
 
 \begin{equation}
   R_{ij}=S_{ij}exp[r_j(1-\frac{S_{ij}}{E_j})+w_{ij}]
@@ -131,20 +132,36 @@ where $i$ is year class,
 
 $j$ is population,
 
-$r_j$ is the $log(slope)$ where $S_{ij} = 0$,
+$r_j$ is the $log(slope)$ where $S_{ij} = 0$, with the following prior of:
 
-$E_{ij}$ is equivalent to $S_{rep}$, when $S_{rep} = R_{ij} = S_{ij}$,
+$$
+r_j \sim N(r_m, h_j)
+$$,
+
+$$
+r_m \sim N(0.6, 0.45)
+$$,
+
+$$
+h_j \sim N(0, E_{SD})
+$$,
+
+$$
+E_{SD} \sim Uniform(0,100)
+$$,
+
+$E_{ij}$ is equivalent to $S_{REP}$, when $S_{REP} = R_{ij} = S_{ij}$,
 
 and, $w_{ij}$ is the normally distributed independent random variable with mean 0 and population specific standard deviation.
 
-This parameterization of the Ricker's model can be simplified into the following expression. It is important to note that this version exlcudes the previously defined $w_{ij}$ because [INSERT REASONING].
+This parameterization of the Ricker's model can be simplified into the following expression. It is important to note that this version excludes the previously defined $w_{ij}$:
 
 \begin{equation}
   log(R/S) = log\alpha_i(1 - \frac{S_i}{E_i})
   (\#eq:nimblericker)
 \end{equation}
 
-where $\alpha$ has a prior of:
+where $\alpha$ has a hierarchical prior of:
 
 $$
 log\alpha \sim dnorm(log\alpha_0, log\alpha_{SD})
@@ -158,13 +175,13 @@ $$
 log\alpha_{SD} \sim Uniform(0, 100)
 $$
 
-To avoid confusion, please kepe in mind that Liermann substitutes $\alpha$ for $r_j$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation.
+To avoid confusion, please keep in mind that Liermann substitutes $\alpha$ for $r_j$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation.
 
 
 
-### S3.b Liermann Model Variations
+### S3.b Building the Regression
 
-This formulation of the Ricker model is then used to evaluate the parameters to then build a regression relationship between $E_{ij}$ and watershed area $(WA)$, as follows:
+The Ricker model estimated parameters are then used to build a regression relationship between $E_{ij}$ and watershed area $(WA)$, as follows:
 
 \begin{equation}
   log(E_j) = a + a_DL+j + (b = b_DL_j)logW_j + k_j
@@ -180,7 +197,7 @@ which we have modified to read:
 
 where $j$ is population,
 
-$E_{ij}$ is equivalent to $S_{rep}$ (as following with Liermann et al. 2011's formulation),
+$E_{ij}$ is equivalent to $S_{REP}$ (as following with Liermann et al. 2011's formulation),
 
 $b0$ is the intercept of the regression,
 
@@ -197,9 +214,29 @@ $$
 E_{SD} \sim Uniform(0, 100)
 $$
 
-*Insert explanation of stream vs. ocean type calculations.*
+The main difference between the two forms is the coded differentiation of stream versus ocean type regressions. At their core the two create two lines - however the Liermann method creates a parameter that acts is the effective offset between them, where the Nimble model format creates two separate parameters. Both values can be calculated from either model and are redundant.
 
-This same $logE0_j$ equation is then used to calculate the predicted WA's. 
+
+
+### S3.c Predictions
+
+The current nimble model calculates $S_{REP}$ (as seen above in the $logE0_j$ equation) and $S_{MSY}$ by the following methods and following Scheurell's Lambert W method for estimation/optimization [CITATION]. This is done by first calculating $\beta$:
+
+$$
+\beta = log\alpha/E 
+$$ 
+or
+$$
+\beta = log\alpha/S_{REP}
+$$
+
+using $\beta$, $S_{MSY}$ is calculated as follows:
+
+$$
+S_{MSY} = (1 - LW(1-log\alpha))/\beta
+$$
+
+It should be noted that the prior of $\alpha$ is retained from the original evaluation of the Ricker model.
 
 
 
@@ -354,7 +391,10 @@ stock_recruit_srep_biasCor <- nimbleCode({
     # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
     log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
       # Stick without logE_re for now
-      # remove logE_re - assumes that there is no random effect for a new site prediction - "conditional mean"
+      # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
+        # confidence - how uncertain you are about expected value
+        # prediction - how uncertain you are about predicted new site
+      
     
     # If you just want to predict individual sites
       # Would need to repeat pattern for every iter of j
@@ -455,7 +495,7 @@ Epred <- cbind(Epred, WAin)
 Srep_pred <- Epred[22:42,]
 Srep_pred <- Srep_pred %>% 
   select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
-   %>% ('srep2.5.'= X2.5., 'mean_srep'= Mean, 'srep97.5.'= X97.5., 
+  rename('srep2.5.'= X2.5., 'mean_srep'= Mean, 'srep97.5.'= X97.5., 
          'srepSD' = SD, 'srep50.' = X50., 'srep25.' = X25., 'srep75.' = X75.)
 
 # cbind out the SMSY_pred
@@ -464,7 +504,7 @@ ESmsy <- sum.dfc[substr(rownames(sum.dfc), 1,8) == "predSmsy",] # CHANGE INDEXIN
 Smsy_pred <- ESmsy[22:42,] # CHANGE INDEXING
 Smsy_pred <- Smsy_pred %>% 
   select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
-   %>% ('smsy2.5.'= X2.5., 'mean_smsy'= Mean, 'smsy97.5.'= X97.5., 
+  rename('smsy2.5.'= X2.5., 'mean_smsy'= Mean, 'smsy97.5.'= X97.5., 
          'smsySD' = SD, 'smsy50.' = X50., 'smsy25.' = X25., 'smsy75.' = X75.)
 
 # Now I will have the mean, median, CI's (ALL PREDICTED) and the base WAin dataframe bound together
@@ -507,10 +547,6 @@ eval_dat <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>%
 
 
 ### S6.a Stock-wise comparisons of SREP Plots
-
-```{r unused plotting}
-
-```
 
 ```{r stockwise SREP, echo=FALSE, message=FALSE}
 # config options: fig.align = 'centre'
@@ -589,6 +625,11 @@ SMSY_f
 
 Important to note that because there is no error on the prediction terms - one is essentially drawing from the regression line created. This can best be seen by plotting log predicted 'mean' Srep against log watershed area - which produces a straight line. This line is controlled by the slope and intercept estimated by the model posterior.
 
+```{r bwa values, echo=FALSE, message=FALSE}
+intercept <- sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"]
+slope <-  sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]
+```
+
 ```{r baseline WA, echo=FALSE, message=FALSE}
 # Regression of WAbase and Srep
 ggplot(data = Ec, aes(x = log(WA), y = Mean)) +
@@ -599,7 +640,7 @@ ggplot(data = Ec, aes(x = log(WA), y = Mean)) +
     slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
   ylab("Log Srep") +
   xlab("Log Watershed Area")
-
+# Color them for ocean/vs stream type
 # How does it look with the logE_re term
 ```
 
@@ -622,7 +663,7 @@ reg_f <- reg_mean +
 reg_f
 ```
 
-```{r pauls plots, echo=FALSE}
+```{r pauls plots, include=FALSE, echo=FALSE}
 # ggplot(data = Ec, aes(x = log(WA), y = Mean)) +
 #   geom_point() + 
 #   geom_errorbar(aes(ymin = X2.5., ymax = X97.5. )) + 
@@ -645,7 +686,7 @@ reg_f
 
 ### S6.c CSAS Table comparisons
 
-```{r nimble table, echo=FALSE, message=FALSE}
+```{r nimble table, include=FALSE, echo=FALSE, message=FALSE}
 # NON FUNCTION - change the object names
 # combo <- data.frame(SGEN_noenh, SREP_noenh)
 # combo <- combo %>% 
@@ -656,7 +697,7 @@ reg_f
 # kable(combo, caption = "Estimated SREP, SGEN, and SMSY with Enhanced Stocks")
 ```
 
-```{r CSAS table, echo=FALSE, message=FALSE}
+```{r CSAS table, include=FALSE, echo=FALSE, message=FALSE}
 # Population_csas <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
 # 
 # SGEN_csas <- c(120, 1400, 1000, 220, 650)
