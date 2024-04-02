@@ -90,7 +90,11 @@ The package currently utilizes the following data sets:
 -   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
 -   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use watershed areas with input from WCVI Staff: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River. PLEASE NOTE: duplicate stock/river names are no acceptable for example in the case of Seymour river - please specify their difference - Georgia Strait vs. South Thompson origins in the river name itself. Duplicate river names will result in a invalid object lengths error when running the IWAM function.
 
-## S2.a IWAM Model Run
+## S2. Models
+
+### S2.a IWAM Model Run
+
+All setup is internal to the IWAM function.
 
 ``` {r iwam function, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
 IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # Data (INPUT)
@@ -105,7 +109,9 @@ IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # D
                        est.table = FALSE # Store tables
 )
 ```
-## S2.b Nimble Model Run
+### S2.b Nimble Model Setup
+
+As the Nimble model has not yet been convereted into a function - all setup and definitions must be run here internally.
 
 ```{r nimble datasetup, include=FALSE}
 # Setup data:
@@ -199,6 +205,8 @@ constants <- list(
 )
 ```
 
+### S2.c Nimble Model
+
 ```{r model stock_recruit_srep_biasCor, echo=FALSE}
 stock_recruit_srep_biasCor <- nimbleCode({
 
@@ -206,7 +214,7 @@ stock_recruit_srep_biasCor <- nimbleCode({
   logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
   logAlphaSD ~ dunif(0, 100)
   logESD ~ dunif(0, 100)
-    # Can we create regional mean alpha's?
+    # Can we create regional mean alpha's
     # Can we use the distribution's used by Diane Dobson - see bootstrap
 
   ## Based on Parken et al. 2006 (log ( 1/beta ) has a linear relationship with log Watershed Area.
@@ -237,12 +245,13 @@ stock_recruit_srep_biasCor <- nimbleCode({
       # remove - sigma^2/2 otherwise the estimations are too big - makes it difficult to interpret the variables
 
     logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
-      # where is this used?
   }
 
   ## predWA
   for ( j in 1:2 ){ # STREAM AND OCEAN TYPE
-    for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
+  # if (type == j) # assign 
+    # elif (skip)
+    for( i in 1:nPred ){ # CHANGING - 115 iterations - number of predicted watershed areas
     log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
     # logE_re[i] ~ dnorm(mean=0, sd = logESD)
 
@@ -254,7 +263,7 @@ stock_recruit_srep_biasCor <- nimbleCode({
       # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
         # confidence - how uncertain you are about expected value
         # prediction - how uncertain you are about predicted new site
-      
+    
     
     # If you just want to predict individual sites
       # Would need to repeat pattern for every iter of j
@@ -279,6 +288,8 @@ stock_recruit_srep_biasCor <- nimbleCode({
 
 })
 ```
+
+### S2.d Nimble Run
 
 ```{r nimble model run, include=FALSE}
 RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = constants, 
@@ -308,6 +319,8 @@ Cmcmc2 <- compileNimble(Rmcmc2, project = RmodelSrep)
 mcmc.out <- runMCMC(Cmcmc2, niter=100000, nburnin=10000, nchains=4, samplesAsCodaMCMC = TRUE) 
 # niter=100000
 ```
+
+### S2.e Nimble Outputs
 
 ```{r nimble outputs, include=FALSE}
 # call out mcmc chains:
@@ -434,10 +447,9 @@ log_alpha <- log_alpha %>%
 # E_pred = SREP
 ```
 
-```{r nimble sgen}
+```{r nimble sgen, echo=FALSE, message=FALSE}
 # sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
-sgen.out <- apply()
-
+# sgen.out <- apply()
 
   # method 1: sgen2
 # Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
@@ -497,6 +509,7 @@ WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv")) %>%
   mutate(WA = round(WA,0)) # ?
 ```
 
+### S3.a IWAM Table
 
 *Table 1. IWAM: SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.*
 ``` {r kable table, echo=FALSE, message=FALSE}
@@ -513,6 +526,8 @@ complete <- complete %>% left_join(WAin, by=join_by(Stock)) %>%
   
 kable(complete, caption = "IWAM: SGEN, SREP, and SMSY Estimates for All Stocks")
 ```
+
+### S3.b Nimble Table
 
 *Table 2. NIMBLE: SGEN, SREP, and SMSY estimates including quantiles for all listed stocks. (See above Table 1 description.*
 ```{r nimble kable table, echo=FALSE, message=FALSE}
@@ -532,7 +547,6 @@ kable(nimble_estimates, caption = "NIMBLE: SGEN, SREP, and SMSY Estimates for Al
   # Call it: Backcalculation_stockestimates_table.csv
 write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
 ```
-
 
 ## S4. Comparative Plotting
 
@@ -557,6 +571,8 @@ eval_data <- Parken_eval %>%
   mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
   mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
 ```
+
+### S4.a Stockwise
 
 ``` {r Parken stockwise SMSY, echo=FALSE, message=FALSE, fig.align = 'centre', fig.width = 16, fig.height = 9}
 # out.width="100%"
@@ -626,7 +642,8 @@ SREP_parken <- SREP_pl +
 SREP_parken
 ```
 
-
+```{Parken stockwise SGEN}
+```
 
 ``` {r srep plotly, include=FALSE, echo=FALSE, message=FALSE, fig.align = 'centre'}
 # ggplotly(SREP_parken)
@@ -659,4 +676,14 @@ SREP_parken
 # 
 # 
 # fig
+```
+
+### S4.b Regression
+
+The point of this plotting exercise is to show where the back-calculated estimates fall in relation to the "training"/synoptic dataset.
+
+``` {r regression example}
+# copy from IWAM_Nimblemodel.RMD - watch transformations
+
+
 ```

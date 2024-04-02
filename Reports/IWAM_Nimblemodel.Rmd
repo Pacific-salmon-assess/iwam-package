@@ -230,7 +230,7 @@ This parameterization of the Ricker's model can be simplified into the following
 where $\alpha$ has a hierarchical prior of:
 
 $$
-log\alpha \sim dnorm(log\alpha_0, log\alpha_{SD})
+log\alpha \sim N(log\alpha_0, log\alpha_{SD})
 $$
 
 $$
@@ -404,15 +404,25 @@ constants <- list(
   N_Stk = max(srdat$Stocknumber + 1),
   stk = srdat$Stocknumber + 1,
   N_Obs = nrow(srdat),
-  logWAbase = log(WAbase$WA),
-  S = srdat$Sp,
-  type = lifehist$lh + 1, # Figure out after which one is which
+  logWAbase = log(WAbase$WA) - 7.3, # mean(log(WAIn$WA)) - subtracting is same as division on log scale
+  S = srdat$Sp, 
+  type = lifehist$lh + 1 # Figure out after which one is which
     # one value per stock in ordering
     # 1 = stream, 2 = ocean
-  nPred = nPred, # length of predicted watersheds
-  logWAPred = logWAPred # put in the predicted watersheds  
+  # nPred = nPred, # length of predicted watersheds
+  # logWAPred = logWAPred # put in the predicted watersheds  
   # takes a vector - have to match by order after - cbind it back onto a table
 )
+
+mean_logWA <- 7.3
+pred.line <- data.frame(expand.grid(logWA = 4:16-mean_logWA, type = 1:2))
+constants$pred.line <- pred.line
+
+WAin$logWA <- log(WAin$WA) - mean_logWA
+WAin$type = WAin$lh + 1
+constants$npred.line <- nrow(pred.line)
+constants$pred.dat <- WAin[, c("logWA", "type")]
+constants$npred <- nrow(WAin)
 ```
 
 
@@ -423,20 +433,23 @@ constants <- list(
 stock_recruit_srep_biasCor <- nimbleCode({
 
   ## priors
-  logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
+  logAlpha0 ~ dnorm(mean=0.6, sd=0.45)
+  # logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
   logAlphaSD ~ dunif(0, 100)
   logESD ~ dunif(0, 100)
     # Can we create regional mean alpha's?
     # Can we use the distribution's used by Diane Dobson - see bootstrap
 
   ## Based on Parken et al. 2006 (log ( 1/beta ) has a linear relationship with log Watershed Area.
-  b0[1] ~ dflat() # dnorm(0, tau = 10)  ## Flat intercept for stream
-  b0[2] ~ dflat() ## Flat intercept for ocean
+  # b0[1] ~ dflat() 
+  b0[1] ~ dnorm(0, tau = 31)  ## Flat intercept for stream
+  # b0[2] ~ dflat() ## Flat intercept for ocean
+  b0[2] ~ dnorm(0, tau = 31)
 
-  bWA[1] ~ dnorm(0, tau = 1)  ## log Watershed area slope for stream
-  bWA[2] ~ dnorm(0, tau = 1)  ## log Watershed area slope for ocean
+  bWA[1] ~ dnorm(0, tau = 0.01)  ## log Watershed area slope for stream
+  bWA[2] ~ dnorm(0, tau = 0.01)  ## log Watershed area slope for ocean
 
-  sigma ~ dunif(0, 100)
+  # sigma ~ dunif(0, 100)
 
   for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
     logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
@@ -448,6 +461,7 @@ stock_recruit_srep_biasCor <- nimbleCode({
     # log_E[i] <- b0 + b0_stream*type[i] + (bWA + bWA_stream*type[i])*logWAbase[i] + logE0[i]
     # where Here lifehist[i] is the life history type (Lj = 0 for stream-type and Lj = 1 for ocean-type).
 
+    tauobs[i] ~ dgamma(0.001, 0.001)
     E[i] <- exp(log_E[i])
   }
 
@@ -456,45 +470,64 @@ stock_recruit_srep_biasCor <- nimbleCode({
     logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # - sigma^2/2
       # remove - sigma^2/2 otherwise the estimations are too big - makes it difficult to interpret the variables
 
-    logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
+    logRS[i] ~ dnorm( logRS_pred[i], tau = tauobs[stk[i]])
+    # logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
+
   }
 
-  ## predWA
-  for ( j in 1:2 ){ # STREAM AND OCEAN TYPE
-    for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
-    log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
-    # logE_re[i] ~ dnorm(mean=0, sd = logESD)
-
-    ## Pred Srep
-    # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
-    log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
-    # log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAbackPred[i]
-      # Stick without logE_re for now
-      # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
-        # confidence - how uncertain you are about expected value
-        # prediction - how uncertain you are about predicted new site
-      
-    
-    # If you just want to predict individual sites
-      # Would need to repeat pattern for every iter of j
-    # log(E_pred[i]) <- b0[pred_type[i]] + bWA[pred_type[i]]*logWAPred[i]
-      # E_pred is equal to alpha/beta
-
-    ## Pred Smsy
-    beta_pred[i,j] <- log_alpha[i,j]/E_pred[i,j] # Pred beta
-    predSmsy[i,j] <- (1 - LambertW(1-log_alpha[i,j], 1))/beta_pred[i,j]
-    # predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))*E_pred[i]/log_alpha[i]
-    
-    ## Pred Sgen
-    # Double-check Get_LRP_bs for IWAM methods of calculation
-    # predSgen[i] <- # Sgen equation derivation from: 
-    # can't call functions from helperFunctions.R into nimble - illegal
-    # sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
-    # predSgen[i,j] <- -1/beta_pred[i,j]*LambertW(-beta_pred[i,j]*predSmsy[i,j]/log_alpha[i,j])
-      # Check if there are any differences between LambertW and LambertW0
-      # Two different formulations of Lambert's by Paul
+  ## pred line
+  for( i in 1:npred.line){
+    log_alpha_line[i] ~ dnorm(logAlpha0, sd = logAlphaSD)
+    log(E_pred_line[i]) <- b0[pred.line[i,2]] + bWA[pred.line[i,2]]*pred.line[i,1]
+    beta_pred_line[i] <- log_alpha_line[i]/E_pred_line[i] # Pred beta
+    predSmsy_line[i] <- (1 - LambertW(1-log_alpha_line[i], 1))/beta_pred_line[i]    
   }
+  
+  ## WA predictions
+  for( i in 1:npred){
+    log_alpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD)
+    log(E_pred[i]) <- b0[pred.dat[i,2]] + bWA[pred.dat[i,2]]*pred.dat[i,1]
+    beta_pred[i] <- log_alpha[i]/E_pred[i] # Pred beta
+    predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))/beta_pred[i]    
   }
+  
+  # 
+  # ## predWA
+  # for ( j in 1:2 ){ # STREAM AND OCEAN TYPE
+  #   for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
+  #   log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
+  #   # logE_re[i] ~ dnorm(mean=0, sd = logESD)
+  # 
+  #   ## Pred Srep
+  #   # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
+  #   log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
+  #   # log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAbackPred[i]
+  #     # Stick without logE_re for now
+  #     # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
+  #       # confidence - how uncertain you are about expected value
+  #       # prediction - how uncertain you are about predicted new site
+  #     
+  #   
+  #   # If you just want to predict individual sites
+  #     # Would need to repeat pattern for every iter of j
+  #   # log(E_pred[i]) <- b0[pred_type[i]] + bWA[pred_type[i]]*logWAPred[i]
+  #     # E_pred is equal to alpha/beta
+  # 
+  #   ## Pred Smsy
+  #   beta_pred[i,j] <- log_alpha[i,j]/E_pred[i,j] # Pred beta
+  #   predSmsy[i,j] <- (1 - LambertW(1-log_alpha[i,j], 1))/beta_pred[i,j]
+  #   # predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))*E_pred[i]/log_alpha[i]
+  #   
+  #   ## Pred Sgen
+  #   # Double-check Get_LRP_bs for IWAM methods of calculation
+  #   # predSgen[i] <- # Sgen equation derivation from: 
+  #   # can't call functions from helperFunctions.R into nimble - illegal
+  #   # sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
+  #   # predSgen[i,j] <- -1/beta_pred[i,j]*LambertW(-beta_pred[i,j]*predSmsy[i,j]/log_alpha[i,j])
+  #     # Check if there are any differences between LambertW and LambertW0
+  #     # Two different formulations of Lambert's by Paul
+  # }
+  # }
 
 })
 ```
@@ -585,7 +618,7 @@ stock_recruit_srep_biasCor_2 <- nimbleCode({
 
 Lorem ipsum. ...
 
-```{r model run, echo=FALSE}
+```{r model run, echo=FALSE, warning=FALSE, message=FALSE}
 
 # Model 2:
 # constants$typeOcean <- (constants$type == 2)*1
@@ -614,9 +647,10 @@ conf2 <- configureMCMC(RmodelSrep)
 # conf2$addSampler(target =c("b0[2]"), type = 'slice')
 # conf2$addSampler(target =c("bWA[2]"), type = 'slice')
 
-conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", 
-                    "logAlphaSD", "logESD", "logE0", "E_pred", "beta_pred", "log_alpha",
-                    "predSmsy")) 
+conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", "tauobs",
+                    "logAlphaSD", "logESD", "logE0", 
+                    "E_pred", "beta_pred", "log_alpha","predSmsy",
+                    "log_alpha_line", "beta_pred_line", "predSmsy_line", "E_pred_line"))
 
 Rmcmc2 <- buildMCMC(conf2)
 Cmodel2 <- compileNimble(RmodelSrep)
@@ -626,8 +660,7 @@ Cmcmc2 <- compileNimble(Rmcmc2, project = RmodelSrep)
 # mvSamples <- Cmcmc2$mvSamples
 # samples <- as.matrix(mvSamples)
 # outc <- mcmc(samples[-c(1:10000),])	# Burn in
-mcmc.out <- runMCMC(Cmcmc2, niter=100000, nburnin=10000, nchains=4, samplesAsCodaMCMC = TRUE) 
-# niter=100000
+mcmc.out <- runMCMC(Cmcmc2, niter=50000, nburnin=5000, nchains=3, samplesAsCodaMCMC = TRUE)
 ```
 
 ## S6. Model evaluation and plotting
@@ -655,8 +688,6 @@ What plots do I want to show:
 
 ```{r mcmc testing}
 # consider gathering draws for bayesplots
-
-
 density <- data.frame(do.call("rbind", mcmc.out))
   # subset out E_preds
   # label them - melt them for ggplot
@@ -672,16 +703,16 @@ density <- data.frame(do.call("rbind", mcmc.out))
 # library(MCMCvis)
 
 # To get common numerical summaries, function MCMCsummary() does the job:
-mcmcsum <- MCMCsummary(object = mcmc.out, round = 2)
+# mcmcsum <- MCMCsummary(object = mcmc.out, round = 2)
 
 # A caterpillar plot to visualise posterior distribution of theta with MCMCplot():
-MCMCplot(object = mcmc.out, params = 'b0')
+# MCMCplot(object = mcmc.out, params = 'b0')
 
 # Trace plots
 MCMCtrace(object = mcmc.out,
           pdf = FALSE, # no export to PDF
           ind = TRUE, # separate density lines per chain
-          params = "b0")
+          params = "tauobs")
 # E_pred - SMSY predicted
 # b0 - intercept estimates
 # bWA - slope estimate
