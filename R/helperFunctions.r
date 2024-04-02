@@ -55,7 +55,6 @@ PredInt <- function(x,y,Newx=x, Predy){
   PI$upr <- upr
   PI$lwr <- lwr
   return(PI)
-  
 }
 
 # Sgen <- -1/beta*lamW::lambertW0(-beta*Smsy/alpha) ## Choose it on the log scale.
@@ -73,7 +72,7 @@ sGenOptimum <- function ( S, theta ) {
 }
 
 
-sGenSolver <- function (loga, b3) {
+sGenSolver <- function (loga, b) {
   # Function to estimate Sgen from loga and b Ricker parameters
   theta <- c(loga, b)
   sMSY <- (1 - gsl::lambert_W0(exp(1 - loga))) / b
@@ -175,21 +174,24 @@ Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE) {
   b.par <- log(a.par)/SREP
   if (explicit){
     SMSY <- (1 - gsl::lambert_W0(exp(1 - log(a.par) ))) / (b.par)
-    
     }
   
   if( !explicit ){
-    SMSY <- log(a.bar)/ b.par * (0.5 - 0.07 * log(a.par))
+    SMSY <- log(a.par)/ b.par * (0.5 - 0.07 * log(a.par))
   }
   
-  sgen.out <- sGenSolver( log(a.par), b.par )
+  sgen.out <- numeric(length(a.par))
   
+  for (i in 1:length(a.par)){
+    sgen.out[i] <- sGenSolver( log(a.par[i]), b.par[i] )
+  }
+
   if(plot){
     Rpred <- NA
     for (i in 1:1000){ Rpred[i]<- a.par * i * exp (- b.par * i)}
     if (const.SMAX) xlab <- "Spawners" else xlab <- ""
     plot(1:1000, Rpred, type="l", ylim = c (0, 1400), xlab = xlab,  ylab = "Recruits", lwd=2 )
-    abline(a=0, b=1)
+    abline(a=0, b=1) # straight 1:1 line from origin
     abline(v=sgen.out, lty="dotted")
     abline(v=SMSY, lty="dashed")
     abline(v=(1/b.par), lty="dotdash")
@@ -213,9 +215,10 @@ Sgen.fn3 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE) {
   if (explicit){
     SMSY <- (1 - gsl::lambert_W0(exp(1 - log(a.par) ))) / (b.par)
     sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par) ## Choose it on the log scale.
+    print(sgen.out)
   }
   if( !explicit ){
-    SMSY <- log(a.bar)/ b.par * (0.5 - 0.07 * log(a.par))
+    SMSY <- log(a.par)/ b.par * (0.5 - 0.07 * log(a.par))
     sgen.out <- sGenSolver( log(a.par), b.par )
   }
   if(plot){
@@ -233,7 +236,7 @@ Sgen.fn3 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE) {
     if (half.a) if(!const.SMAX) title("Half productivity; constant SREP")
     if (half.a) if(const.SMAX) title("Half productivity; constant SMAX")
   }
-  return( list( SGEN = sgen.out , SMSY = SMSY, SREP = SREP, apar = a.par, bpar = b.par) )
+  return( list( SGEN = sgen.out, SMSY = SMSY, SREP = SREP, apar = a.par, bpar = b.par) )
 }
 
 ggplot.corr <- function(data, lag.max = 10, ci = 0.95, title="") {

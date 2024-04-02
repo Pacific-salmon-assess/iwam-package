@@ -1,22 +1,22 @@
-CU,Stock,WA,lh,SA,SA_ind,Inlet,Enh
-WCVI Nootka & Kyuquot,Artlish,63.55,1,26,5,Kyuquot,0
-WCVI South,Bedwell/Ursus,99.36,1,24,3,Clayoquot,0
-WCVI Nootka & Kyuquot,Burman,69.89,1,25,4,Nootka/Esperanza,1
-WCVI North,Cayeghle,49.42,1,27,6,Quatsino,0
-WCVI Nootka & Kyuquot,Conuma,19.71,1,25,4,Nootka/Esperanza,1
-WCVI South,Cypre,39.03,1,24,3,Clayoquot,0
-WCVI Nootka & Kyuquot,Gold,856.34,1,25,4,Nootka/Esperanza,1
-WCVI Nootka & Kyuquot,Kaouk,100.51,1,26,5,Kyuquot,0
-WCVI Nootka & Kyuquot,Leiner,109.25,1,25,4,Nootka/Esperanza,1
-WCVI North,Marble,167.51,1,27,6,Quatsino,0
-WCVI South,Megin,245.34,1,24,3,Clayoquot,0
-WCVI South,Moyeha,115.68,1,24,3,Clayoquot,0
-WCVI South,Nahmint,41.74,1,23,2,Barkley,0
-WCVI South,Nitinat,356.62,1,22,1,Nitinat,1
-WCVI South,San Juan,330,1,20,0,San Juan,1
-WCVI South,Sarita,84.22,1,23,2,Barkley,1
-WCVI South,Somass,1056.84,1,23,2,Barkley,1
-WCVI Nootka & Kyuquot,Tahsis,76.93,1,25,4,Nootka/Esperanza,0
-WCVI Nootka & Kyuquot,Tahsish,171.97,1,26,5,Kyuquot,0
-WCVI South,Tranquil,12.22,1,24,3,Clayoquot,1
-WCVI Nootka & Kyuquot,Zeballos,193.85,1,25,4,Nootka/Esperanza,1
+CU,Stock,WA,WA_back,lh,SA,SA_ind,Inlet,Enh
+WCVI Nootka & Kyuquot,Artlish,63.55,115.50,1,26,5,Kyuquot,0
+WCVI South,Bedwell/Ursus,99.36,90.61,1,24,3,Clayoquot,0
+WCVI Nootka & Kyuquot,Burman,69.89,224.33,1,25,4,Nootka/Esperanza,1
+WCVI North,Cayeghle,49.42,78.57,1,27,6,Quatsino,0
+WCVI Nootka & Kyuquot,Conuma,19.71,114.99,1,25,4,Nootka/Esperanza,1
+WCVI South,Cypre,39.03,55.06,1,24,3,Clayoquot,0
+WCVI Nootka & Kyuquot,Gold,856.34,941.83,1,25,4,Nootka/Esperanza,1
+WCVI Nootka & Kyuquot,Kaouk,100.51,106.72,1,26,5,Kyuquot,0
+WCVI Nootka & Kyuquot,Leiner,109.25,97.32,1,25,4,Nootka/Esperanza,1
+WCVI North,Marble,167.51,179.65,1,27,6,Quatsino,0
+WCVI South,Megin,245.34,125.25,1,24,3,Clayoquot,0
+WCVI South,Moyeha,115.68,288.42,1,24,3,Clayoquot,0
+WCVI South,Nahmint,41.74,312.86,1,23,2,Barkley,0
+WCVI South,Nitinat,356.62,910.72,1,22,1,Nitinat,1
+WCVI South,San Juan,330,1501.43,1,20,0,San Juan,1
+WCVI South,Sarita,84.22,133.86,1,23,2,Barkley,1
+WCVI South,Somass,1056.84,2608.06,1,23,2,Barkley,1
+WCVI Nootka & Kyuquot,Tahsis,76.93,71.12,1,25,4,Nootka/Esperanza,0
+WCVI Nootka & Kyuquot,Tahsish,171.97,98.65,1,26,5,Kyuquot,0
+WCVI South,Tranquil,12.22,56.50,1,24,3,Clayoquot,1
+WCVI Nootka & Kyuquot,Zeballos,193.85,9.90,1,25,4,Nootka/Esperanza,1

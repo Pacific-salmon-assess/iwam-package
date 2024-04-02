@@ -40,7 +40,7 @@ Where $R$ is the recruitment per stock \[numeric, often scaled\],
 
 $S$ is the spawners or spawner abundance \[numeric, often scaled\],
 
-$\alpha$ is a dimensionless number of recruits per spawner produced at very low spawner density \[dimensionless\], this may also be thought of as the intercept of the relationship between $\frac{R}{S}$ and $S$,
+$\alpha$ is a dimensionless number of recruits per spawner produced at very low spawner density (productivity) \[dimensionless\], this may also be thought of as the intercept of the relationship between $\frac{R}{S}$ and $S$,
 
 $\beta$ is the strength of the density dependence expressed as $1/S_{MAX}$ \[$spawners^{-1}$\], similarly this can be described as the slope of the previously described relationship,
 

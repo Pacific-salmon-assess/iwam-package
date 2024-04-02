@@ -430,7 +430,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
       # associated TMB file name (dll)
       # misc. information e.g. tracing, random effects parameters 
   
-  opt <- nlminb(obj$par, 
+  opt <- nlminb(obj$par, # starting values + rnorm 
                 obj$fn, 
                 obj$gr, 
                 control = list(eval.max = 1e5, iter.max = 1e5), 
@@ -454,7 +454,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
                                             "logB", 
                                             "logSigma",  
                                             "SMSY", 
-                                            "SREP"))
+                                            "SREP",
+                                            "lnSMSY",
+                                            "lnSREP"))
   
   stnum <- unique(srdat[, c("Stocknumber")])
   pars$Stocknumber <- rep(stnum)
@@ -1043,8 +1045,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   }
   
   #### Return function ####
-  return(list(datain, dfout))
+  return(list(dataname = datain, dfout, modelpars = pars, 
+              all_Deltas = all_Deltas, srdat = srdat, lh = lifehist, 
+              WAbase = WAbase, pred_lnSREP = pred_lnSREP, 
+              pred_lnWA = data$pred_lnWA, SRes = SRes))
   # used to contain SREP_out, SGEN_out, SMSY_out
+  
+  # need equations for the WA regression lines + intervals
+  # does this need to go higher up?
 }
 
 #### End of IWAM_func ####

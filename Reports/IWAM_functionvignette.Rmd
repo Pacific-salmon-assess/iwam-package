@@ -84,7 +84,7 @@ IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
                        remove.EnhStocks = TRUE, # Enhancement INPUT
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # change the internal seed for the bootstrap
-                       bs_nBS = 20000, # change the internal number of trials for the bootstrap - 20000
+                       bs_nBS = 10, # change the internal number of trials for the bootstrap - 20000
                        plot = FALSE, # print plots to DataOut/
                        est.table = FALSE # store tables - NOT FUNCTIONING
 )

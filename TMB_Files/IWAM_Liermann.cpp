@@ -253,7 +253,10 @@ Type objective_function<Type>:: operator() ()
   }
 
   
-  vector <Type> lnSMSY = log(SMSY*scale);
+  vector <Type> lnSMSY = log(SMSY*scale); //This is taking a value on the real
+  // scale * a constant scalar (ignore) and putting it on the log-scale
+  // This shouldn't matter because it was calculated on the real-scale
+  // It's only if you are exponentiating it back that it would be bad
   vector <Type> lnSREP = log(SREP*scale);
   
   

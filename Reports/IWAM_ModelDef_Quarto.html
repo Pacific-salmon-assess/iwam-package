@@ -71,36 +71,77 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="model-description" class="level4">
 <h4 class="anchored" data-anchor-id="model-description">Model Description</h4>
-<p>The equations and description below will walk you through the hierarchical structure of the IWAM model from raw input to final predictive estimates of spawners required for maximum sustainable yield (<span class="math inline">\(S_{MSY}\)</span>) and spawners required for replacement (<span class="math inline">\(S_{REP}\)</span>), including a detailed definitions list of all notation used and its corresponding label in the supplied repository code [<a href="https://github.com/carrieholt/Watershed-Area-Model">carrieholt/Watershed-Area-Model: Watershed Area Model (github.com)</a>].</p>
+<p>The equations and description below will walk you through the hierarchical structure of the IWAM model from raw input to final predictive estimates of spawners required for maximum sustainable yield (<span class="math inline">\(S_{MSY}\)</span>), “spawner abundance that will result in recovery to <span class="math inline">\(S_{MSY}\)</span> in one generation under equilibrium conditions” (<span class="math inline">\(S_{GEN}\)</span>), and spawners required for replacement (<span class="math inline">\(S_{REP}\)</span>), including a detailed definitions list of all notation used and its corresponding label in the supplied repository code [<a href="https://github.com/carrieholt/Watershed-Area-Model">carrieholt/Watershed-Area-Model: Watershed Area Model (github.com)</a>].</p>
 </section>
 </section>
-<section id="basic-ricker-model" class="level2">
-<h2 class="anchored" data-anchor-id="basic-ricker-model">Basic Ricker Model</h2>
+<section id="over-arching-model-flow" class="level2">
+<h2 class="anchored" data-anchor-id="over-arching-model-flow">Over-arching Model Flow</h2>
+<p>The model, regardless of its form between Parken et al., Leirmann et al., and Holt et al., follow the following three model stages:</p>
+<ol type="1">
+<li><p>Evaluation of the Ricker model using a learning spawner and recruit dataset</p></li>
+<li><p>Regression of Ricker model parameters against the watershed areas of the learning dataset</p></li>
+<li><p>Estimation of <em>new</em> Ricker model parameters for stocks where only watershed area is known, using the regression model</p></li>
+</ol>
+<p>The main differences between the models occur in how each of the stages are handled internally, and how error is propagated between them. These differences will be explored in the following document.</p>
+</section>
+<section id="the-ricker-model" class="level2">
+<h2 class="anchored" data-anchor-id="the-ricker-model">The Ricker Model</h2>
+<p>The Ricker model is predominantly expressed in the following form:</p>
+<p><span class="math display">\[
+R = \alpha S e^{- \beta S}e^\tau
+\]</span></p>
+<p>Where <span class="math inline">\(R\)</span> is the recruitment per stock [numeric, often scaled],</p>
+<p><span class="math inline">\(S\)</span> is the spawners or spawner abundance [numeric, often scaled],</p>
+<p><span class="math inline">\(\alpha\)</span> is a dimensionless number of recruits per spawner produced at very low spawner density [dimensionless], this may also be thought of as the intercept of the relationship between <span class="math inline">\(\frac{R}{S}\)</span> and <span class="math inline">\(S\)</span>,</p>
+<p><span class="math inline">\(\beta\)</span> is the strength of the density dependence expressed as <span class="math inline">\(1/S_{MAX}\)</span> [<span class="math inline">\(spawners^{-1}\)</span>], similarly this can be described as the slope of the previously described relationship,</p>
+<p>and <span class="math inline">\(\tau\)</span> is a normally distributed error term.</p>
+<p>The Ricker model is written in this form to reflect a stochastic process (time ordered and random) by adding the log-normal error term <span class="math inline">\(\tau\)</span>, a normal distributed term often used to account for environmental variability. This is the form used in both the Parken et al.&nbsp;(2006) and the Holt et al.&nbsp;(2023) models. The Liermann et al.&nbsp;(2011) model uses a slightly different forms, shown here as:</p>
+<p><span class="math display">\[
+R=Se^{\alpha(1-\frac{S}{S_{REP}})}
+\]</span></p>
+<p>The Liermann model is then further written out in a hierarchical form as:</p>
+<p><span class="math display">\[
+R_{ij} = S_{ij}exp(\alpha_j(1-\frac{S_{ij}}{E_j}+w_{ij}))
+\]</span></p>
+<p>Where <span class="math inline">\(i\)</span> is year class, <span class="math inline">\(j\)</span> is population,</p>
+<p><span class="math inline">\(\alpha_j\)</span> (also expressed as <span class="math inline">\(r_j\)</span>) is the <span class="math inline">\(log(slope)\)</span> where <span class="math inline">\(S_{ij} = 0\)</span>,</p>
+<p><span class="math inline">\(E_{ij}\)</span> is positive and defined as <span class="math inline">\(R_{ij} = S_{ij} = S_{REP}\)</span>,</p>
+<p>and <span class="math inline">\(w_{ij}\)</span> is a normally distributed error term.</p>
+<p>These forms can be used to re-specify the equation - in the instance above for <span class="math inline">\(S_{REP}\)</span>. The main difference between the two forms of the Ricker model is the expression of <span class="math inline">\(\alpha\)</span> - as either on the real or log-scale - thereby changing its interpretability.</p>
+<p>For reference, alternative forms can also appear as:</p>
 <p><span class="math display">\[
 R = S e^{\alpha- \beta S}e^\tau
 \]</span></p>
-<p>Which contains the following terms: <span class="math inline">\(R\)</span> : recruitment per stock [numeric, often scaled], <span class="math inline">\(S\)</span> : Spawners or spawner abundance [numeric, often scaled], <span class="math inline">\(\alpha\)</span> : dimensionless number of recruits per spawner produced at very low spawner density [dimensionless], this may also be thought of as the intercept of the relationship between <span class="math inline">\(\frac{R}{S}\)</span> and <span class="math inline">\(S\)</span>, <span class="math inline">\(\beta\)</span> : the strength of the density dependence expressed as <span class="math inline">\(1/S_{MAX}\)</span> [<span class="math inline">\(spawners^{-1}\)</span>], similarly this can be described as the slope of the previously described relationship, <span class="math inline">\(\tau\)</span> : the normally distributed error. The base Ricker model is written in this form to reflect a stochastic process (time ordered and random) by adding the log-normal error term <span class="math inline">\(\tau\)</span>, a normal distributed term often used to account for environmental variability.</p>
 <section id="hierarchical-ricker-alpha-and-linear-form-ricker" class="level4">
 <h4 class="anchored" data-anchor-id="hierarchical-ricker-alpha-and-linear-form-ricker">Hierarchical Ricker (<span class="math inline">\(\alpha\)</span>) and Linear Form Ricker</h4>
-<p>This baseline form is then converted into the two following forms of a hierarchical Ricker (1) and a linearized Ricker (2).</p>
+<p>The baseline form are then made hierarchical and linearized by log transformation. The example shown below is the Parken and Holt Ricker linearized equation:</p>
 <p><span class="math display">\[
-R_i = S_i \cdot e^{\alpha_i-\beta_i\cdot S_i}\cdot e^{\tau_i}
-\]</span></p>
-<p>Which is then linearized by log transformation into the form:</p>
-<p><span id="eq-*"><span class="math display">\[
 log(\frac{R_i}{S_i}) = log(\alpha_i)-\beta_i \cdot S_i + \tau_i
-\tag{1}\]</span></span></p>
-<p>Where <span class="math inline">\(\tau \sim Normal(0, \sigma_\tau)\)</span></p>
-<p>and <span class="math inline">\(log(\alpha_i) \sim Normal(\mu Log(\alpha), SigmaLog(\alpha))\)</span>,</p>
-<p>and <span class="math inline">\(\mu log(\alpha_i) \sim Normal(1.5,5)\)</span>,</p>
+\]</span></p>
+<p>Where <span class="math inline">\(\tau \sim Normal(0, \sigma_\tau)\)</span>,</p>
+<p><span class="math inline">\(log(\alpha_i) \sim Normal(\mu Log(\alpha), SigmaLog(\alpha))\)</span>,</p>
+<p><span class="math inline">\(\mu log(\alpha_i) \sim Normal(1.5,5)\)</span>,</p>
 <p>and <span class="math inline">\(\sigma log(\alpha_i) \sim InvGamma(0.01,0.01)\)</span>.</p>
-<p>In this regard, <span class="math inline">\(\alpha\)</span> is the intercept and <span class="math inline">\(\beta\)</span> is the slope of the spawner-recruit relationship. The hyper-priors (incorrect term) on <span class="math inline">\(log(\alpha)\)</span> are likelihood penalties. In a frequentist model description, the penalizing function is a method for smoothing and to improve the sampling of the estimator - in this case [INSERT SAMPLER].</p>
-<p><strong>BIAS CORRECTION EQUATIONS?</strong></p>
-<p><strong>INSERT PRIOR DISTRIBUTION PLOTS</strong></p>
+<p>In this regard, <span class="math inline">\(\alpha\)</span> is the intercept and <span class="math inline">\(\beta\)</span> is the slope of the spawner-recruit relationship, where <span class="math inline">\(log(\alpha)\)</span> has a hierarchical prior set.</p>
+</section>
+</section>
+<section id="ricker-model-prior-distribution-plots" class="level2">
+<h2 class="anchored" data-anchor-id="ricker-model-prior-distribution-plots">Ricker Model Prior Distribution Plots</h2>
+<p>To be updated. Distribution plots of all Ricker model priors defined above with example data.</p>
+<section id="s_msy-and-s_rep-calculation" class="level4">
+<h4 class="anchored" data-anchor-id="s_msy-and-s_rep-calculation"><span class="math inline">\(S_{MSY}\)</span> and <span class="math inline">\(S_{REP}\)</span> Calculation</h4>
+<p>Using the Ricker estimated <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span>, the following derivations of <span class="math inline">\(S_{MSY}\)</span> and <span class="math inline">\(S_{REP}\)</span> are used. The solution to <span class="math inline">\(S_{MSY}\)</span> is solved with a Lambert W equation defined by Schueurel (2016).</p>
+<p><span class="math display">\[
+S_{MSY} = \frac{1-W(e^{1-(\alpha)})}{\beta}
+\]</span></p>
+<p><span class="math display">\[
+S_{REP} = \frac{ln\alpha}{\beta}
+\]</span></p>
 </section>
 </section>
 <section id="watershed-area-model" class="level2">
 <h2 class="anchored" data-anchor-id="watershed-area-model">Watershed Area Model</h2>
+<p>Once the Ricker model parameters have been estimated and used to calculate <span class="math inline">\(S_{MSY}\)</span> and <span class="math inline">\(S_{REP}\)</span>, the following regressions are formed. Both Parken and Holt form a total of 4 regression models, while Liermann forms two. Between both methods, there are two models - one for stream and one for ocean life histories. The difference is that Liermann only regresses <span class="math inline">\(S_{REP}\)</span> against watershed area, instead of also using <span class="math inline">\(S_{MSY}\)</span> as per Parken. The below equations show the Parken forms:</p>
 <p><span class="math display">\[
 ln(S_{MSY}) = ln(\delta_0) + \delta_1 \cdot ln(WA) + \delta_\epsilon
 \]</span></p>
@@ -118,22 +159,30 @@ ln(S_{REP}) = ln(\gamma_o) + \gamma_1 \cdot ln(WA) + \gamma_\epsilon
 <p><span class="math display">\[
 ln(S_{MSY}) = ln(\delta_{0,stream}) + ln(\delta_{0,ocean}) \cdot X + (\delta_{1,stream} + \delta_{1,ocean} \cdot X) \cdot ln(WA) + \delta_\epsilon
 \]</span></p>
-<p>where, <span class="math inline">\(\delta_\epsilon \sim Normal(0,\sigma_\epsilon)\)</span> and <span class="math inline">\(X = 0\)</span> for stream type and <span class="math inline">\(X = 1\)</span> is for ocean type populations.</p>
-<section id="s_msy-and-s_rep-calculation" class="level4">
-<h4 class="anchored" data-anchor-id="s_msy-and-s_rep-calculation"><span class="math inline">\(S_{MSY}\)</span> and <span class="math inline">\(S_{REP}\)</span> Calculation</h4>
-<p><span class="math display">\[
-S_{MSY} = \frac{1-W(e^{1-(\alpha)})}{\beta}
-\]</span></p>
-<p><span class="math display">\[
-S_{REP} = \frac{\alpha}{\beta}
-\]</span></p>
+<p>where, <span class="math inline">\(\delta_\epsilon \sim Normal(0,\sigma_\epsilon)\)</span>,</p>
+<p>and <span class="math inline">\(X = 0\)</span> for stream type and <span class="math inline">\(X = 1\)</span> is for ocean type populations.</p>
+<p>This form is then duplicated for <span class="math inline">\(S_{REP}\)</span>.</p>
+<p>It is within the WA regression that Parken introduces a bias correction term in the form of <span class="math inline">\(+\frac{\sigma^2}{2}\)</span>, which is added to the intercept. This correction term accounts for the skew of the mean when transforming out the log-space.</p>
 </section>
+<section id="wa-regression-model-prior-distribution-plots" class="level2">
+<h2 class="anchored" data-anchor-id="wa-regression-model-prior-distribution-plots">WA Regression Model Prior Distribution Plots</h2>
+<p>To be updated. Distribution plots of all WA regression model priors defined above with example data.</p>
 </section>
-<section id="bootstrapping" class="level2">
-<h2 class="anchored" data-anchor-id="bootstrapping">Bootstrapping</h2>
+<section id="prediction-and-bootstrapping" class="level2">
+<h2 class="anchored" data-anchor-id="prediction-and-bootstrapping">Prediction and Bootstrapping</h2>
+<p><em>Prediction of novel stock</em> <span class="math inline">\(S_{REP}\)</span> based on watershed area: …</p>
+<p>In order to produce the final estimates of <span class="math inline">\(S_{MSY}\)</span> and <span class="math inline">\(S_{GEN}\)</span>, the IWAM calculates a new <span class="math inline">\(\beta\)</span> parameter based on the Ricker model evaluated <span class="math inline">\(S_{REP}\)</span> and <span class="math inline">\(\alpha\)</span>. The following equations use Scheurell’s [CITATION] Lambert W method for estimation/optimization of <span class="math inline">\(S_{MSY}\)</span>. This is done by first calculating <span class="math inline">\(\beta\)</span>: <span class="math display">\[
+\beta = log\alpha/S_{REP}
+\]</span></p>
+<p>using <span class="math inline">\(\beta\)</span>, <span class="math inline">\(S_{MSY}\)</span> is calculated as follows:</p>
+<p><span class="math display">\[
+S_{MSY} = (1 - LW(1-log\alpha))/\beta
+\]</span></p>
+<p>It is within this stage, that the IWAM model differs from the Parken assumption of a global <span class="math inline">\(\alpha\)</span> given that the Parken estimates of <span class="math inline">\(\alpha\)</span> were too high for natural ecosystems. Within the IWAM bootstrapping model stage, a new a life-history model [CITATION: Leudke] produced estimate of <span class="math inline">\(\alpha\)</span> is used. Ideally, <span class="math inline">\(\alpha\)</span> would be instead a regionally hierarchical parameter, and would not be altered at different stages.</p>
 </section>
 <section id="iwam-model-outline-reference" class="level2">
 <h2 class="anchored" data-anchor-id="iwam-model-outline-reference">IWAM Model Outline Reference</h2>
+<p><em>This section is now outdated.</em></p>
 <p>This section provides a walk through the 6 sections of the IWAM code repository and provided references to possible areas that may require changes depending on your intended usage case. The sections are as listed:</p>
 <ol type="1">
 <li>Read in data</li>
@@ -160,6 +209,7 @@ S_{REP} = \frac{\alpha}{\beta}
 </section>
 <section id="dictionary-of-referenced-functions" class="level2">
 <h2 class="anchored" data-anchor-id="dictionary-of-referenced-functions">Dictionary of Referenced Functions</h2>
+<p><em>This section is now outdated.</em></p>
 <p>This section provides a reference to all associated scripts that work alongside the IWAM.</p>
 <ul>
 <li><p>PlotSR.R: Features the following functions:</p>

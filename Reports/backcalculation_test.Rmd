@@ -19,6 +19,11 @@ library(hrbrthemes)
 library(gsl)
 library(knitr)
 library(plotly)
+
+library(nimble)
+library(coda)
+library(dplyr)
+library(geomtextpath)
 ```
 
 ```{r source files, include=FALSE, echo=FALSE, message=FALSE}
@@ -30,6 +35,43 @@ source(here::here("R/IWAM_model.R"))
 ``` {r options, include=FALSE}
 options(scipen=999)
 # opts_chunk$set(out.width='750px', dpi=200)
+```
+
+```{r LW nimble replicate, echo=FALSE}
+## Make lambertW function.
+## Use Newton's Method with precision 1e-9 
+LambertW <- nimbleFunction(
+  # setup = function(){}, ## To run in a nimble model can't have setup code.
+  run = function(x = double(), log = integer(0, default = 0)){ 
+    if(log == 1) {
+      logx <- x
+    }else{
+        logx <- log(x)
+    }
+    ## Choose a positive starting value.
+    y <- logx
+    if(logx < 0) y <- 0
+    done <- 0L
+    for (i in 1:100) {
+      if(done == 0){
+        if ( abs( logx - log(y) - y) < 1e-9) {done <- 1}
+        y <- y - (y - exp(logx - y)) / (1 + y);                  
+      }
+    }
+    if (done == 0) print("W: failed convergence");
+    returnType(double())
+    return(y)
+  },
+  ## Turn this on to build locally and check AD.
+  # methods = list(
+  #   gr_lambertW = function(x = double(), log = integer(0, default=1)){
+  #       ans <- derivs(run(x, log), wrt=1, order=0:2)
+  #       returnType(ADNimbleList())
+  #       return(ans)
+  #     }
+  # ),
+  buildDerivs = list(run = list(ignore = c('i', 'done')))
+)
 ```
 
 ## Check for Back-Calculated Watershed Areas
@@ -48,7 +90,7 @@ The package currently utilizes the following data sets:
 -   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
 -   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use watershed areas with input from WCVI Staff: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River. PLEASE NOTE: duplicate stock/river names are no acceptable for example in the case of Seymour river - please specify their difference - Georgia Strait vs. South Thompson origins in the river name itself. Duplicate river names will result in a invalid object lengths error when running the IWAM function.
 
-## S2. Initialize function
+## S2.a IWAM Model Run
 
 ``` {r iwam function, echo=TRUE, message=FALSE, warning=FALSE, results=FALSE}
 IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # Data (INPUT)
@@ -57,14 +99,363 @@ IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # D
                        remove.EnhStocks = FALSE, # Remove Enhancement stocks (INPUT)
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # Change the internal seed for the bootstrap (INPUT)
-                       bs_nBS = 20000, # Change the internal number of trials for the bootstrap (INPUT)
+                       bs_nBS = 10, # Change the internal number of trials for the bootstrap (INPUT)
                        # Run 10 for testing purposes - otherwise 20000
                        plot = FALSE, # Print plots to DataOut/
                        est.table = FALSE # Store tables
 )
 ```
+## S2.b Nimble Model Run
 
-## S3. Check outputs
+```{r nimble datasetup, include=FALSE}
+# Setup data:
+srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
+WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
+
+# Constants:
+  # e.g. Enh = True, ...
+# remove.EnhStocks <- FALSE
+  # Only matters if we do aggregations e.g. by CU or by Inlet
+  # In which case just import the IWAM_model code loops into this code chunk starting line 327
+
+srdatwna <- srdatwna %>% filter(Name != "Hoko" & Name != "Hoh") 
+
+stockwna <- srdatwna %>% filter (is.na(Rec) == TRUE) %>% 
+  dplyr::select (Stocknumber) %>%  unique() %>% unlist() 
+
+# Remove years with NAs
+srdat <- srdatwna %>% filter(Rec != "NA") 
+order_test_1 <- srdat %>% filter(Stocknumber == stockwna[1] | 
+                             Stocknumber == stockwna[2])
+if(max(srdat$Stocknumber) >= stockwna[1]) { # if the max stock number (24)
+  for (i in 1:length(stockwna)) { # for  stocks identified with NAs (2)
+    len <- length (srdat[which (srdat$Stocknumber == stockwna[i]), ]$yr_num) - 1
+    srdat [which (srdat$Stocknumber == stockwna[i]), ]$yr_num <- c (0:len)
+  }
+}
+order_test_2 <- srdat %>% filter(Stocknumber == stockwna[1] | 
+                             Stocknumber == stockwna[2])
+srdat <- digit_scaling(srdat)
+srdat_scale <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
+srdat_scale <- srdat_scale$scale 
+srdat_cow <- srdat %>% filter(Name == "Cowichan" & 
+                                Yr >= 1985 & 
+                                Yr !=1986 & 
+                                Yr != 1987) # length = 10
+n_cow <- length(srdat_cow$Yr)
+srdat_cow$yr_num <- 0:(n_cow-1)
+srdat <- srdat %>%  filter(Name != "Cowichan") %>% bind_rows(srdat_cow) %>%
+  arrange(Stocknumber)
+names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
+WAbase <- WAbase %>% full_join(names, by="Name") %>% arrange(Stocknumber)
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+  group_by(Stocknumber) %>% 
+  summarize(lh=max(Stream)) %>% 
+  arrange (Stocknumber)
+
+data <- list(
+  logRS = log(srdat$Rec) - log(srdat$Sp)  
+)
+```
+
+```{r nimble constant and inits, include=FALSE}
+inits <- function(){
+  list(b0 = c(2.11, 2.11),
+    bWA = c(0.1, 0.1),
+    logAlpha0 = 1.5,
+    logESD = 1,
+    logAlphaSD = 1)
+}
+
+# Insert predictive WA's
+# WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv"))
+  # Now includes back-calculated watershed areas
+
+# WAin <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+  # Could just use WCVI_Parken from the beginning here - then I don't have to do this join below
+
+nPred <- length(WAin$WA) # length of predicted watershed areas
+logWAPred <-  log(WAin$WA) # predicted watershed areas takes a vector
+# logWAPred <- log(WAin$WA_back) # back-calculated water shed areas as a vector
+# NOTE: these will be ORDERED - this order must be maintained in order to bind them back in at the end
+
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+    group_by(Stocknumber) %>% 
+    summarize(lh=max(Stream))
+
+constants <- list(
+  N_Stk = max(srdat$Stocknumber + 1),
+  stk = srdat$Stocknumber + 1,
+  N_Obs = nrow(srdat),
+  logWAbase = log(WAbase$WA),
+  S = srdat$Sp,
+  type = lifehist$lh + 1, # Figure out after which one is which
+    # one value per stock in ordering
+    # 1 = stream, 2 = ocean
+  nPred = nPred, # length of predicted watersheds
+  logWAPred = logWAPred # put in the predicted watersheds  
+  # takes a vector - have to match by order after - cbind it back onto a table
+)
+```
+
+```{r model stock_recruit_srep_biasCor, echo=FALSE}
+stock_recruit_srep_biasCor <- nimbleCode({
+
+  ## priors
+  logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
+  logAlphaSD ~ dunif(0, 100)
+  logESD ~ dunif(0, 100)
+    # Can we create regional mean alpha's?
+    # Can we use the distribution's used by Diane Dobson - see bootstrap
+
+  ## Based on Parken et al. 2006 (log ( 1/beta ) has a linear relationship with log Watershed Area.
+  b0[1] ~ dflat() # dnorm(0, tau = 10)  ## Flat intercept for stream
+  b0[2] ~ dflat() ## Flat intercept for ocean
+
+  bWA[1] ~ dnorm(0, tau = 1)  ## log Watershed area slope for stream
+  bWA[2] ~ dnorm(0, tau = 1)  ## log Watershed area slope for ocean
+
+  sigma ~ dunif(0, 100)
+
+  for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
+    logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
+    logE0[i] ~ dnorm(mean=0, sd = logESD) ## Stock level random effect 
+
+    log_E[i] <- b0[type[i]] + bWA[type[i]]*logWAbase[i] + logE0[i] ## Stock level regression
+    # according to Liermann there should be something like:
+      # E <- a + a*lifehist[i] + (b + b*lifehist[i])*logWAbase[i] + logE0[i]
+    # log_E[i] <- b0 + b0_stream*type[i] + (bWA + bWA_stream*type[i])*logWAbase[i] + logE0[i]
+    # where Here lifehist[i] is the life history type (Lj = 0 for stream-type and Lj = 1 for ocean-type).
+
+    E[i] <- exp(log_E[i])
+  }
+
+  ## Model and residuals:  
+  for(i in 1:N_Obs){ # 501 iterations - number of base observations
+    logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # - sigma^2/2
+      # remove - sigma^2/2 otherwise the estimations are too big - makes it difficult to interpret the variables
+
+    logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
+      # where is this used?
+  }
+
+  ## predWA
+  for ( j in 1:2 ){ # STREAM AND OCEAN TYPE
+    for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
+    log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
+    # logE_re[i] ~ dnorm(mean=0, sd = logESD)
+
+    ## Pred Srep
+    # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
+    log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
+    # log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAbackPred[i]
+      # Stick without logE_re for now
+      # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
+        # confidence - how uncertain you are about expected value
+        # prediction - how uncertain you are about predicted new site
+      
+    
+    # If you just want to predict individual sites
+      # Would need to repeat pattern for every iter of j
+    # log(E_pred[i]) <- b0[pred_type[i]] + bWA[pred_type[i]]*logWAPred[i]
+      # E_pred is equal to alpha/beta
+
+    ## Pred Smsy
+    beta_pred[i,j] <- log_alpha[i,j]/E_pred[i,j] # Pred beta
+    predSmsy[i,j] <- (1 - LambertW(1-log_alpha[i,j], 1))/beta_pred[i,j]
+    # predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))*E_pred[i]/log_alpha[i]
+    
+    ## Pred Sgen
+    # Double-check Get_LRP_bs for IWAM methods of calculation
+    # predSgen[i] <- # Sgen equation derivation from: 
+    # can't call functions from helperFunctions.R into nimble - illegal
+    # sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
+    # predSgen[i,j] <- -1/beta_pred[i,j]*LambertW(-beta_pred[i,j]*predSmsy[i,j]/log_alpha[i,j])
+      # Check if there are any differences between LambertW and LambertW0
+      # Two different formulations of Lambert's by Paul
+  }
+  }
+
+})
+```
+
+```{r nimble model run, include=FALSE}
+RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = constants, 
+  inits = inits(), buildDerivs=TRUE) # Build derivs if you want MLE
+Cmodel2 <- compileNimble(RmodelSrep)
+# Running calculate on model
+#   [Note] Any error reports that follow may simply reflect missing values in model variables.
+# Checking model sizes and dimensions
+#   [Note] This model is not fully initialized. This is not an error.
+#          To see which variables are not initialized, use model$initializeInfo().
+#          For more information on model initialization, see help(modelInitialization).
+
+# conf2 <- configureMCMC(RmodelSrep)
+conf2 <- configureMCMC(RmodelSrep, control = list(adaptFactorExponent = 0.25))
+Rmcmc2 <- buildMCMC(conf2)
+# ?buildLaplace
+
+conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", 
+                    "logAlphaSD", "logESD", "logE0", "E_pred", "beta_pred", "log_alpha",
+                    "predSmsy")) # "predSgen"
+
+Cmcmc2 <- compileNimble(Rmcmc2, project = RmodelSrep)
+# Cmcmc2$run(niter = 50000)	# Run chain directly on object
+# mvSamples <- Cmcmc2$mvSamples
+# samples <- as.matrix(mvSamples)
+# outc <- mcmc(samples[-c(1:10000),])	# Burn in
+mcmc.out <- runMCMC(Cmcmc2, niter=100000, nburnin=10000, nchains=4, samplesAsCodaMCMC = TRUE) 
+# niter=100000
+```
+
+```{r nimble outputs, include=FALSE}
+# call out mcmc chains:
+lapply(mcmc.out(FUN))
+
+out.alpha <- do.call('rbind', mcmc.out[, grepl("log_alpha", colnames(mcmc.out[[1]]))])
+# direct from chains
+pred.alpha <- data.frame()
+for(i in 1:length(WAin$Stock)){ # length of the number of stocks - could tie them direct to WAin?
+  for(i in 1:2){
+    tmp <- exp(out.alpha)
+    type <- c("stream", "ocean")[i]
+    pred.alpha <- rbind(pred.alpha, data.frame(type = type, 
+                      mean = mean(tmp), median = median(tmp), lower = quantile(tmp, 0.025),
+                      upper = quantile(tmp, 0.975)))
+  }
+}
+
+
+
+#sum.outc <- summary(outc) # ****
+sum.outc <- summary(mcmc.out)
+sum.dfc <- data.frame(do.call("cbind", sum.outc))
+Ec <- sum.dfc[substr(rownames(sum.dfc), 1,5) == "log_E",]
+Ec <- cbind(Ec, WAbase)
+  # bind in WAbase and lifehist so that I can get lh for future usage
+Ec <- left_join(Ec, lifehist, by="Stocknumber")
+
+# # cbind back E_pred to the WAin df to get back those predicted SREP'S and CI's
+Epred <- sum.dfc[substr(rownames(sum.dfc), 1,6) == "E_pred",] # 6 refers to the number of characters in the string to search for?
+Epred <- cbind(Epred, WAin)
+# Mutate in a column for exp(E_pred) to get the final SREP values?
+  # Confirm that E_pred is the log form?
+
+# Within Ep (SREP predicted estimates)
+  # Pull out rows by index for ocean and stream life history and then bind them back together
+  # Remove all the columns we don't need
+  # Pipe all the above
+# ** FOR WCVI TEST STOCKS - THERE ARE ONLY lh=1 type stocks = ocean **
+  # Within the nimble code that means = 2
+  # Because it is lh + 1 in the data-setup
+Srep_pred <- Epred[116:230,]# [22:42,]
+# Srep_pred <- (1) Epred[1 or 2] matching when Epred$lh = 1 or 0
+  # first divide into ocean and stream? and then draw from one or the other depending
+  # on condition?
+Epred_stream <- Epred[1:115,] # stream division
+Epred_ocean <- Epred[116:230,] # ocean division
+for (i in 1:115){ # Over-writes Srep_pred just to keep the headers - this is a trash method
+  if (Epred$lh[i] == 0) {
+    Srep_pred[i,] <- Epred_stream[i,]
+} else {
+    Srep_pred[i,] <- Epred_ocean[i,]
+}
+}
+
+Srep_pred <- Srep_pred %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+  rename('srep2.5.'= X2.5., 'mean_srep'= Mean, 'srep97.5.'= X97.5., 
+         'srepSD' = SD, 'srep50.' = X50., 'srep25.' = X25., 'srep75.' = X75.)
+
+# cbind out the SMSY_pred
+ESmsy <- sum.dfc[substr(rownames(sum.dfc), 1,8) == "predSmsy",] # CHANGE INDEXING
+ESmsy <- cbind(ESmsy, WAin)
+
+Smsy_pred <- ESmsy[116:230,] # CHANGE INDEXING
+Esmsy_stream <- ESmsy[1:115,] # stream division
+Esmsy_ocean <- ESmsy[116:230,] # ocean division
+for (i in 1:115){ # Overwrites Srep_pred just to keep the headers - this is a trash method
+  if (ESmsy$lh[i] == 0) {
+    Smsy_pred[i,] <- Esmsy_stream[i,]
+} else {
+    Smsy_pred[i,] <- Esmsy_ocean[i,]
+}
+}
+# Smsy_pred <- ESmsy[1:21,]
+Smsy_pred <- Smsy_pred %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+  rename('smsy2.5.'= X2.5., 'mean_smsy'= Mean, 'smsy97.5.'= X97.5., 
+         'smsySD' = SD, 'smsy50.' = X50., 'smsy25.' = X25., 'smsy75.' = X75.)
+
+# Now I will have the mean, median, CI's (ALL PREDICTED) and the base WAin dataframe bound together
+
+# Bind Srep and Smsy preds together into preds
+preds <- cbind(Srep_pred,Smsy_pred)
+# preds
+
+
+
+# You should calculate alpha (with the chain) AND then take mean
+# pred.WA <- data.frame()
+# # out.b0 <- do.call('rbind', mcmc.out[, c("b0[1]", "b0[2]")])
+# #out.bwa <- do.call('rbind', mcmc.out[, c("bWA[1]", "bWA[2]")])
+# out.alpha <- do.call('rbind', mcmc.out[, c("logAlpha0", "logAlphaSD")])
+# for( logA in 2:20){
+#   for(i in 1:2){
+#     tmp <- exp(out.b0[,i] + out.bwa[,i]*logA)
+#     type <- c("stream", "ocean")[i]
+#     pred.WA <- rbind(pred.WA, data.frame(logWA = logA, type = type, mean = mean(tmp), 
+#                       median = median(tmp), lower = quantile(tmp, 0.025), 
+#                       upper = quantile(tmp, 0.975)))
+#   }
+# }
+
+#log_alpha ** These are the means of the log value - consider using the median
+logalpha <- sum.dfc[substr(rownames(sum.dfc), 1,9) == "log_alpha",]
+log_alpha <- logalpha[116:230,]
+alpha_stream <- logalpha[1:115,] # stream division
+alpha_ocean <- logalpha[116:230,] # ocean division
+for (i in 1:115){ # Overwrites Srep_pred just to keep the headers - this is a trash method
+  if (ESmsy$lh[i] == 0) {
+    log_alpha[i,] <- alpha_stream[i,]
+} else {
+    log_alpha[i,] <- alpha_ocean[i,]
+}
+}
+# alpha <- logalpha[1:21,] # CHANGE INDEXING
+log_alpha <- log_alpha %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+  rename('alpha2.5.'= X2.5., 'mean_alpha'= Mean, 'alpha97.5.'= X97.5., 
+         'alphaSD' = SD, 'alpha50.' = X50., 'alpha25.' = X25., 'alpha75.' = X75.)
+
+# sgen calculation
+# log_alpha = alpha
+# E_pred = SREP
+```
+
+```{r nimble sgen}
+# sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
+sgen.out <- apply()
+
+
+  # method 1: sgen2
+# Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
+# USING MEAN
+m1sgen <- Sgen.fn2(exp(log_alpha$mean_alpha), Srep_pred$mean_srep, 
+                    explicit = TRUE, plot = FALSE)
+# USING MEDIAN
+m1sgen <- Sgen.fn2(exp(log_alpha$alpha50.), Srep_pred$X50., 
+                    explicit = TRUE, plot = FALSE)
+# SGENcalcs <- purrr::map2_dfr (alpha$mean_alpha, Srep_pred$mean_srep, Sgen.fn2)
+  # method 2: sgen3 ala Paul
+# Sgen.fn3 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
+# const.SMAX <- TRUE
+m2sgen <- Sgen.fn3(exp(log_alpha$mean_alpha), Srep_pred$mean_srep,
+                   explicit = TRUE, plot=FALSE)
+```
+
+## S3. Tables
 
 This code is a direct lift from the IWAM function vignette. Once the model and bootstrapping has completed, the function will store the following objects:
 
@@ -72,7 +463,7 @@ This code is a direct lift from the IWAM function vignette. Once the model and b
 
 The following tables (1-3) have been prepared for comparison to Holt et al. (2023) Res Doc (Table 9). The table will also be stored in your repository folder under the name of "Backcalculation_stockestimates_table.csv".
 
-```{r Complete table, echo=FALSE, message=FALSE}
+```{r prep iwam table, echo=FALSE, message=FALSE}
 SREP <- IWAM_backcalc[[2]] %>%
   filter(RP=='SREP') %>%
   rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
@@ -90,15 +481,24 @@ SGEN <- IWAM_backcalc[[2]] %>%
   relocate(Stock)
 ```
 
+```{r prep nimble table, echo=FALSE, message=FALSE}
+# data coming from: m1sgen/ms2gen
+# m1sgen # how do I get out lwr and upr bounds out of that function?
+
+# SREP
+# SMSY
+# SGEN
+```
+
 ``` {r read in WA, echo=FALSE, message=FALSE}
 # WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>% 
 WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv")) %>% 
   # filter(Stock != "Cypre") %>% # remove Cypre - see Get_LRP_bs.R
-  mutate(WA = round(WA,0)) 
+  mutate(WA = round(WA,0)) # ?
 ```
 
 
-*Table 1. SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.*
+*Table 1. IWAM: SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.*
 ``` {r kable table, echo=FALSE, message=FALSE}
 complete <- data.frame(SGEN, SREP, SMSY) %>% 
   # confirm that all stocks line-up
@@ -111,7 +511,20 @@ complete <- complete %>% left_join(WAin, by=join_by(Stock)) %>%
   relocate(WA, .after=Stock) # %>% 
   # arrange(Stock)
   
-kable(complete, caption = "SGEN, SREP, and SMSY Estimates for All Stocks")
+kable(complete, caption = "IWAM: SGEN, SREP, and SMSY Estimates for All Stocks")
+```
+
+*Table 2. NIMBLE: SGEN, SREP, and SMSY estimates including quantiles for all listed stocks. (See above Table 1 description.*
+```{r nimble kable table, echo=FALSE, message=FALSE}
+# dataset creation
+# nimble_estimates
+
+# kable(nimble_estimates, caption = "NIMBLE: SGEN, SREP, and SMSY Estimates for All Stocks")
+nimble_estimates <- data.frame(complete$Stock, complete$WA, m1sgen$SGEN, m1sgen$SREP, m1sgen$SMSY) %>% 
+  rename("Stock" = complete.Stock, "WA" = complete.WA, "SGEN" = m1sgen.SGEN, "SREP" = m1sgen.SREP,
+         "SMSY" = m1sgen.SMSY)
+
+kable(nimble_estimates, caption = "NIMBLE: SGEN, SREP, and SMSY Estimates for All Stocks")
 ```
 
 ``` {r Table output, echo=FALSE, message=FALSE}
@@ -129,7 +542,7 @@ The objective of this section is to provide comparison figures between the IWAM 
 # load in iwam_model estimates for SREP and SMSY as two separate objects
 # SMSY and SGEN already loaded
 
-# load in Parken estimates
+# Add Parken estimates (coming from WAin)
 Parken_eval <- data.frame(SGEN, SREP, SMSY) %>% 
   # confirm that all stocks line-up
   select(-Stock.1, -Stock.2) %>% 
@@ -156,7 +569,7 @@ SMSY_pl <- ggplot(eval_data, aes(x=Stock, y = SMSY)) +
   theme_classic() + 
   ylab("SMSY Estimate") + 
   xlab("") +
-  # coord_cartesian(ylim = c(0,25000)) +
+  coord_cartesian(ylim = c(0,25000)) +
   # coord_flip() +
   # scale_x_discrete(expand = c(0,0)) +
   # scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2), 
@@ -175,9 +588,10 @@ SMSY_parken <- SMSY_pl +
                 width = 0.2,                     
                 position = position_nudge(-0.1), 
                 inherit.aes = FALSE) 
- 
+
 SMSY_parken
 ```
+
 ``` {r Parken stockwise SREP, echo=FALSE, message=FALSE, fig.align = 'centre', fig.width = 16, fig.height = 9}
 # out.width="100%"
 SREP_pl <- ggplot(eval_data, aes(x=Stock, y = SREP)) +
@@ -210,11 +624,12 @@ SREP_parken <- SREP_pl +
                 inherit.aes = FALSE) 
  
 SREP_parken
-# ggplotly(p)
 ```
 
+
+
 ``` {r srep plotly, include=FALSE, echo=FALSE, message=FALSE, fig.align = 'centre'}
-ggplotly(SREP_parken)
+# ggplotly(SREP_parken)
 ```
 
 ```{r plotly test, include=FALSE, echo=FALSE, message=FALSE}
@@ -223,25 +638,25 @@ ggplotly(SREP_parken)
 # fig <- plot_ly(data = iris, x = ~Sepal.Length, y = ~Petal.Length, color = ~Species)
 # fig
 
-SREP_plotly <- plot_ly(data = eval_data, 
-                   x = ~Stock, 
-                   y = ~SREP, 
-                   name = "IWAM Estimate",
-                   error_y = list(array = ~((`SREP UQ` - SREP)/1.96)),
-                   type = 'scatter')
-
-# UL = PA_SREP + (1.96 * PA_SE_SREP)
-# UL - PA_SREP = (1.96 * PA_SE_SREP)
-# (UL - PA_SREP) / 1.96 = PA_SE_SREP
-
-fig <- SREP_plotly %>% 
-  add_markers(data = eval_data, 
-                   x = ~Stock, 
-                   y = ~PA_SREP, 
-                   name = "Parken Estimate",
-                   error_y = list(array=~(PA_SE_SREP)),
-                   type = 'scatter')
-
-
-fig
+# SREP_plotly <- plot_ly(data = eval_data, 
+#                    x = ~Stock, 
+#                    y = ~SREP, 
+#                    name = "IWAM Estimate",
+#                    error_y = list(array = ~((`SREP UQ` - SREP)/1.96)),
+#                    type = 'scatter')
+# 
+# # UL = PA_SREP + (1.96 * PA_SE_SREP)
+# # UL - PA_SREP = (1.96 * PA_SE_SREP)
+# # (UL - PA_SREP) / 1.96 = PA_SE_SREP
+# 
+# fig <- SREP_plotly %>% 
+#   add_markers(data = eval_data, 
+#                    x = ~Stock, 
+#                    y = ~PA_SREP, 
+#                    name = "Parken Estimate",
+#                    error_y = list(array=~(PA_SE_SREP)),
+#                    type = 'scatter')
+# 
+# 
+# fig
 ```

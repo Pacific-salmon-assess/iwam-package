@@ -5,13 +5,17 @@ date: "2024-02-01"
 output: html_document
 ---
 
+# Document Head
+
 ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(echo = TRUE)
 
 # Always remember to add a line between file structures for clean knitting.
 ```
 
-```{r libraries, echo=FALSE}
+## Libraries
+
+```{r libraries, echo=FALSE, message=FALSE}
 library(tidyverse)
 library(nimble)
 library(coda)
@@ -28,12 +32,19 @@ library(viridis)
 library(hrbrthemes)
 library(gsl)
 library(knitr)
+library(geomtextpath)
+
+library(MCMCvis)
 ```
+
+## Custom Functions
 
 ```{r custom library, echo=FALSE}
 source(here::here("R/helperFunctions.R"))
+  # used for solving Sgen specifically in the Nimble model
+    # either using Sgen.fn2 (IWAM original) or Sgen.fn3 (Paul's version)
 source(here::here("R/PlotFunctions.R"))
-source(here::here("R/Get_LRP_bs.R"))
+# source(here::here("R/Get_LRP_bs.R")) # This cannot be sourced otherwise it bricks it
 source(here::here("R/IWAM_model.R"))
 ```
 
@@ -74,6 +85,61 @@ LambertW <- nimbleFunction(
 )
 ```
 
+```{r LW0 nimble, echo=FALSE}
+LambertW0 <- nimbleFunction(
+  setup = function(){},
+  run = function(x = double()) {
+    eps <- 2.2204460492503131e-16
+    returnType(double())
+    if (x == Inf) {
+      return(Inf);
+    } else if (x < -exp(-1)) {
+      return(NaN);
+    } else if (abs(x - exp(-1)) <= eps) {
+      return(-1.0);
+    } else if (abs(x) <= 1e-16) {
+      ## This close to 0 the W_0 branch is best estimated by its Taylor/Pade
+      ## expansion whose first term is the value x and remaining terms are below
+      ## machine double precision. See
+      ## https://math.stackexchange.com/questions/1700919
+ 
+      return(x);
+    } else {
+      w <- 0
+      if (abs(x) <= 6.4e-3) {
+        ## When this close to 0 the Fritsch iteration may underflow. Instead,
+        ## function will use degree-6 minimax polynomial approximation of Halley
+        ## iteration-based values. Should be more accurate by three orders of
+        ## magnitude than Fritsch's equation (5) in this range.
+        return((((((-1.0805085529250425e1 * x + 5.2100070265741278) * x -
+               2.6666665063383532) * x + 1.4999999657268301) * x -
+               1.0000000000016802) * x + 1.0000000000001752) * x +
+               2.6020852139652106e-18);
+ 
+      } else if (x <= exp(1)) {
+        ## Use expansion in Corliss 4.22 to create (2, 2) Pade approximant.
+        ## Equation with a few extra terms is:
+        ## -1 + p - 1/3p^2 + 11/72p^3 - 43/540p^4 + 689453/8398080p^4 - O(p^5)
+        ## This is just used to estimate a good starting point for the Fritsch
+        ## iteration process itself.
+        p <- sqrt(2.0 * (exp(1) * x + 1.0))
+        Numer <- (0.2787037037037037 * p + 0.311111111111111) * p - 1.0;
+        Denom <- (0.0768518518518518 * p + 0.688888888888889) * p + 1.0;
+        w <- Numer / Denom;
+      } else {
+        ## Use first five terms of Corliss et al. 4.19 */
+        w <- log(x)
+        L_2 <- log(w)
+        L_3 <- L_2 / w
+        L_3_sq <- L_3 * L_3
+        w <- w - L_2 + L_3 + 0.5 * L_3_sq - L_3 / w + L_3 / (w * w) - 1.5 * L_3_sq /
+          w + L_3_sq * L_3 / 3.0;
+      }
+      return(FritschIter(x, w));
+    }
+  }
+)
+```
 
 
 ## S1. Report Introduction
@@ -303,16 +369,29 @@ inits <- function(){
     logESD = 1,
     logAlphaSD = 1)
 }
+
+# for second model
+# inits <- function(){
+#   list(b0 = c(2.11, 0),
+#     bWA = c(0.1, 0),
+#     logAlpha0 = 1.5,
+#     logESD = 1,
+#     logAlphaSD = 1)
+# }
+
 ```
 
 ```{r predicted WA, echo=FALSE}
 # Insert predictive WA's
 WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+  # Now includes back-calculated watershed areas
+
 # WAin <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
   # Could just use WCVI_Parken from the beginning here - then I don't have to do this join below
 
 nPred <- length(WAin$WA) # length of predicted watershed areas
-logWAPred <-  log(WAin$WA) # predicted watershed areas takes a vector 
+logWAPred <-  log(WAin$WA) # predicted watershed areas takes a vector
+# logWAPred <- log(WAin$WA_back) # back-calculated water shed areas as a vector
 # NOTE: these will be ORDERED - this order must be maintained in order to bind them back in at the end
 ```
 
@@ -361,9 +440,88 @@ stock_recruit_srep_biasCor <- nimbleCode({
 
   for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
     logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
-    logE0[i] ~ dnorm(mean=0, sd = logESD) ## Stock level random effect 
+    logE0[i] ~ dnorm(mean = 0, sd = logESD) ## Stock level random effect 
 
     log_E[i] <- b0[type[i]] + bWA[type[i]]*logWAbase[i] + logE0[i] ## Stock level regression
+    # according to Liermann there should be something like:
+      # E <- a + a*lifehist[i] + (b + b*lifehist[i])*logWAbase[i] + logE0[i]
+    # log_E[i] <- b0 + b0_stream*type[i] + (bWA + bWA_stream*type[i])*logWAbase[i] + logE0[i]
+    # where Here lifehist[i] is the life history type (Lj = 0 for stream-type and Lj = 1 for ocean-type).
+
+    E[i] <- exp(log_E[i])
+  }
+
+  ## Model and residuals:  
+  for(i in 1:N_Obs){ # 501 iterations - number of base observations
+    logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # - sigma^2/2
+      # remove - sigma^2/2 otherwise the estimations are too big - makes it difficult to interpret the variables
+
+    logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
+  }
+
+  ## predWA
+  for ( j in 1:2 ){ # STREAM AND OCEAN TYPE
+    for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
+    log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
+    # logE_re[i] ~ dnorm(mean=0, sd = logESD)
+
+    ## Pred Srep
+    # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
+    log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
+    # log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAbackPred[i]
+      # Stick without logE_re for now
+      # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
+        # confidence - how uncertain you are about expected value
+        # prediction - how uncertain you are about predicted new site
+      
+    
+    # If you just want to predict individual sites
+      # Would need to repeat pattern for every iter of j
+    # log(E_pred[i]) <- b0[pred_type[i]] + bWA[pred_type[i]]*logWAPred[i]
+      # E_pred is equal to alpha/beta
+
+    ## Pred Smsy
+    beta_pred[i,j] <- log_alpha[i,j]/E_pred[i,j] # Pred beta
+    predSmsy[i,j] <- (1 - LambertW(1-log_alpha[i,j], 1))/beta_pred[i,j]
+    # predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))*E_pred[i]/log_alpha[i]
+    
+    ## Pred Sgen
+    # Double-check Get_LRP_bs for IWAM methods of calculation
+    # predSgen[i] <- # Sgen equation derivation from: 
+    # can't call functions from helperFunctions.R into nimble - illegal
+    # sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
+    # predSgen[i,j] <- -1/beta_pred[i,j]*LambertW(-beta_pred[i,j]*predSmsy[i,j]/log_alpha[i,j])
+      # Check if there are any differences between LambertW and LambertW0
+      # Two different formulations of Lambert's by Paul
+  }
+  }
+
+})
+```
+
+```{r model stock_recruit_srep_biasCor_2, echo=FALSE}
+stock_recruit_srep_biasCor_2 <- nimbleCode({
+
+  ## priors
+  logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
+  logAlphaSD ~ dunif(0, 100)
+  logESD ~ dunif(0, 100)
+    # Can we create regional mean alpha's?
+    # Can we use the distribution's used by Diane Dobson - see bootstrap
+
+  ## Based on Parken et al. 2006 (log ( 1/beta ) has a linear relationship with log Watershed Area.
+  b0[1] ~ dflat() # dnorm(0, tau = 10)  ## Flat intercept for stream
+  b0[2] ~ dnorm(0, tau = 5)  ## Flat intercept for ocean
+  bWA[1] ~ dnorm(0, tau = 1)  ## log Watershed area slope for stream
+  bWA[2] ~ dnorm(0, tau = 5)  ## log Watershed area slope for ocean
+
+  sigma ~ dunif(0, 100)
+
+  for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
+    logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
+    logE0[i] ~ dnorm(mean = 0, sd = logESD) ## Stock level random effect 
+
+    log_E[i] <- b0[1] + b0[2]*typeOcean[i] + bWA[1]*logWAbase[i] + bWA[2]*logWAbase[i]*typeOcean[i] + logE0[i] ## Stock level regression
     # according to Liermann there should be something like:
       # E <- a + a*lifehist[i] + (b + b*lifehist[i])*logWAbase[i] + logE0[i]
     # log_E[i] <- b0 + b0_stream*type[i] + (bWA + bWA_stream*type[i])*logWAbase[i] + logE0[i]
@@ -382,14 +540,15 @@ stock_recruit_srep_biasCor <- nimbleCode({
   }
 
   ## predWA
-  for ( j in 1:2 ){
+  for ( j in 1:2 ){ # STREAM AND OCEAN TYPE
     for( i in 1:nPred ){ # CHANGING - 21 iterations - number of predicted watershed areas
     log_alpha[i,j] ~ dnorm(logAlpha0, sd = logAlphaSD)
     # logE_re[i] ~ dnorm(mean=0, sd = logESD)
 
     ## Pred Srep
     # log(E_pred[i]) <- b0 + bWA*logWAPred[i] # + logE_re[i]
-    log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAPred[i] # + logE_re[i]
+    log(E_pred[i,j]) <- b0[1] + b0[2]*(j-1) + (bWA[1] + bWA[2]*(j-1))*logWAPred[i] # + logE_re[i]
+    # log(E_pred[i,j]) <- b0[j] + bWA[j]*logWAbackPred[i]
       # Stick without logE_re for now
       # remove logE_re - assumes that there is no random effect for a site-specific effect for the prediction - "conditional mean"
         # confidence - how uncertain you are about expected value
@@ -405,6 +564,15 @@ stock_recruit_srep_biasCor <- nimbleCode({
     beta_pred[i,j] <- log_alpha[i,j]/E_pred[i,j] # Pred beta
     predSmsy[i,j] <- (1 - LambertW(1-log_alpha[i,j], 1))/beta_pred[i,j]
     # predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))*E_pred[i]/log_alpha[i]
+    
+    ## Pred Sgen
+    # Double-check Get_LRP_bs for IWAM methods of calculation
+    # predSgen[i] <- # Sgen equation derivation from: 
+    # can't call functions from helperFunctions.R into nimble - illegal
+    # sgen.out <- -1/b.par*gsl::lambert_W0(-b.par*SMSY/a.par)
+    # predSgen[i,j] <- -1/beta_pred[i,j]*LambertW(-beta_pred[i,j]*predSmsy[i,j]/log_alpha[i,j])
+      # Check if there are any differences between LambertW and LambertW0
+      # Two different formulations of Lambert's by Paul
   }
   }
 
@@ -413,14 +581,19 @@ stock_recruit_srep_biasCor <- nimbleCode({
 
 *Notes for Tor: ORIGINAL: take out own alpha distributions - Liermann takes the hierarchical alpha - We know that alpha's differ regionally - so we can either have regional hierarchical means. Want to be able to adjust alpha for Sgen.*
 
-
-
 ## S5. Model run
 
 Lorem ipsum. ...
 
 ```{r model run, echo=FALSE}
-RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = constants, 
+
+# Model 2:
+# constants$typeOcean <- (constants$type == 2)*1
+# RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor_2, data = data, constants = constants, 
+#   inits = inits(), buildDerivs=TRUE)
+
+# Model 1:
+RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = constants,
   inits = inits(), buildDerivs=TRUE) # Build derivs if you want MLE
 
 # Running calculate on model
@@ -430,12 +603,21 @@ RmodelSrep <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = c
 #          To see which variables are not initialized, use model$initializeInfo().
 #          For more information on model initialization, see help(modelInitialization).
 
-# conf2 <- configureMCMC(RmodelSrep)
-conf2 <- configureMCMC(RmodelSrep, control = list(adaptFactorExponent = 0.25))
+# Model 1:
+conf2 <- configureMCMC(RmodelSrep)
+
+# Model 2:
+# conf2 <- configureMCMC(RmodelSrep, control = list(adaptFactorExponent = 0.1))
+# conf2$removeSamplers(c("b0", "bWA"))
+# conf2$addSampler(target =c("b0[1]"), type = 'slice')
+# conf2$addSampler(target =c("bWA[1]"), type = 'slice')
+# conf2$addSampler(target =c("b0[2]"), type = 'slice')
+# conf2$addSampler(target =c("bWA[2]"), type = 'slice')
 
 conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", 
-                    "logAlphaSD", "logESD", "logE0", "E_pred", "beta_pred",
-                    "predSmsy"))
+                    "logAlphaSD", "logESD", "logE0", "E_pred", "beta_pred", "log_alpha",
+                    "predSmsy")) 
+
 Rmcmc2 <- buildMCMC(conf2)
 Cmodel2 <- compileNimble(RmodelSrep)
 
@@ -444,10 +626,9 @@ Cmcmc2 <- compileNimble(Rmcmc2, project = RmodelSrep)
 # mvSamples <- Cmcmc2$mvSamples
 # samples <- as.matrix(mvSamples)
 # outc <- mcmc(samples[-c(1:10000),])	# Burn in
-mcmc.out <- runMCMC(Cmcmc2, niter=100000, nburnin=1000, nchains=4, samplesAsCodaMCMC = TRUE)
+mcmc.out <- runMCMC(Cmcmc2, niter=100000, nburnin=10000, nchains=4, samplesAsCodaMCMC = TRUE) 
+# niter=100000
 ```
-
-
 
 ## S6. Model evaluation and plotting
 
@@ -472,12 +653,50 @@ What plots do I want to show:
     -   log(WA) vs log(SREP)
     -   log(WA) vs log(SMSY)
 
+```{r mcmc testing}
+# consider gathering draws for bayesplots
+
+
+density <- data.frame(do.call("rbind", mcmc.out))
+  # subset out E_preds
+  # label them - melt them for ggplot
+  # consider thining them to 1000 per chain (4000 total) - posterior's won't be smooth
+```
+
+```{r mcmc hists, include=FALSE}
+# mcmc.out %>%
+#   as_tibble() %>%
+#   ggplot() + 
+#   geom_histogram(aes(x = chain1[,"E_pred"]), color = "white") + 
+#   labs(x = "x axis")
+# library(MCMCvis)
+
+# To get common numerical summaries, function MCMCsummary() does the job:
+mcmcsum <- MCMCsummary(object = mcmc.out, round = 2)
+
+# A caterpillar plot to visualise posterior distribution of theta with MCMCplot():
+MCMCplot(object = mcmc.out, params = 'b0')
+
+# Trace plots
+MCMCtrace(object = mcmc.out,
+          pdf = FALSE, # no export to PDF
+          ind = TRUE, # separate density lines per chain
+          params = "b0")
+# E_pred - SMSY predicted
+# b0 - intercept estimates
+# bWA - slope estimate
+# logAlpha0
+# logAlphaSD
+```
+
 ```{r mcmc data retrieval, echo=FALSE, message=FALSE, warning=FALSE}
 #sum.outc <- summary(outc) # ****
-sum.outc <- summary(mcmc.out)
+sum.outc <- summary(mcmc.out) # taking mean at real-scale
 sum.dfc <- data.frame(do.call("cbind", sum.outc))
 Ec <- sum.dfc[substr(rownames(sum.dfc), 1,5) == "log_E",]
 Ec <- cbind(Ec, WAbase)
+  # bind in WAbase and lifehist so that I can get lh for future usage
+Ec <- left_join(Ec, lifehist, by="Stocknumber")
 
 # # cbind back E_pred to the WAin df to get back those predicted SREP'S and CI's
 Epred <- sum.dfc[substr(rownames(sum.dfc), 1,6) == "E_pred",] # 6 refers to the number of characters in the string to search for?
@@ -493,6 +712,8 @@ Epred <- cbind(Epred, WAin)
   # Within the nimble code that means = 2
   # Because it is lh + 1 in the data-setup
 Srep_pred <- Epred[22:42,]
+# Srep_pred <- Epred[1:21,]
+# Srep_pred <- Epred[1:21,]
 Srep_pred <- Srep_pred %>% 
   select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
   rename('srep2.5.'= X2.5., 'mean_srep'= Mean, 'srep97.5.'= X97.5., 
@@ -502,6 +723,7 @@ Srep_pred <- Srep_pred %>%
 ESmsy <- sum.dfc[substr(rownames(sum.dfc), 1,8) == "predSmsy",] # CHANGE INDEXING
 
 Smsy_pred <- ESmsy[22:42,] # CHANGE INDEXING
+# Smsy_pred <- ESmsy[1:21,]
 Smsy_pred <- Smsy_pred %>% 
   select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
   rename('smsy2.5.'= X2.5., 'mean_smsy'= Mean, 'smsy97.5.'= X97.5., 
@@ -512,7 +734,35 @@ Smsy_pred <- Smsy_pred %>%
 # Bind Srep and Smsy preds together into preds
 preds <- cbind(Srep_pred,Smsy_pred)
 # preds
+
+#log_alpha's
+logalpha <- sum.dfc[substr(rownames(sum.dfc), 1,9) == "log_alpha",]
+alpha <- logalpha[22:42,]
+# alpha <- logalpha[1:21,] # CHANGE INDEXING
+alpha <- alpha %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+  rename('alpha2.5.'= X2.5., 'mean_alpha'= Mean, 'alpha97.5.'= X97.5., 
+         'alphaSD' = SD, 'alpha50.' = X50., 'alpha25.' = X25., 'alpha75.' = X75.)
 ```
+
+```{r sgen calc, echo=FALSE, message=FALSE, warning=FALSE}
+# sgen calculation
+# log_alpha = alpha
+# E_pred = SREP
+
+  # method 1: sgen2
+# Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
+m1sgen <- Sgen.fn2(exp(alpha$mean_alpha), Srep_pred$mean_srep, 
+                    explicit = TRUE, plot = FALSE)
+# SGENcalcs <- purrr::map2_dfr (alpha$mean_alpha, Srep_pred$mean_srep, Sgen.fn2)
+  # method 2: sgen3 ala Paul
+# Sgen.fn3 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
+# const.SMAX <- TRUE
+m2sgen <- Sgen.fn3(exp(alpha$mean_alpha), Srep_pred$mean_srep,
+                   explicit = TRUE, plot=FALSE)
+```
+
+### S6. IWAM model Run
 
 ```{r iwam and parken model setup, echo=FALSE, message=FALSE, warning=FALSE}
 IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # INPUT Data
@@ -529,10 +779,11 @@ SMSY <- IWAM_WCVI_noEnh[[2]] %>%
 SREP <-IWAM_WCVI_noEnh[[2]] %>%
   filter(RP=='SREP')
 
-Parken <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+Parken_WCVI <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
   # Could just use WCVI_Parken from the beginning here - then I don't have to do this join below
+Parken_est <- read.csv(here::here("DataIn/Parkenest.csv"))
 
-eval_dat <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>% 
+eval_dat <- Parken_WCVI %>% left_join(SMSY, by=join_by(Stock)) %>% 
   rename("SMSY" = Value, "UL SMSY" = upr, "LL SMSY" = lwr) %>%
   select(-RP) %>% 
   left_join(SREP, by=join_by(Stock)) %>%
@@ -544,7 +795,32 @@ eval_dat <- Parken %>% left_join(SMSY, by=join_by(Stock)) %>%
   mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
 ```
 
+```{r acf plot}
+SRes <- IWAM_WCVI_noEnh$SRes
+Plotacf(SRes)
+```
 
+```{r stres plot}
+PlotStdResid(SRes)
+```
+
+```{r IWAM reg plots}
+# prepare data sets
+pars <- IWAM_WCVI_noEnh$modelpars
+all_Deltas <- IWAM_WCVI_noEnh$all_Deltas
+lifehist <- IWAM_WCVI_noEnh$lh
+WAbase <- IWAM_WCVI_noEnh$WAbase
+pred_lnSREP <- IWAM_WCVI_noEnh$pred_lnSREP
+# pred_lnSMSY
+pred_lnWA <- IWAM_WCVI_noEnh$pred_lnWA
+mod <- "IWAM_Liermann" 
+
+# plotWAregressionSMSY(pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
+#                       pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+
+plotWAregressionSREP(pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
+                      pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+```
 
 ### S6.a Stock-wise comparisons of SREP Plots
 
@@ -560,7 +836,7 @@ SREP_i <- ggplot(eval_dat, aes(x=Stock, y = SREP)) +
   
   theme_classic() + 
   ylab("SREP Estimate") + 
-  # ylim(0,25000) +
+  # ylim(0,50000) +
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
 
 # SREP_i
@@ -575,8 +851,7 @@ SREP_p <- SREP_i +
 
 SREP_f <- SREP_p + 
   geom_point(preds, mapping = aes(x = Stock, y = srep50.), color='orange') + # mean_srep or srep50. (median)
-  geom_errorbar(data = preds, aes(x = Stock, ymax = `srep97.5.`, ymin = `srep2.5.`), color='orange', width = 0.2, 
-                inherit.aes = FALSE)
+  geom_errorbar(data = preds, aes(x = Stock, ymax = `srep97.5.`, ymin = `srep2.5.`), color='orange', width = 0.2, inherit.aes = FALSE)
 
 SREP_f
 ```
@@ -604,7 +879,7 @@ SMSY_p <- SMSY_i +
   geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY), width = 0.2, position = position_nudge(-0.2), 
                 inherit.aes = FALSE)
 
-SMSY_p
+# SMSY_p
 
 # Add final geom for nimble estimates
 # SMSY_f <- SMSY_p +
@@ -612,32 +887,193 @@ SMSY_p
 #     geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY), width = 0.2, position = position_nudge(-0.1),
 #                 inherit.aes = FALSE)
 SMSY_f <- SMSY_p + 
-  geom_point(preds, mapping = aes(x = Stock, y = smsy50.), color='orange') + 
-  geom_errorbar(data = preds, aes(x = Stock, ymax = `smsy97.5.`, ymin = `smsy2.5.`), color='orange', width = 0.2, 
-                inherit.aes = FALSE)
+  geom_point(preds, mapping = aes(x = Stock, y = smsy50.), color='blue') + 
+  geom_errorbar(data = preds, aes(x = Stock, ymax = `smsy97.5.`, ymin = `smsy2.5.`), color='blue', width = 0.2, inherit.aes = FALSE)
 
 SMSY_f
 ```
 
+```{r synoptic stockwise}
+# Parken data: Parken_est
+# IWAM data: ???
+# Nimble data: Ec (Srep only)
 
+# Base of Nimble estimates
+SREP_synN <- ggplot(Ec, aes(x=Name, y = exp(X50.))) +
+  geom_errorbar(aes(ymax = exp(X97.5.), ymin = exp(X2.5.)), width = 0.2, color='blue', 
+                position = position_nudge(0.2)) +
+  geom_point(color = 'blue', position = position_nudge(0.2)) +
+  theme_classic() + 
+  ylab("SREP Estimate") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+
+# SREP_synN
+
+# Add geom for Parken point estimates (no errorbars)
+SREP_synP <- SREP_synN + 
+  geom_point(Parken_est, mapping = aes(x = Stockname, y = SREP, inherit.aes = FALSE), 
+             position = position_nudge(-0.2))
+
+# SREP_synP
+
+# Iwam synoptic data retreival
+iwam_synoptic <- IWAM_WCVI_noEnh$modelpars[IWAM_WCVI_noEnh$modelpars$Param == "lnSREP", ]
+
+# Add geom for IWAM points + errorbars
+SREP_synplot <- SREP_synP +
+  geom_point(iwam_synoptic, mapping = aes(x = Name, y = exp(Estimate)), color='red') + # mean_srep or srep50. (median)
+  geom_errorbar(data = iwam_synoptic, aes(x = Name, ymax = exp(Estimate + 1.96 * Std..Error),
+                                          ymin = exp(Estimate - 1.96 * Std..Error)),
+                                          color='red', width = 0.2,inherit.aes = FALSE)
+
+SREP_synplot
+```
 
 ### S6.b WA Regression Plots
 
 Important to note that because there is no error on the prediction terms - one is essentially drawing from the regression line created. This can best be seen by plotting log predicted 'mean' Srep against log watershed area - which produces a straight line. This line is controlled by the slope and intercept estimated by the model posterior.
 
-```{r bwa values, echo=FALSE, message=FALSE}
-intercept <- sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"]
-slope <-  sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]
+```{r fixing WAreg}
+# Fixing that the points are on the line
+  # bWA and b0 are describing the mean mu on the log-scale and therefore need
+  # to be transformed correctly - best done directly from the mcmc outputs.
+  # Morale of the story is that summary() is a trap.
+  # Watch what when you take means.
+pred.WA <- data.frame()
+out.b0 <- do.call('rbind', mcmc.out[, c("b0[1]", "b0[2]")])
+out.bwa <- do.call('rbind', mcmc.out[, c("bWA[1]", "bWA[2]")])
+out.alpha <- do.call('rbind', mcmc.out[, c("logAlpha0", "logAlphaSD")])
+for( logA in 2:20){
+  for(i in 1:2){
+    tmp <- exp(out.b0[,i] + out.bwa[,i]*logA)
+    type <- c("stream", "ocean")[i]
+    pred.WA <- rbind(pred.WA, data.frame(logWA = logA, type = type, mean = mean(tmp), median = median(tmp), 
+                                lower = quantile(tmp, 0.025), upper = quantile(tmp, 0.975)))
+  }
+}
+
+pred.WA %>% ggplot(aes(x=logWA, y = log(mean), col = type, fill=type)) +
+    geom_line() + 
+    geom_ribbon(aes(ymin = log(lower), ymax = log(upper)), alpha = .2) +
+    geom_point(data = preds, mapping=aes(x = log(WA), y = log(mean_srep)), shape=1) +
+    geom_point(data = Ec, mapping=aes(x = log(WA), y = Mean)) +
+    theme_classic()
 ```
 
-```{r baseline WA, echo=FALSE, message=FALSE}
+```{r bwa values, echo=FALSE, message=FALSE}
+intercept <- sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"]
+int_upper <- sum.dfc[grepl("b0", row.names(sum.dfc )),"X2.5."]
+int_lower <- sum.dfc[grepl("b0", row.names(sum.dfc )),"X97.5."]
+
+slope <-  sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]
+slope_upper <- sum.dfc[grepl("bWA", row.names(sum.dfc )),"X2.5."]
+slope_lower <- sum.dfc[grepl("bWA", row.names(sum.dfc )),"X97.5."]
+```
+
+```{r baseline WA nimble, echo=FALSE, message=FALSE}
 # Regression of WAbase and Srep
-ggplot(data = Ec, aes(x = log(WA), y = Mean)) +
-  geom_point() +
+ggplot(data = Ec, aes(x = log(WA), y = Mean, color=factor(lh+1))) +
+  geom_point() + # colour points based on whether they are stream or ocean (lh)
   geom_errorbar(aes(ymin = X2.5., ymax = X97.5. )) +
+  
+  geom_point(data = preds, mapping=aes(x = log(WA), y = log(mean_srep)), shape=1) + 
+  geom_errorbar(mapping=aes(ymin = log(srep2.5.), ymax = log(srep97.5.), x = log(WA)),
+                color='red', linetype='dashed',
+                data = preds, inherit.aes = FALSE) +
   theme_classic() +
-  geom_abline(intercept = sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"],
-    slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
+  # geom_abline(intercept = sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"],
+  #   slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
+  geom_abline(intercept = intercept[1],
+              slope = slope[1],
+              color = 'black') +
+  # add ribbon?
+    # will require two additional lines for upper and lower limit
+    # and then a geom_ribbon
+  geom_abline(intercept = int_upper[1],
+              slope = slope_upper[1],
+              color = 'black',
+              linetype='dashed') +
+  geom_abline(intercept = int_lower[1],
+              slope = slope_lower[1],
+              color = 'black',
+              linetype='dashed') +
+  
+  geom_abline(intercept = intercept[2], 
+              slope = slope[2],
+              color = 'red') +
+  geom_abline(intercept = int_upper[2],
+              slope = slope_upper[2],
+              color = 'red',
+              linetype='dashed') +
+  geom_abline(intercept = int_lower[2],
+              slope = slope_lower[2],
+              color = 'red',
+              linetype='dashed') +
+  # add ribbon
+  # geom_abline(intercept = 0,
+  #             slope = 1,
+  #             linetype = 'dashed') +
+  scale_color_manual(values = c("black", "red"), labels = c("stream", "ocean")) +
+  labs(color = "Life history") +
+  xlim(2,13) +
+  ylim(3,15) +
+  ylab("Log Srep") +
+  xlab("Log Watershed Area")
+# Color them for ocean/vs stream type
+# How does it look with the logE_re term
+```
+
+```{r baseline WA IWAM, echo=FALSE, message=FALSE}
+# Regression of WAbase and Srep
+# IWAM Data
+  # eval_dat$SREP
+
+ggplot(data = eval_dat, aes(x = log(WA), y = log(SREP), color=factor(lh+1))) +
+  geom_point() + # colour points based on whether they are stream or ocean (lh)
+  geom_errorbar(aes(ymin = log(`LL SREP`), ymax = log(`UL SREP`) )) +
+  
+  # geom_point(data = preds, mapping=aes(x = log(WA), y = log(mean_srep)), shape=1) + 
+  # geom_errorbar(mapping=aes(ymin = log(srep2.5.), ymax = log(srep97.5.), x = log(WA)),
+  #               color='red', linetype='dashed',
+  #               data = preds, inherit.aes = FALSE) +
+  theme_classic() +
+  # geom_abline(intercept = sum.dfc[grepl("b0", row.names(sum.dfc )),"Mean"],
+  #   slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
+  # geom_abline(intercept = intercept[1],
+  #             slope = slope[1],
+  #             color = 'black') +
+  # # add ribbon?
+  #   # will require two additional lines for upper and lower limit
+  #   # and then a geom_ribbon
+  # geom_abline(intercept = int_upper[1],
+  #             slope = slope_upper[1],
+  #             color = 'black',
+  #             linetype='dashed') +
+  # geom_abline(intercept = int_lower[1],
+  #             slope = slope_lower[1],
+  #             color = 'black',
+  #             linetype='dashed') +
+  # 
+  # geom_abline(intercept = intercept[2], 
+  #             slope = slope[2],
+  #             color = 'red') +
+  # geom_abline(intercept = int_upper[2],
+  #             slope = slope_upper[2],
+  #             color = 'red',
+  #             linetype='dashed') +
+  # geom_abline(intercept = int_lower[2],
+  #             slope = slope_lower[2],
+  #             color = 'red',
+  #             linetype='dashed') +
+  # add ribbon
+  # geom_abline(intercept = 0,
+  #             slope = 1,
+  #             linetype = 'dashed') +
+  
+  scale_color_manual(values = c("black", "red"), labels = c("stream", "ocean")) +
+  labs(color = "Life history") +
+  # xlim(2,13) +
+  # ylim(3,15) +
   ylab("Log Srep") +
   xlab("Log Watershed Area")
 # Color them for ocean/vs stream type
@@ -654,7 +1090,7 @@ reg_mean <- ggplot(data = preds, aes(x = log(WA), y = log(mean_srep))) +
   ylab("Log Srep") +
   xlab("Log Watershed Area")
 
-reg_mean
+# reg_mean
 
 reg_f <- reg_mean + 
   geom_point(data = preds, mapping = aes(x = log(WA), y = log(srep50.)), color='orange') # +

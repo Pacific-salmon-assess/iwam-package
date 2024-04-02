@@ -46,15 +46,15 @@ source (here::here("R/helperFunctions.R"))
 # Dataframe $SMU_ppn
 
 # Current wcvi case study example uses 
-remove.EnhStocks <- FALSE
-Bern_logistic <- FALSE
-prod <- "LifeStageModel"
-LOO <- NA
-run_logReg <- FALSE
-run.bootstraps <- TRUE
+# remove.EnhStocks <- FALSE
+# Bern_logistic <- FALSE
+# prod <- "LifeStageModel"
+# LOO <- NA
+# run_logReg <- FALSE
+# run.bootstraps <- TRUE
 
 # datain <- c("DataOut/dataout_target_ocean_noEnh.csv") # RUNS CLEAN because NO CU INFORMATION to overlap
-datain <- c("DataOut/dataout_target_wEnh.csv") # ERRORS BECAUSE CU DUPLICATES CAUSED BY TWO LH's
+# datain <- c("DataOut/dataout_target_wEnh.csv") # ERRORS BECAUSE CU DUPLICATES CAUSED BY TWO LH's
 
 Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file name/path of output of IWAM Model
                        remove.EnhStocks = TRUE,  
@@ -168,6 +168,8 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
                                          SREP_SE$SE))
     
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
+      # what are the default parameters of sgen.fn2?
+      # explicit=TRUE by default
     
     RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>%
       mutate(SGEN=round(SGEN*Scale,0))
@@ -298,7 +300,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   run_logReg <- FALSE
   if(run_logReg==FALSE){
-    return(list(bench= select(SGENcalcs,-apar, -bpar)*Scale))
+    return(list(bench= select(SGENcalcs, -apar, -bpar)*Scale))
     
   }
   #--------------------------------------------------------------------------- #
