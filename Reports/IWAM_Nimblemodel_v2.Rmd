@@ -164,11 +164,6 @@ LambertW0 <- nimbleFunction(
 )
 ```
 
-```{r poor man's LW}
-library(gsl)
-RLambertsW <- nimbleRcall(function(x = double()){}, Rfun = 'lambert_W0',
-    returnType = double())
-```
 
 ## S1. Report Introduction
 
@@ -199,8 +194,13 @@ The package currently utilizes the following data sets:
 
 Lorem ipsum ...
 
+## Lamberts poor man's W
 
-
+```{r}
+library(gsl)
+RLambertsW <- nimbleRcall(function(x = double()){}, Rfun = 'lambert_W0',
+    returnType = double())
+```
 
 ### S3.a Ricker Model
 
@@ -390,14 +390,6 @@ data <- list(
 ```
 
 ```{r model inits, echo=FALSE}
-# inits <- function(){
-#   list(b0 = c(9, 9),
-#     bWA = c(0.83, 1),
-#     logAlpha0 = 1.5,
-#     logESD = 1,
-#     logAlphaSD = 1)
-# }
-
 inits <- function(){
   list(b0 = c(9, 9),
     bWA = c(0.83, 1),
@@ -405,6 +397,16 @@ inits <- function(){
     logESD = 1,
     logAlphaSD = 1)
 }
+
+# for second model
+# inits <- function(){
+#   list(b0 = c(2.11, 0),
+#     bWA = c(0.1, 0),
+#     logAlpha0 = 1.5,
+#     logESD = 1,
+#     logAlphaSD = 1)
+# }
+
 ```
 
 ```{r predicted WA, echo=FALSE}
@@ -441,7 +443,7 @@ constants <- list(
   # takes a vector - have to match by order after - cbind it back onto a table
 )
 
-pred.line <- data.frame(expand.grid(logWA = 3:16-mean_logWA, type = 1:2))
+pred.line <- data.frame(expand.grid(logWA = 1:16-mean_logWA, type = 1:2))
 constants$pred.line <- pred.line
 
 WAin$logWA <- log(WAin$WA) - mean_logWA
@@ -457,7 +459,7 @@ constants$npred <- nrow(WAin)
 
 ```{r model stock_recruit_srep_biasCor, echo=FALSE}
 stock_recruit_srep_biasCor <- nimbleCode({
-  
+
   ## priors
   logAlpha0 ~ dnorm(mean=0.6, sd=0.45)
   # logAlpha0 ~ dnorm(mean=1.5, sd=2.5)
@@ -475,7 +477,7 @@ stock_recruit_srep_biasCor <- nimbleCode({
   bWA[1] ~ dnorm(0, tau = 0.01)  ## log Watershed area slope for stream
   bWA[2] ~ dnorm(0, tau = 0.01)  ## log Watershed area slope for ocean
 
-  # sigma ~ dunif(0, 100) # global sigma
+  # sigma ~ dunif(0, 100)
 
   for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
     logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
@@ -487,7 +489,7 @@ stock_recruit_srep_biasCor <- nimbleCode({
     # log_E[i] <- b0 + b0_stream*type[i] + (bWA + bWA_stream*type[i])*logWAbase[i] + logE0[i]
     # where Here lifehist[i] is the life history type (Lj = 0 for stream-type and Lj = 1 for ocean-type).
 
-    tauobs[i] ~ dgamma(0.001, 0.001) # stock specific precision
+    tauobs[i] ~ dgamma(0.001, 0.001)
     E[i] <- exp(log_E[i])
   }
 
@@ -496,8 +498,8 @@ stock_recruit_srep_biasCor <- nimbleCode({
     logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # - sigma^2/2
       # remove - sigma^2/2 otherwise the estimations are too big - makes it difficult to interpret the variables
 
-    logRS[i] ~ dnorm( logRS_pred[i], tau = tauobs[stk[i]]) # stock specific precision
-    # logRS[i] ~ dnorm( logRS_pred[i], sd = sigma) # global sigma
+    logRS[i] ~ dnorm( logRS_pred[i], tau = tauobs[stk[i]])
+    # logRS[i] ~ dnorm( logRS_pred[i], sd = sigma)
 
   }
 
@@ -507,8 +509,8 @@ stock_recruit_srep_biasCor <- nimbleCode({
     log(E_pred_line[i]) <- b0[pred.line[i,2]] + bWA[pred.line[i,2]]*pred.line[i,1]
     beta_pred_line[i] <- log_alpha_line[i]/E_pred_line[i] # Pred beta
     predSmsy_line[i] <- (1 - LambertW(1-log_alpha_line[i], 1))/beta_pred_line[i]
-    # b_line[i] <- -log_alpha_line[i]/E_pred_line[i]
-    predSgen_line[i] <- -1/beta_pred_line[i]*LambertW(-beta_pred_line[i]*predSmsy_line[i]/exp(log_alpha_line[i]))
+    b_line[i] <- -log_alpha_line[i]/E_pred_line[i]
+    predSgen_line[i] <- -1/b_line[i]*RLambertsW(-b_line[i]*predSmsy_line[i]/exp(log_alpha_line[i]))
   }
   
   ## WA predictions
@@ -517,8 +519,8 @@ stock_recruit_srep_biasCor <- nimbleCode({
     log(E_pred[i]) <- b0[pred.dat[i,2]] + bWA[pred.dat[i,2]]*pred.dat[i,1]
     beta_pred[i] <- log_alpha[i]/E_pred[i] # Pred beta
     predSmsy[i] <- (1 - LambertW(1-log_alpha[i], 1))/beta_pred[i]
-    # bpred[i] <- -log_alpha[i]/E_pred[i]
-    predSgen[i] <- -1/beta_pred[i]*LambertW(-beta_pred[i]*predSmsy[i]/exp(log_alpha[i]))  
+    bpred[i] <- -log_alpha[i]/E_pred[i]
+    predSgen[i] <- -1/bpred[i]*RLambertsW(-bpred[i]*predSmsy[i]/exp(log_alpha[i]))  
   }
   
   # 
@@ -648,7 +650,7 @@ stock_recruit_srep_biasCor_2 <- nimbleCode({
 
 Lorem ipsum. ...
 
-```{r model run, warning=FALSE, message=FALSE}
+```{r model run, echo=FALSE, warning=FALSE, message=FALSE}
 
 # Model 2:
 # constants$typeOcean <- (constants$type == 2)*1
@@ -677,11 +679,10 @@ conf2 <- configureMCMC(RmodelSrep)
 # conf2$addSampler(target =c("b0[2]"), type = 'slice')
 # conf2$addSampler(target =c("bWA[2]"), type = 'slice')
 
-conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", "tauobs", #  "tauobs",
+conf2$setMonitors(c('logAlpha', 'logAlpha0', 'E', 'log_E', "b0", "bWA", "tauobs",
                     "logAlphaSD", "logESD", "logE0", 
                     "E_pred", "beta_pred", "log_alpha","predSmsy", "predSgen",
                     "log_alpha_line", "beta_pred_line", "predSmsy_line", "E_pred_line", "predSgen_line"))
-#  "predSgen_line" "predSgen"
 
 Rmcmc2 <- buildMCMC(conf2)
 Cmodel2 <- compileNimble(RmodelSrep)
@@ -743,7 +744,7 @@ density <- data.frame(do.call("rbind", mcmc.out))
 MCMCtrace(object = mcmc.out,
           pdf = FALSE, # no export to PDF
           ind = TRUE, # separate density lines per chain
-          params = "bWA")
+          params = "predSgen_line")
 # E_pred - SMSY predicted
 # b0 - intercept estimates
 # bWA - slope estimate
@@ -752,6 +753,7 @@ MCMCtrace(object = mcmc.out,
 ```
 
 ```{r mcmc data retrieval, echo=FALSE, message=FALSE, warning=FALSE}
+#sum.outc <- summary(outc) # ****
 sum.outc <- summary(mcmc.out) # taking mean at real-scale
 sum.dfc <- data.frame(do.call("cbind", sum.outc))
 Ec <- sum.dfc[substr(rownames(sum.dfc), 1,5) == "log_E",]
@@ -817,13 +819,13 @@ predDat <- Epred %>% left_join(ESmsy) %>% left_join(ESgen)
 
 # Now I will have the mean, median, CI's (ALL PREDICTED) and the base WAin dataframe bound together
 
-# #log_alpha's
-# logalpha <- sum.dfc[substr(rownames(sum.dfc), 1,10) == "log_alpha[",]
-# # alpha <- logalpha[1:21,] # CHANGE INDEXING
-# logalpha <- logalpha %>% 
-#   select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
-#   rename('alpha2.5.'= X2.5., 'mean_alpha'= Mean, 'alpha97.5.'= X97.5., 
-#          'alphaSD' = SD, 'alpha50.' = X50., 'alpha25.' = X25., 'alpha75.' = X75.)
+#log_alpha's
+logalpha <- sum.dfc[substr(rownames(sum.dfc), 1,10) == "log_alpha[",]
+# alpha <- logalpha[1:21,] # CHANGE INDEXING
+logalpha <- logalpha %>% 
+  select(-Naive.SE, -start, -end, -thin, -nchain, -Time.series.SE) %>% 
+  rename('alpha2.5.'= X2.5., 'mean_alpha'= Mean, 'alpha97.5.'= X97.5., 
+         'alphaSD' = SD, 'alpha50.' = X50., 'alpha25.' = X25., 'alpha75.' = X75.)
 ```
 
 ```{r sgen calc, echo=FALSE, message=FALSE, warning=FALSE}
@@ -833,14 +835,14 @@ predDat <- Epred %>% left_join(ESmsy) %>% left_join(ESgen)
 
   # method 1: sgen2
 # Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
-# m1sgen <- Sgen.fn2(exp(alpha$mean_alpha), Srep_pred$mean_srep, 
-#                     explicit = TRUE, plot = FALSE)
+m1sgen <- Sgen.fn2(exp(alpha$mean_alpha), Srep_pred$mean_srep, 
+                    explicit = TRUE, plot = FALSE)
 # SGENcalcs <- purrr::map2_dfr (alpha$mean_alpha, Srep_pred$mean_srep, Sgen.fn2)
   # method 2: sgen3 ala Paul
 # Sgen.fn3 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE)
 # const.SMAX <- TRUE
-# m2sgen <- Sgen.fn3(exp(alpha$mean_alpha), Srep_pred$mean_srep,
-#                    explicit = TRUE, plot=FALSE)
+m2sgen <- Sgen.fn3(exp(alpha$mean_alpha), Srep_pred$mean_srep,
+                   explicit = TRUE, plot=FALSE)
 ```
 
 ### S6. IWAM model Run
@@ -1161,7 +1163,7 @@ ggplot(data = eval_dat, aes(x = log(WA), y = log(SREP), color=factor(lh+1))) +
 # How does it look with the logE_re term
 ```
 
-```{r logWA reg plot Sgen, echo=FALSE, message=FALSE}
+```{r logWA regression plots, echo=FALSE, message=FALSE}
 reg_mean_sgen <- ggplot(data = predDat, aes(x = log(WA), y = log(mean_sgen))) +
   geom_point() +
   geom_errorbar(aes(ymin = log(srep2.5.), ymax = log(srep97.5.) )) +
@@ -1170,9 +1172,7 @@ reg_mean_sgen <- ggplot(data = predDat, aes(x = log(WA), y = log(mean_sgen))) +
   #   slope = sum.dfc[grepl("bWA", row.names(sum.dfc )), "Mean"]) +
   ylab("Log Srep") +
   xlab("Log Watershed Area")
-```
 
-```{r logWA regression plots, echo=FALSE, message=FALSE}
 reg_mean <- ggplot(data = preds, aes(x = log(WA), y = log(mean_srep))) +
   geom_point() +
   geom_errorbar(aes(ymin = log(srep2.5.), ymax = log(srep97.5.) )) +
