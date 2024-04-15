@@ -216,7 +216,7 @@ Type objective_function<Type>:: operator() ()
     ans += -( dt( sigma_nu, Type(1), true ));
   }
   
-    // Get predicted values for plotting  WA regresssion with CIs
+    // Get predicted values for plotting WA regresssion with CIs
   int N_pred = pred_lnWA.size();
   vector <Type> pred_lnSMSY_stream_CI(N_pred);
   vector <Type> pred_lnSMSY_ocean_CI(N_pred);

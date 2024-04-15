@@ -1047,7 +1047,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   #### Return function ####
   return(list(dataname = datain, dfout, modelpars = pars, 
               all_Deltas = all_Deltas, srdat = srdat, lh = lifehist, 
-              WAbase = WAbase, pred_lnSREP = pred_lnSREP, 
+              WAbase = WAbase, pred_lnSREP = pred_lnSREP, pred_lnSMSY = pred_lnSMSY, 
+              pred_lnSREP_pi = pred_lnSREP_pi, pred_lnSMSY_pi = pred_lnSMSY_pi,
               pred_lnWA = data$pred_lnWA, SRes = SRes))
   # used to contain SREP_out, SGEN_out, SMSY_out
   

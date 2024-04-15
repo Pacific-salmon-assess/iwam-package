@@ -152,7 +152,9 @@ To be updated. Distribution plots of all WA regression model priors defined abov
 
 *Prediction of novel stock* $S_{REP}$ based on watershed area: ...
 
-In order to produce the final estimates of $S_{MSY}$ and $S_{GEN}$, the IWAM calculates a new $\beta$ parameter based on the Ricker model evaluated $S_{REP}$ and $\alpha$. The following equations use Scheurell's \[CITATION\] Lambert W method for estimation/optimization of $S_{MSY}$. This is done by first calculating $\beta$: $$
+In order to produce the final estimates of $S_{MSY}$ and $S_{GEN}$, the IWAM calculates a new $\beta$ parameter based on the Ricker model evaluated $S_{REP}$ and $\alpha$. The following equations use Scheurell's \[CITATION\] Lambert W method for estimation/optimization of $S_{MSY}$. This is done by first calculating $\beta$: 
+
+$$
 \beta = log\alpha/S_{REP}
 $$
 
