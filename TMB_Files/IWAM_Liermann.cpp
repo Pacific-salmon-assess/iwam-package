@@ -236,7 +236,7 @@ Type objective_function<Type>:: operator() ()
   int N_target_stream = target_lnWA_stream.size();
   vector <Type> target_lnSMSY_stream(N_target_stream);
   vector <Type> target_lnSREP_stream(N_target_stream);
-
+  
   for (int i=0; i<N_target_stream; i++){
     target_lnSMSY_stream(i) = logDelta1 + exp(logDelta2) * target_lnWA_stream(i);
     target_lnSREP_stream(i) = logNu1 + exp(logNu2) * target_lnWA_stream(i);
@@ -244,14 +244,25 @@ Type objective_function<Type>:: operator() ()
   
   ///Get predicted values for ocean-type target stocks with CIs
   int N_target_ocean = target_lnWA_ocean.size();
-  vector <Type> target_lnSMSY_ocean(N_target_ocean);    
+  vector <Type> target_lnSMSY_ocean(N_target_ocean);
   vector <Type> target_lnSREP_ocean(N_target_ocean);
 
   for (int i=0; i<N_target_ocean; i++){
     target_lnSMSY_ocean(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * target_lnWA_ocean(i);
     target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
   }
-
+  
+  
+  // ///Get predicted lines values
+  // int N_target_ocean = target_lnWA_ocean.size();
+  // vector <Type> target_lnSMSY_ocean(N_target_ocean);
+  // vector <Type> target_lnSREP_ocean(N_target_ocean);
+  // 
+  // for (int i=0; i<N_target_ocean; i++){
+  //   target_lnSMSY_ocean(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * target_lnWA_ocean(i);
+  //   target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
+  // }
+  
   
   vector <Type> lnSMSY = log(SMSY*scale); //This is taking a value on the real
   // scale * a constant scalar (ignore) and putting it on the log-scale

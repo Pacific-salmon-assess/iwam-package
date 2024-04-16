@@ -611,7 +611,7 @@ SGEN <- IWAM_backcalc[[2]] %>%
 # WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>% 
 WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv")) %>% 
   # filter(Stock != "Cypre") %>% # remove Cypre - see Get_LRP_bs.R
-  mutate(WA = round(WA,0)) # ?
+  mutate(WA = round(WA,0)) #
 ```
 
 ### S3.a IWAM Table

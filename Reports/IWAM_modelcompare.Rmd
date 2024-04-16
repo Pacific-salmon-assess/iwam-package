@@ -33,7 +33,9 @@ library(zoo)
 library(viridis)
 library(hrbrthemes)
 library(gsl)
-library(knitr)
+
+library(knitr) # Tables
+library(latex2exp) # For adding latex into plot labels
 
 # library(geomtextpath)
 ```
@@ -118,7 +120,7 @@ The purpose of this report is to:
 -   Clearly and simply explain the background, usage, and differences of the TMB and NIMBLE IWAM models
 -   Justify the usage of the new Nimble model
 -   Introduce next steps in model development
--   Walkthrough the outputs of both models
+-   Walk through the outputs of both models
 
 
 
@@ -144,7 +146,7 @@ The model, regardless of its form between Parken et al., Leirmann et al., and Ho
 
 2.  Regression of Ricker model parameters against the watershed areas of the stocks included in the SR timeseries set
 
-3.  Using the regression model estimate *new* Ricker model parameters for stocks where only watershed area is known
+3.  Using the regression model estimate *new* Ricker model parameters and benchmarks for stocks where only watershed area is known
 
 The main differences between the models occur in how each of the stages are handled internally, and how error is propagated between them. These differences will be explored in the following document.
 
@@ -167,7 +169,7 @@ To describe the two main forms of the IWAM model, we will go step by step throug
 
 
 
-#### The Parken et al. 2006 and Holt et al. 2023 Model Type
+### The Parken et al. 2006 and Holt et al. 2023 Model Type
 
 The Ricker model is predominantly expressed in the following form:
 
@@ -243,20 +245,18 @@ Once these regressions models are evaluated, the $\delta$ parameters are used to
 It is within the bootstrapping, that the IWAM model differs from the Parken assumption of a global $\alpha$ given that the Parken estimates of $\alpha$ were too high for natural ecosystems. Within the IWAM bootstrapping model stage, a new a life-history model produced estimate of $\alpha$ is used. Ideally, $\alpha$ would be instead a regionally hierarchical parameter, and would not be altered at different stages.
 
 With a new prior for $\alpha$ and the regression model estimated $S_{REP}$, the bootstrapping step does the following:
+
 -   Re-estimate $\beta$ as $\beta = log(\alpha)/S_{REP}$
 -   Re-estimate $S_{MSY}$ with the above $\beta$
--   Optimize for an estimate of $S_{GEN}$ using the supplied $\alpha$ and new $\beta$, where
+-   Optimize for an estimate of $S_{GEN}$ using the supplied $\alpha$ and new $\beta$ (See Benchmark estimation for complete equation)
 
-$$
-S_{GEN} = -1/\beta*LambertW(-\beta*\frac{S_{MSY}}{\alpha})
-$$
 With the optimization complete, we are now supplied with our final estimates of $S_{GEN}$, $S_{MSY}$, and $S_{REP}$.
 
 <!-- Tor: Question: Why is SMSY re-estimated a total of three times? Would the value change a little each time? Does it matter?-->
 
 
 
-#### The Liermann et al. 2011 Model Type
+### The Liermann et al. 2011 Model Type
 
 The following model is based off of Liermann et al. 2011. The main difference between this formulation of the Ricker model and the one used by Parken and Holt, is the scale of $\alpha$. Being either on the real or log-scale, and the parameterization of the watershed area regression to $S_{rep}$. The implication of these differences will be discussed further in the model differences section.
 
@@ -369,7 +369,7 @@ Armed now with the regression coefficients $b0$ and $bWA$, we may estimate new s
 
 
 
-## Parameter estimation
+## Benchmark Estimation
 
 Using the Ricker estimated $\alpha$ and $\beta$ (from the Parken/Holt model type) or $E$ (from the Liermann model type), the following equations are used for $S_{MSY}$ and $S_{REP}$.
 
@@ -385,6 +385,12 @@ $$
 
 The same equations are used for these calculations regardless of model. The only two exceptions are that we use an explicit form of LambertW re-created in framework for Nimble, and $S_{REP}$ is explicitly already calculated in the Liermann method.
 
+$S_{MSY}$, $\beta$, and $\alpha$ are then used in the final calculation of $S_{GEN}$, shown explicity here as:
+
+$$
+S_{GEN} = -1/\beta*LambertW(-\beta*\frac{S_{MSY}}{\alpha})
+$$
+
 
 
 ## Comparison of Model Steps and Main Model Differences
@@ -392,17 +398,19 @@ The same equations are used for these calculations regardless of model. The only
 
 -   Identify the core differences between the two model variants
     -   The parameterization of $S_{REP}$, and by that measure the exclusion of $\beta$
-    -   2 vs. 4 regression models
-    -   Methods of estimation (?)
-    -   Propogation of error
+    -   Methods of estimation: TMB versus Nimble
+    -   Propagation of error: sequential versus statistical integration approaches
 
 The core difference between the two model types stems from the difference in the parameterization of the watershed are regression model. The Holt model (TMB) creates 2 sets of regressions for $S_{REP}$ and $S_{MSY}$, where the Liermann model has only one set for $S_{REP}$. The reason this is possible, is because the Ricker model that Liermann uses has isolated $S_{REP}$ as a term to be estimated, where the Holt model instead evaluates $\beta$. While there is no effective difference between these forms of the Ricker, Liermann argues that isolating for $S_{REP}$ is simpler and more biologically interpretable. From a modelling stand-point, it makes sense to reduce the total number of internal models. We can ask the question, what would the difference between the regressions of $S_{REP}$ and $S_{MSY}$ be, given that they are both estimated from the same $\alpha$ and $\beta$.
 
 
 ## Justification for continued usage of the $S_{REP}$ model
 
--   Justify the usage of the new Nimble model
+-   Justify the usage of the new Nimble model and how to choose between them:
+    -   The Liermann method is a direct method of estimation of $S_{REP}$
+    -   The Holt method is a direct estimation of $S_{MSY}$ or $S_{MAX}$
     -   Model implementation in the future e.g. design matrix formatting for the inclusion of a) more model parameters, and b) varying model structures
+    -   What does the client want in terms of benchmarks?
     
 
 
@@ -410,10 +418,11 @@ The core difference between the two model types stems from the difference in the
 
 -   Next steps in model development
     -   Model analysis and investigation (posterior predictive checks)
-    -   Consideration and discussion around $S_{REP}$ and $S_{MAX}$ as management parameters. This would include a potential re-parameterization of the model for $S_{MAX}$
+    -   Consideration and discussion around $S_{REP}$ and $S_{MAX}$ as management benchmarks. This would include a potential re-parameterization of the model for $S_{MAX}$
     -   Translations of both models into RTMB
-    -   Incorporation of a regional varying $\alpha$ parameter
-    -   Implementation of the Liermann random-walk $\alpha$
+    -   Incorporation of a regionally hierarchical $\alpha$ parameter
+    -   Consider Parken's implementation of an internal productivity covariate
+    -   Consider implementation of the Liermann random-walk $\alpha$
     -   Development of packages/functions for ease of use by managers
 
 
@@ -426,14 +435,14 @@ The following briefly explains the usag eof the IWAM integrated function (for th
 
 <!-- Tor: insert IWAM model full setup and run -->
 
-The TMB model for the Holt implementation can be accessed through a single function: `IWAM_func` from the IWAM repository of Pacific-Salmon-Assess. The function requires only the input of stocks and watersheds for those that you wish to estimate sotck recruitment parameters for. In the case below: `WCVIStocks.csv`. The remaining function defaults are to control the presence or absense of enhancement, and the parameters of the bootstrapping.
+The TMB model for the Holt implementation can be accessed through a single function: `IWAM_func` from the IWAM repository of Pacific-Salmon-Assess. The function requires only the input of stocks and watersheds for those that you wish to estimate stock recruitment relationships. In the case below: `WCVIStocks.csv`. The remaining function defaults are to control the presence or absense of enhancement, and the parameters of the bootstrapping.
 
 ```{r iwam and parken model setup, message=FALSE, warning=FALSE, results='hide'}
 IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # Input data
                        remove.EnhStocks = TRUE, # Enhancement input
                        run.bootstrap = TRUE, # On/off for bootstrap process
                        bs_seed = 1, # internal seed for the bootstrap
-                       bs_nBS = 10, # internal number of trials for the bootstrap (default 20000)
+                       bs_nBS = 100, # internal number of trials for the bootstrap (default 20000)
                        plot = FALSE, # print plots to 'DataOut/'
                        est.table = FALSE # store kable formatted tables
 )
@@ -567,9 +576,9 @@ cmodel <- compileNimble(model)
 
 cmcmc <- compileNimble(mcmc, project = model)
 mcmc.out <- runMCMC(cmcmc, niter=50000, nburnin=5000, nchains=3, samplesAsCodaMCMC = TRUE)
-```
 
-```{r mcmc traces, echo=FALSE, include=FALSE}
+beta.out <- do.call('rbind', mcmc.out[, grepl("beta\\[", colnames(mcmc.out[[1]]))])
+slopes <- summary(mcmc(beta.out))
 # MCMCtrace(object = mcmc.out, params = "beta")
 ```
 
@@ -750,7 +759,7 @@ WAbase <- WAbase %>%
 
 ```
 
-```{r nimble residuals, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+```{r nimble residuals setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 ## Posterior Predictive Checks:
 ## Combine random amounts of the multiple chains.
 samples <- NULL
@@ -763,24 +772,24 @@ DHARMaRes <- createDHARMa(simulatedResponse = t(ppsim), observedResponse = data$
              fittedPredictedResponse = logRS_predMean, integerResponse = FALSE)
 ```
 
-```{r residual plots extra}
-plot(DHARMaRes)
-
-boxplot(DHARMaRes$scaledResiduals~srdat$Name)
-abline(h = 0.5, col = 'red')
-
-srdat$res <- DHARMaRes$scaledResiduals
-ggplot(data = srdat, aes(x = Name, y = res)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 0.5, col = 'red') + 
-  theme_classic()
-
+```{r residual plots extra, echo=FALSE}
+# plot(DHARMaRes)
+# 
+# boxplot(DHARMaRes$scaledResiduals~srdat$Name)
+# abline(h = 0.5, col = 'red')
+# 
+srdat$Res <- DHARMaRes$scaledResiduals
+# ggplot(data = srdat, aes(x = Name, y = res)) +
+#   geom_boxplot() +
+#   geom_hline(yintercept = 0.5, col = 'red') + 
+#   theme_classic()
+# 
 logalpha.sum <- summary(mcmc.out[, grep('logAlpha\\[', colnames(mcmc.out[[1]]))])
 srdat.alpha <- WAbase %>% bind_cols(data.frame(do.call("cbind", logalpha.sum)))
-ggplot(data = srdat.alpha, aes(x = Name, y = Mean)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = X2.5., ymax = X97.5.)) +
-  theme_classic()
+# ggplot(data = srdat.alpha, aes(x = Name, y = Mean)) +
+#   geom_point() +
+#   geom_errorbar(aes(ymin = X2.5., ymax = X97.5.)) +
+#   theme_classic()
 ```
 
 ### Comparison of Ouputs
@@ -802,76 +811,176 @@ ggplot(data = srdat.alpha, aes(x = Name, y = Mean)) +
 # PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
 ```
 
-#### Stock-wise comparisons of parameters {.tabset}
+#### Stock-wise Comparisons of Benchmarkss {.tabset}
 
 ##### SREP
 
 ```{r stockwise SREP, echo=FALSE, message=FALSE}
 # config options: fig.align = 'centre'
 
-# Init plot and add geom for IWAM estimates as baselines
-SREP_i <- ggplot(eval_dat, aes(x=Stock, y = SREP)) +
-  geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`), width = 0.2, color='red', position = position_nudge(0.2)) +
-  geom_point(color = 'red', position = position_nudge(0.2)) +
+benchmarks <- eval_dat %>% 
+  full_join(WAin, by="Stock")
+
+benchmarks_srep <- ggplot(benchmarks, aes(x=Stock, y = SREP)) +
+  geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`, color='TMB',), width = 0.2, position = position_nudge(0.2)) +
+  geom_point(aes(color = 'TMB'), position = position_nudge(0.2)) +
   
+  geom_point(aes(x = Stock, y = PA_SREP, color='Parken'), position = position_nudge(-0.2)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_UL_SREP, ymin = PA_LL_SREP, color='Parken'), width = 0.2, position = position_nudge(-0.2)) +
+  
+  geom_point(aes(x = Stock, y = Srep_Mean, color='Nimble')) +
+  geom_errorbar(aes(x = Stock, ymax = `Srep_97.5%`, ymin = `Srep_2.5%`, color='Nimble'), width = 0.2, inherit.aes = FALSE) +
   theme_classic() + 
-  ylab("SREP Estimate") + 
-  # ylim(0,50000) +
-  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+  ylab(TeX("$S_{REP}$ Estimate")) + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+  scale_color_manual(name='Model',
+                     breaks=c('Parken', 'TMB', 'Nimble'),
+                     values=c('Parken'='black', 'TMB'='red', 'Nimble'='blue'))
 
-# SREP_i
-
-# Add geom for Parken estimates
-SREP_p <- SREP_i + 
-  geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SREP), position = position_nudge(-0.2)) + 
-  geom_errorbar(aes(x = Stock, ymax = PA_UL_SREP, ymin = PA_LL_SREP), width = 0.2, position = position_nudge(-0.2), 
-                inherit.aes = FALSE)
-
-# SREP_p
-
-SREP_f <- SREP_p +
-  geom_point(WAin, mapping = aes(x = Stock, y = Srep_Mean), color='blue') +
-  geom_errorbar(data = WAin, aes(x = Stock, ymax = `Srep_97.5%`, ymin = `Srep_2.5%`), color='blue', width = 0.2, inherit.aes = FALSE)
-
-SREP_f
+benchmarks_srep
 ```
 
 ##### SMSY
 
 ```{r stockwise SMSY, echo=FALSE, message=FALSE}
 # Init plot and add geom for IWAM estimates as baselines
-SMSY_i <- ggplot(eval_dat, aes(x=Stock, y = SMSY)) +
-  geom_errorbar(aes(ymax = `UL SMSY`, ymin = `LL SMSY`), width = 0.2, color='red', position = position_nudge(0.2)) +
-  geom_point(color = 'red', position = position_nudge(0.2)) +
+
+# combine eval_dat and WAin in order to have one dataset to make the legend
+benchmarks_smsy <- ggplot(benchmarks, aes(x=Stock, y = SMSY)) +
+  geom_errorbar(aes(ymax = `UL SMSY`, ymin = `LL SMSY`, color='TMB',), width = 0.2, position = position_nudge(0.2)) +
+  geom_point(aes(color = 'TMB'), position = position_nudge(0.2)) +
+  
+  geom_point(aes(x = Stock, y = PA_SMSY, color='Parken'), position = position_nudge(-0.2)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY, color='Parken'), width = 0.2, position = position_nudge(-0.2)) +
+  
+  geom_point(aes(x = Stock, y = Smsy_Mean, color='Nimble')) +
+  geom_errorbar(aes(x = Stock, ymax = `Smsy_97.5%`, ymin = `Smsy_2.5%`, color='Nimble'), width = 0.2, inherit.aes = FALSE) +
   theme_classic() + 
-  ylab("SMSY Estimate") + 
-  # ylim(0,25000) +
-  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1))
+  ylab(TeX("$S_{MSY}$ Estimate")) + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+  scale_color_manual(name='Model',
+                     breaks=c('Parken', 'TMB', 'Nimble'),
+                     values=c('Parken'='black', 'TMB'='red', 'Nimble'='blue'))
 
-# SMSY_i
-
-# Add geom for Parken estimates
-SMSY_p <- SMSY_i + 
-  geom_point(eval_dat, mapping = aes(x = Stock, y = PA_SMSY), position = position_nudge(-0.2)) + 
-  geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY), width = 0.2, position = position_nudge(-0.2), 
-                inherit.aes = FALSE)
-
-# SMSY_p
-
-SMSY_f <- SMSY_p +
-  geom_point(WAin, mapping = aes(x = Stock, y = Smsy_Mean), color='blue') +
-  geom_errorbar(data = WAin, aes(x = Stock, ymax = `Smsy_97.5%`, ymin = `Smsy_2.5%`), color='blue', width = 0.2, inherit.aes = FALSE)
-
-SMSY_f
+benchmarks_smsy
 ```
 
-##### SGEN
 
 #### WA Regression {.tabset}
 
+##### TMB {.tabset}
+
+```{r tmb reg prep, echo=FALSE}
+# IWAM_
+  # pars: 
+mod <- "IWAM_Liermann" 
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+  group_by(Stocknumber) %>% 
+  summarize(lh=max(Stream)) %>% 
+  arrange (Stocknumber)
+pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
+
+# re-create the correct srdat w/ scale - just copy in the Iwam code for it
+srdat2 <- IWAM_WCVI_noEnh$srdat
+```
+
+###### SREP
+```{r tmb srep wa reg, echo=FALSE, warning=FALSE, message=FALSE}
+plotWAregressionSREP(pars=IWAM_WCVI_noEnh$modelpars, 
+                             IWAM_WCVI_noEnh$all_Deltas, 
+                             srdat2, 
+                             lifehist,
+                             WAbase=WAbase, 
+                             pred_lnSREP=IWAM_WCVI_noEnh$pred_lnSREP, 
+                             pred_lnWA = pred_lnWA, # this is wrong
+                             title1 = "SREP Regression",
+                             mod=mod)
+```
+
+###### SMSY
+```{r tmb SMSY wa reg, echo=FALSE, warning=FALSE, message=FALSE}
+plotWAregressionSMSY(pars=IWAM_WCVI_noEnh$modelpars, 
+                             IWAM_WCVI_noEnh$all_Deltas, 
+                             srdat2, 
+                             lifehist,
+                             WAbase=WAbase, 
+                             pred_lnSMSY=IWAM_WCVI_noEnh$pred_lnSMSY, 
+                             pred_lnWA = pred_lnWA, # this is wrong
+                             title1 = "SMSY Regression",
+                             mod=mod)
+```
+
+##### NIMBLE
+
+```{r nimble wa reg, echo=FALSE, warning=FALSE, message=FALSE}
+# filter(WAline, lh == 'ocean')
+
+# intercept is larger because we shifted the intercept to the right, following Liermann, mean(logWA)
+  # everything is fitted the same
+  # seemed to improve convergence with Liermann
+  # typically scaling technique
+
+ggplot(data = WAline, aes(x = logWA, y = log(`Srep_50%`), colour = lh, fill = lh)) +
+  geom_line() + 
+  geom_ribbon(aes(ymin = log(`Srep_2.5%`), ymax = log(`Srep_97.5%`)), alpha = .1) +
+
+  geom_point(data = WAin, mapping = aes(logWA, log(`Srep_50%`), colour = lh), alpha=0.2) +
+  geom_errorbar(data = WAin, mapping = aes(ymin = log(`Srep_2.5%`), ymax = log(`Srep_97.5%`), colour = lh), alpha=0.2) +
+
+  geom_point(data = WAbase, mapping = aes(logWA, log(`Srep_50%`), colour = lh)) +
+  geom_errorbar(data = WAbase, mapping = aes(ymin = log(`Srep_2.5%`), ymax = log(`Srep_97.5%`), colour = lh )) + 
+  theme_classic() +
+  ylab("Log Srep") +
+  xlab("Log Watershed Area") +
+  annotate("text", x=10, y=5, label= "8.91 + 0.68*log(WA)") + # stream
+  annotate("text", x=5, y=15, label= "10.04 + 0.95*log(WA)") # ocean
+```
+
+##### Parken et al. 2006 {.tabset}
+
+###### Figures
+![unchanged image](Parkenregressions.png)
+<!-- Tor: The comparison of the 3 figures-->
+
+###### Parameter Table
+![Caption for the picture.](Parkenregparametertable.png)
+<!-- Tor: The table of parameter values-->
+
+
+
+#### ACF {.tabset}
+
 ##### TMB
 
-```{r tmb SREP wa reg, include=FALSE, eval=FALSE}
+```{r tmb acf plot, echo=FALSE, message=FALSE, warning=FALSE}
+Plotacf(SRes_tmb)
+```
+
+##### NIMBLE
+
+```{r nimble acf, echo=FALSE}
+Plotacf(srdat)
+```
+
+#### Residuals {.tabset}
+
+##### TMB
+
+```{r tmb stres plot, echo=FALSE, message=FALSE, warning=FALSE}
+PlotStdResid(SRes_tmb)
+```
+
+##### NIMBLE
+
+```{r nimble residuals, echo=FALSE}
+PlotStdResid(srdat)
+```
+
+## Appendices
+
+<!-- If needed -->
+
+```{r tmb SREP wa reg OLD, include=FALSE, eval=FALSE}
 # IWAM_WCVI_noEnh --> 
   # eval_dat - only includes the point estimates of SREP/SMSY (no SGEN)
   # Need to get model parameters for betas and recreate the line - not the same as predicting the line with the ribbon as the Nimble model - I'm not sure I can do that in the same way - may need to ask Paul
@@ -901,7 +1010,7 @@ ggplot(data = eval_dat, aes(x = log(WA), y = log(SREP), colour = lh, fill = lh))
   geom_abline(intercept = nu_int,
               slope = nu_slope,
               color = 'black') +
-  geom_errorbar(aes(ymin = nu_errmin, ymax = nu_errmax), alpha=0.2) +
+  # geom_errorbar(aes(ymin = nu_errmin, ymax = nu_errmax), alpha=0.2) +
   theme_classic()
 
   # geom_line() + 
@@ -916,87 +1025,3 @@ ggplot(data = eval_dat, aes(x = log(WA), y = log(SREP), colour = lh, fill = lh))
   # xlab("Log Watershed Area") +
   # theme_classic()
 ```
-
-```{r tmb SMSY wa reg 2, include=FALSE}
-```
-
-##### NIMBLE
-
-```{r nimble wa reg, include=FALSE}
-ggplot(data = WAline, aes(x = logWA, y = log(Sgen_Mean), colour = lh, fill = lh)) +
-  geom_line() + 
-  geom_ribbon(aes(ymin = log(`Sgen_2.5%`), ymax = log(`Sgen_97.5%`)), alpha = .1) +
-  
-  geom_point(data = WAin, mapping = aes(logWA, log(Sgen_Mean), colour = lh), alpha=0.2) +
-  geom_errorbar(data = WAin, mapping = aes(ymin = log(`Sgen_2.5%`), ymax = log(`Sgen_97.5%`), colour = lh), alpha=0.2) +
-  
-  geom_point(data = WAbase, mapping = aes(logWA, log(Sgen_Mean), colour = lh)) +
-  geom_errorbar(data = WAbase, mapping = aes(ymin = log(`Sgen_2.5%`), ymax = log(`Sgen_97.5%`), colour = lh )) + 
-  theme_classic() +
-  ylab("Log Sgen") +
-  xlab("Log Watershed Area")
-```
-
-#### Sample WA reg code
-
-```{r nimble old plots, echo=FALSE, include=FALSE}
-# CONSIDER DELETING LATER
-
-##########################################################
-ggplot(data = WAline, aes(x = logWA, y = log(Sgen_Mean), colour = lh, fill = lh)) +
-  geom_line() + 
-  geom_ribbon(aes(ymin = log(`Sgen_2.5%`), ymax = log(`Sgen_97.5%`)), alpha = .2) +
-  geom_point(data = WAin, mapping = aes(logWA, log(Sgen_Mean), colour = lh)) +
-  geom_errorbar(data = WAin, mapping = aes(ymin = log(`Sgen_2.5%`), ymax = log(`Sgen_97.5%`), colour = lh )) +
-  theme_classic() +
-  ylab("Log Sgen") +
-  xlab("Log Watershed Area")
-  
-ggplot(data = WAline, aes(x = logWA, y = log(Smsy_Mean), colour = lh, fill = lh)) +
-  geom_line() + 
-  geom_ribbon(aes(ymin = log(`Smsy_2.5%`), ymax = log(`Smsy_97.5%`)), alpha = .2) +
-  geom_point(data = WAin, mapping = aes(logWA, log(Smsy_Mean), colour = lh)) +
-  geom_errorbar(data = WAin, mapping = aes(ymin = log(`Smsy_2.5%`), ymax = log(`Smsy_97.5%`), colour = lh )) +
-  theme_classic() +
-  ylab("Log Smsy") +
-  xlab("Log Watershed Area")
-
-ggplot(data = WAline, aes(x = logWA, y = log(Srep_Mean), colour = lh, fill = lh)) +
-  geom_line() + 
-  geom_ribbon(aes(ymin = log(`Srep_2.5%`), ymax = log(`Srep_97.5%`)), alpha = .2) +
-  geom_point(data = WAin, mapping = aes(logWA, log(Srep_Mean), colour = lh)) +
-  geom_errorbar(data = WAin, mapping = aes(ymin = log(`Srep_2.5%`), ymax = log(`Srep_97.5%`), colour = lh )) +
-  theme_classic() +
-  ylab("Log Srep") +
-  xlab("Log Watershed Area")
-```
-
-#### ACF {.tabset}
-
-##### TMB
-
-```{r tmb acf plot, echo=FALSE, message=FALSE, warning=FALSE}
-Plotacf(SRes_tmb)
-```
-
-##### NIMBLE
-
-```{r nimble acf, echo=FALSE}
-```
-
-#### Residuals {.tabset}
-
-##### TMB
-
-```{r tmb stres plot, echo=FALSE, message=FALSE, warning=FALSE}
-PlotStdResid(SRes_tmb)
-```
-
-##### NIMBLE
-
-```{r nimble residuals, echo=FALSE}
-```
-
-## Appendices
-
-<!-- If needed -->

@@ -243,7 +243,6 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
                                         SREP_SE$SE))
     
-    
     SGENcalcs <- purrr::map2_dfr (Ric.A.hi, sREP/Scale, Sgen.fn2)
     
     RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% # POSSIBLE ERROR
@@ -254,7 +253,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       mutate(SMSY=round(SMSY*Scale,0))
     
     RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
-                         "SREPLL", "SREPUL", "a.par")]#"CU"
+                         "SREPLL", "SREPUL", "a.par")] #"CU"
     
   } # if(prod == "RunReconstruction"){
   
