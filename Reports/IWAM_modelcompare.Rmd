@@ -142,7 +142,7 @@ The package currently utilizes the following data sets:
 
 The model, regardless of its form between Parken et al., Leirmann et al., and Holt et al., follow the following three model stages:
 
-1.  Evaluation <!--CH Estimation instead of Evaluation--> of the Ricker model using a Chinook spawner and recruit time-series from across the NE Pacific <!--CH add the number of time-series currently used-->
+1.  Estimation of the Ricker model using 25 Chinook spawner and recruit time-series from across the NE Pacific
 
 2.  Regression of benchmarks derived from Ricker model parameters against the log(watershed areas) of the stocks included in the synoptic SR time series
 
@@ -169,48 +169,63 @@ To describe the two main forms of the IWAM model, we will go step by step throug
 
 
 
-### The Parken et al. 2006 and Holt et al. 2023 Model Type
+### SMAX Model Type
 
-The Ricker model is predominantly expressed in the following form:
-<!--CH: suggest putting alpha in the exponent here and call it alpha, since in the TMB code we estimate 'loga' which is the a parameter in the exponent, and it would be easier to  align wiht Leirman's r parameter which is also in the exponent. Then remove the log from the linearized form below, and heirachcal prior eqn-->
+Following Parken et al. 2006 and Holt et al. 2023 the SMAX Ricker model is predominantly expressed in the following form:
+<!--CH: suggest putting alpha in the exponent here and call it alpha, since in the TMB code we estimate 'loga' which is the a parameter in the exponent, and it would be easier to  align wiht Leirman's r parameter which is also in the exponent. Then remove the log from the linearized form below, and heirachcal prior eqn. -->
 
 $$
-R = \alpha S e^{- \beta S}e^\tau
+R = S e^{log(\alpha)- \beta S}e^\tau
 $$
 
 Where $R$ is the abundance of adult recruits expressed as a $numeric$,
 
-$S$ is  spawner abundance expressed as a $numeric$. Is it standard that both recruits and spawners be scaled values for modelling. 
+$S$ is  spawner abundance expressed as a $numeric$. Is it standard that both recruits and spawners be scaled values for modelling. In the case of the IWAM package, both recruits and spawners are transformed by divided by $10^x$ where $x$ is the maximum number of digits across the per-stock timeseries.
 
 $\alpha$ is the dimensionless number of recruits per spawner produced at  low spawner density (productivity), this may also be thought of as the intercept of the relationship between $\frac{R}{S}$ and $S$,
 
 $\beta$ is the strength of the density dependence expressed as $1/S_{MAX}$ $spawners^{-1}$, which can be described as the slope of the previously described relationship,
 
 and $\tau$ represents normally distributed random error which accounts for process and environmental variability.
+<!--TK: This needs a statement for exclusion from the final IWAM model.-->
 
 This is the form used in both the Parken et al. (2006) and the Holt et al. (2023) models.
 
 This model can be linearized for ease of estimation. Further, following Liermann et al. (2010), hierarchical structure is added to the productivity parameter to improve model fit for data-limited populations:
 
 $$
-log(\frac{R_i}{S_i}) = log(\alpha_i)-\beta_i \cdot S_i + \tau_i
+log(\frac{R_i}{S_i}) = log(\alpha)-\beta \cdot S_i - \frac{\sigma_\tau^2}{2}
 $$
 
-Where $\tau \sim Normal(-\sigma_\tau^2/2, \sigma_\tau)$, <!--CH : see line 123 of IWAM_Liermann.cpp-->
+<!-- Where $\tau \sim Normal(-\sigma_\tau^2/2, \sigma_\tau)$, -->
+<!--CH : see line 123 of IWAM_Liermann.cpp-->
 
-and the mean is adjusted by -\sigma_\tau^2/2 to account for the log back-transformation adjustment.
+Where $i$ is the year class per stock,
+<!--TK: There was a form where both \alpha and \beta had _i subscripts. 
+Where are those from?-->
 
-In this regard, $\alpha$ is the intercept and $\beta$ is the slope of the spawner-recruit relationship, where $log(\alpha)$ has a hierarchical prior:
+and the mean is adjusted by $\frac{-\sigma_\tau^2}{2}$ to account for the log back-transformation adjustment with the following distribution:
+<!--TK: Define distribution used and associated justification of choice.-->
 
-$log(\alpha_i) \sim Normal(\mu_\alpha, \sigma_\alpha)$,
+$$
+\sigma_{\alpha_i} \sim InvGamma(0.01,0.01)
+$$
 
-$\mu_\alpha_i \sim Normal(1.5,5)$,
+$\alpha$ is the intercept and $\beta$ is the slope of the spawner-recruit relationship, where $log(\alpha)$ has a hierarchical prior:
+<!--TK: Define distribution used and associated justification of choice.-->
 
-and $\sigma_\alpha_i \sim InvGamma(0.01,0.01)$.
+$$
+log(\alpha_i) \sim Normal(\mu_\alpha, \sigma_\alpha)
+$$
+
+$$
+\mu_{\alpha_i} \sim Normal(1.5,5)
+$$
 
 <!--CH: I think we can exclude this given my addition above: Parken et al. (2006) include a log-transformation bias adjustment to productivity estimate $+\frac{\sigma^2}{2}$. -->
 
-Once the Ricker model parameters have been estimated and used to calculate $S_{MSY}$ and $S_{REP}$, the following regression model is estimated: 
+Once the Ricker model parameters have been estimated and used to calculate $S_{MSY}$ and $S_{REP}$, the following regression model is estimated:
+
 <!-- To move elsewhere below: Both Parken and Holt form a total of 4 regression models, while Liermann forms two. Between both methods, there are two models - one for stream and one for ocean life histories. The difference is that Liermann only regresses $S_{REP}$ against watershed area, instead of also using $S_{MSY}$ as per Parken. The below equations show the Parken forms: -->
 
 $$
@@ -229,7 +244,7 @@ $$
 \delta_\gamma \sim N(0,\sigma^2_\gamma)
 $$
 
-Where $\delta_0$ is the intercept and $\delta_1$ is the slope for the relationship between the natural logarithm of watershed area (WA) and either $S_{MSY}$ and $S_{REP}$. These are then adapted further to separate stream-type and ocean-type fish in the watershed area model. This is done by creating an offset with the baseline as the stream type population. 
+Where $\delta_0$ is the intercept and $\delta_1$ is the slope for the relationship between the natural logarithm of watershed area (WA) and either $S_{MSY}$ and $S_{REP}$. These are then adapted further to separate stream-type and ocean-type fish in the watershed area model. This is done by creating an offset with the baseline as the stream type population. This is an expansion of equations (number). 
 
 $$
 ln(S_{MSY}) = ln(\delta_{0,stream}) + ln(\delta_{0,ocean}) \cdot X + (\delta_{1,stream} + \delta_{1,ocean} \cdot X) \cdot ln(WA) + \delta_\epsilon
@@ -246,8 +261,6 @@ Once these regression models are estimated, the $\delta$ parameters are used to 
 
 When implementing this model for WCVI Chinook (Holt et al. 2023), the inference of productivity was identified as being implausible (recruits/spawner >7) given low estimates of productivity determined from life-cycle models on these populations (recruits/spawners 2-3). Instead of using watershed-area derived estimate of $S_{MSY}$, Holt et al. (2023) derived bootstrapped distributions of benchmarks $S_{MSY}$ and $S_{gen}$ by drawing from independent distributions of productivity derived either from a life-cycle model or a run-reconstruction and a distribution of $\S_{REP}$ values from the watershed-area model. In future model updates, $\alpha$ could instead be estimated as a regionally hierarchical parameter within the IWAM model and the watershed area regression could use regional groupings as co-variates to predict benchmarks, thereby explicitly accounting for differences in productivities among areas. Alternatively, Liermann et al. (2010) used the formulation of the Ricker based on $S_{REP}$ and predicted only $S_{REP}$ from watershed area, avoiding inferences about productivity.
 
-
-
 Here, we follow Holt et al. (2023) to derive bootstrapped uncertainty intervals drawing from distributions for $\alpha$ and the regression model estimates of $S_{REP}$, following these steps:
 
 -   Re-estimate $\beta$ as $\beta = log(\alpha)/S_{REP}$
@@ -261,40 +274,34 @@ CH: My thinking is that we don't use the watershed-area estimate of SMSY because
 
 
 
-### The Liermann et al. 2010 Model Type
+### SREP Model Type
 <!--CH: I've changed this to focus on the parameterization of SREP vs b (1/SMAX). Also, TMB estimates loga diectly, which is the same as r in Liermann, so I have removed that difference.-->
 The following model is based off of Liermann et al. 2010. The main difference between this formulation of the Ricker model and the one used by Parken et al. (2006) and Holt et al. (2023) is parameterization of $S_{REP}$ instead of $\beta$ (1/$S_{MAX}$). <!--CH suggest removing:  is the scale of $\alpha$. Being either on the real or log-scale, and the parameterization of the watershed area regression to $S_{rep}$. The implication of these differences will be discussed further in the model differences section.-->
 
 <!--CH: I suggest keeping the model parameters as in the equation, and not introduction r and E, this adds confusion as r is equivalent to alpha and SREP to E-->
 
 $$
-R=Se^{\alpha(1-\frac{S}{S_{REP}})}
-$$
-
-where $R$ is the number of recruits,
-
-$S$ is the number of spawners,
-
-and, $S_{REP}$ is the point on the curve where $R = S$, also defined as the unfished equilibrium point.
-
-$$
-R_{ij}=S_{ij}exp[r_j(1-\frac{S_{ij}}{E_j})+w_{ij}]
+R_{ij}=S_{ij}e^{log(\alpha_j)(1-\frac{S}{S_{REP_{ij}}})+w_{ij}}
 $$
 
 where $i$ is year class,
 
 $j$ is population,
 
-$r_j$ is the $log(slope)$ where $S_{ij} = 0$, with the following prior of:
+where $R$ is the number of recruits,
 
-<!--CH: it lools like there are two vesrions of these equations here: and below for linearized form, but the priors ar diferent. Which one was used? Remove the one that is not used.-->
+$S$ is the number of spawners,
+
+and, $S_{REP}$ is the point on the curve where $R = S$, also defined as the unfished equilibrium point, $S_{REP} = \frac{log\alpha}{\beta}$.
+
+$\alpha_j$ is the $log(slope)$ where $S_{ij} = 0$, with the following prior of:
 
 $$
-r_j \sim N(r_m, h_j)
+\alpha_j \sim N(\alpha_m, h_j)
 $$
 
 $$
-r_m \sim N(0.6, 0.45)
+\alpha_m \sim N(0.6, 0.45)
 $$
 
 $$
@@ -305,34 +312,12 @@ $$
 E_{SD} \sim Uniform(0,100)
 $$
 
-$E_{ij}$ is equivalent to $S_{REP}$, when $S_{REP} = R_{ij} = S_{ij}$,
-
 and, $w_{ij}$ is the normally distributed independent random variable with mean 0 and population specific standard deviation.
+<!--TK: Is this actually used in the NIMBLE model?-->
 
-This parameterization of the Ricker's model can be simplified into the following expression. It is important to note that this version excludes the previously defined $w_{ij}$:
-<!--CH: I think log\alpha should be alpha, as defined above, and suggest changing E to SREP, as i mentioned above. Also, add $w_{ij}$:-->
+To avoid confusion, please keep in mind that Liermann substitutes $\alpha$ for $r$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation. This also goes for the reference to $S_{REP}$, which you will see is renamed as $E$ in the Liermann notation. All nomenclature across the model types has been made as close as possible to aid in comparison and evaluation.
 
-$$
-log(\frac{R}{S}_{pred}) = log\alpha_i(1 - \frac{S_i}{E_i})
-$$
-
-where $\alpha$ has a hierarchical prior of:
-
-$$
-log\alpha \sim N(log\alpha_0, log\alpha_{SD})
-$$
-
-$$
-log\alpha_0 \sim N(1.5, 2.5)
-$$
-
-$$
-log\alpha_{SD} \sim Uniform(0, 100)
-$$
-
-To avoid confusion, please keep in mind that Liermann substitutes $\alpha$ for $r_j$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation.
-
-This is finally evaluated as:
+This is evaluated as:
 
 $$
 log(\frac{R}{S}) \sim N(log(\frac{R}{S}_{pred}), \tau_{obs})
@@ -343,16 +328,17 @@ where $\tau$ is the stock-specific precision defined as,
 $$
 \tau_{obs} \sim Gamma(0.001, 0.001)
 $$
+
 With the Ricker parameters defined, the regression is then evluated based on $E$. 
 <!--CH: I see this prior on tau is different than for the IWAM-SMAX version of the model. why?-->
+<!--TK: We don't define a Tau prior in the IWAM-SMAX version?-->
 
 $$
-log(E_j) =  b0_{stream,ocean} + bWA_{stream,ocean}*log(WA_j) + log(E0_j)
+log(S_{REP_j}) =  b0_{stream,ocean} + bWA_{stream,ocean}*log(WA_j) + log(E0_j)
 $$
 <!--CH: I'm not sure why the lob(E0_j) term is needed. Why this instead of a random normal deviate as in  Liermann et al. - looking at their eqn 2. In preditions, this is set to zero, correct?-->
-where $j$ is population,
 
-$b0$ is the intercept (either river or ocean),
+where $b0$ is the intercept (either river or ocean),
 
 $$
 b0 \sim N(0, \tau = 0.001)
@@ -454,16 +440,16 @@ IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # Input data
                        remove.EnhStocks = TRUE, # Enhancement input
                        run.bootstrap = TRUE, # On/off for bootstrap process
                        bs_seed = 1, # internal seed for the bootstrap
-                       bs_nBS = 100, # internal number of trials for the bootstrap (default 20000)
+                       bs_nBS = 10, # internal number of trials for the bootstrap (default 20000)
                        plot = FALSE, # print plots to 'DataOut/'
                        est.table = FALSE # store kable formatted tables
 )
 ```
 
 ```{r tmb ouputs, echo=FALSE, message=FALSE, warning=FALSE}
-SMSY_tmb <- IWAM_WCVI_noEnh[[2]] %>%
+SMSY_tmb <- IWAM_WCVI_noEnh[[3]] %>%
   filter(RP=='SMSY')
-SREP_tmb <-IWAM_WCVI_noEnh[[2]] %>%
+SREP_tmb <-IWAM_WCVI_noEnh[[3]] %>%
   filter(RP=='SREP')
 
 Parken_WCVI <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
@@ -483,6 +469,16 @@ eval_dat <- Parken_WCVI %>% left_join(SMSY_tmb, by=join_by(Stock)) %>%
 
 # Standard residuals
 SRes_tmb <- IWAM_WCVI_noEnh$SRes
+srdat2 <- IWAM_WCVI_noEnh$srdat
+
+mod <- "IWAM_Liermann" 
+
+lifehist <- srdat2 %>% dplyr::select(Stocknumber, Name, Stream) %>% # should this be srdat or srdat2?
+  group_by(Stocknumber) %>% 
+  summarize(lh=max(Stream)) %>% 
+  arrange (Stocknumber)
+
+# pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
 ```
 
 
@@ -533,14 +529,17 @@ constants$N_Stk = max(srdat$Stocknumber + 1)
 constants$stk = srdat$Stocknumber + 1
 constants$N_Obs = nrow(srdat)
 constants$S = srdat$Sp
-constants$betaPriorMean = c(10,0,0,0)
+constants$betaPriorMean = c(10,10,0,0)
+# constants$betaPriorMean = c(10, 0,0,0)
 
 ## Build a linear model:
+# constants$X <- model.matrix( ~ -1+lh+lh:logWAshifted, data = WAbase)
 constants$X <- model.matrix( ~ lh*logWAshifted, data = WAbase)
 constants$nbeta <- ncol(constants$X)
 
 inits <- function(){
   list(beta = c(10,0,0,0),
+  # list(beta = c(10,10,0,0),
     logAlpha0 = 1.5,
     logESD = 1,
     logAlphaSD = 1)
@@ -562,7 +561,8 @@ stock_recruit_srep_biasCor <- nimbleCode({
 
   for( i in 1:N_Stk ) { # 25 iterations - number of base stocks
     logAlpha[i] ~ dnorm(logAlpha0, sd = logAlphaSD) ## Random effect for log alpha.
-    logE0[i] ~ dnorm(mean = 0, sd = logESD) ## Stock level random effect 
+    logE0[i] ~ dnorm(mean = 0, sd = logESD) ## Stock level random effect - rename to ij (normally distributed)
+      # or a small greek variable
 
     log(E[i]) <- inprod(beta[1:nbeta], X[i,1:nbeta]) + logE0[i] ## Stock level regression
     tauobs[i] ~ dgamma(0.001, 0.001) # stock specific precision
@@ -571,7 +571,7 @@ stock_recruit_srep_biasCor <- nimbleCode({
   ## Model and residuals:  
   for(i in 1:N_Obs){ # 501 iterations - number of base observations
     logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
-    logRS[i] ~ dnorm( logRS_pred[i], tau = tauobs[stk[i]]) # stock specific precision
+    logRS[i] ~ dnorm( logRS_pred[i], tau = tauobs[stk[i]]) # stock specific precision - change to be variance - does that affect the code?
   }
 })
 ```
@@ -592,6 +592,9 @@ mcmc.out <- runMCMC(cmcmc, niter=50000, nburnin=5000, nchains=3, samplesAsCodaMC
 beta.out <- do.call('rbind', mcmc.out[, grepl("beta\\[", colnames(mcmc.out[[1]]))])
 slopes <- summary(mcmc(beta.out))
 # MCMCtrace(object = mcmc.out, params = "beta")
+
+beta.out <- do.call('rbind', mcmc.out[, grepl("beta\\[", colnames(mcmc.out[[1]]))])
+slopes <- summary(mcmc(beta.out))
 ```
 
 ```{r nimble pp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
@@ -611,6 +614,7 @@ posteriorPredictiveFunction <- nimbleFunction(
     Smsy <- matrix(0, nrow = 2, ncol = 2)
     Sgen <- matrix(0, nrow = 2, ncol = 2)
     Srep <- matrix(0, nrow = 2, ncol = 2)
+    Smax <- matrix(0, nrow = 2, ncol = 2)
   },
   run = function(){},
   methods = list(
@@ -634,34 +638,38 @@ posteriorPredictiveFunction <- nimbleFunction(
       samples <<- mcmcSamples   
       nMCMC <<- dim(samples)[1]
     },
+    ## Assumes X is sorted by stk when passed at obsLevel.
     calcRefPoints = function(X = double(2), obsLevel = integer(0, default = 0)){
       npred <- dim(X)[1]
       Smsy <<- matrix(0, nrow = nMCMC, ncol = npred)
       Sgen <<- matrix(0, nrow = nMCMC, ncol = npred)
       Srep <<- matrix(0, nrow = nMCMC, ncol = npred)
-
+      Smax <<- matrix(0, nrow = nMCMC, ncol = npred)
+      
+      if(obsLevel == 1 & npred != dim(model$logAlpha)[1]){
+        stop("Can only predict for the observed locations")
+      }
       for( i in 1:nMCMC ){
       values(model, vars) <<- samples[i, ]
         for( j in 1:npred){
-          logalpha <- rnorm(1, mean = model$logAlpha0[1], sd = model$logAlphaSD[1])
+          if(obsLevel == 0 ) logalpha <- rnorm(1, mean = model$logAlpha0[1], sd = model$logAlphaSD[1])
+          else logalpha <- model$logAlpha[j]
           E <- exp(inprod(values(model, "beta"), X[j,]) + obsLevel*model$logE0[j])
           beta <- logalpha/E
+          Smax[i,j] <<- 1/beta
           Srep[i,j] <<- E
           Smsy[i,j] <<- (1-nimLambertsW(exp(1-logalpha)))/beta
           Sgen[i,j] <<- -1/beta*nimLambertsW(-beta*Smsy[i,j]/(exp(logalpha)))
         }
       }
     },
-    getSmsy = function(){
+    getRefPostPred = function(type = character(0, default = "Smsy")){
       returnType(double(2))
-      return(Smsy)
-    },
-    getSgen = function(){
-      returnType(double(2))
-      return(Sgen)      
-    },
-    getSrep = function(){
-      returnType(double(2))
+      if(type == "Smsy") return(Smsy)  
+      if(type == "Sgen") return(Sgen)
+      if(type == "Smax") return(Smax)
+      if(type == "Srep") return(Srep)
+      print("Returning Srep")
       return(Srep)
     }
   )
@@ -669,10 +677,70 @@ posteriorPredictiveFunction <- nimbleFunction(
 
 ```
 
+#### .  Nimble Ouputs (for coding purposes only - delete on knit)
+
 ```{r nimble outputs, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 predict <- posteriorPredictiveFunction(model, mcmc)
 cpredict <- compileNimble(predict)
 
+
+summarize_all_ref_pts <- function(predInfo){
+  summarize <- function(mat){
+    res <- data.frame()
+    for( i in 1:ncol(mat) ){
+      res <- rbind(res, data.frame(Mean = mean(mat[,i]), SD = sd(mat[,i]), 
+        LowerCI = quantile(mat[,i], 0.025), Median = quantile(mat[,i], 0.5), UpperCI = quantile(mat[,i], 0.975), 
+        row.names = i)
+      )
+    }
+    return(res)
+  }
+  out <- data.frame()
+  for( i in c("Srep", "Smax", "Smsy", "Sgen") ){
+    tmp <- summarize(cpredict$getRefPostPred(i))
+    tmp$type <- i
+    tmp <- cbind(predInfo, tmp)
+    out <- rbind(out, tmp)
+  }  
+  return(out)
+}
+
+
+## Prediction design matrix:
+WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+WAin$logWA <- log(WAin$WA)
+WAin$logWAshifted <- WAin$logWA-mean_logWA
+WAin <- WAin %>%
+  mutate(lh = factor(ifelse(lh == 0, "stream", "ocean"), levels = c("stream", "ocean")))
+Xpred <- model.matrix( ~ lh*logWAshifted, data = WAin)  ## This has to match model input.
+# Xpred <- model.matrix( ~ -1+lh+lh:logWAshifted, data = WAin)
+## Make sure internal variable names match with output.
+getOrder <- cpredict$getVarNames()
+
+## Predict new sites:
+samples <- do.call("rbind", mcmc.out)[, getOrder] ## If this fails need to check your MCMC tracked vars.
+cpredict$saveMCMC(samples)
+cpredict$calcRefPoints(Xpred) ## 45,000 x 5 this is a big operation.
+sum.pred <- summarize_all_ref_pts(WAin)
+
+## Make a prediction matrix for a line:
+WAline <- expand.grid(lh = c("stream", "ocean"), logWA = 2:14)
+WAline <- WAline %>%
+  mutate(lh = factor(lh, levels = c("stream", "ocean")),
+    logWAshifted = logWA - mean_logWA)
+Xline <- model.matrix( ~ lh*logWAshifted, data = WAline) ## This has to match model input.
+# Xline <- model.matrix( ~ -1+lh+lh:logWAshifted, data = WAline)
+cpredict$calcRefPoints(Xline) ## 45,000 x 5 this is a big operation.
+sum.line <- summarize_all_ref_pts(WAline)
+  
+## Make a prediction matrix for observations
+Xbase <- model.matrix( ~ lh*logWAshifted, data = WAbase) ## This has to match model input.
+# Xbase <- model.matrix( ~ -1+lh+lh:logWAshifted, data = WAbase)
+cpredict$calcRefPoints(Xbase, 1) ## 45,000 x 5 this is a big operation.
+sum.base <- summarize_all_ref_pts(WAbase)
+```
+
+```{r old nimble outputs, eval=FALSE, echo=FALSE}
 ## Prediction design matrix:
 WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
 WAin$logWA <- log(WAin$WA)
@@ -806,32 +874,86 @@ srdat.alpha <- WAbase %>% bind_cols(data.frame(do.call("cbind", logalpha.sum)))
 
 ### Comparison of Ouputs
 
-
 #### Spawner-recruit curves {.tabset}
 
-##### TMB
+##### TMB {.tabset}
 
 ```{r stock-recruit curve code, include=FALSE}
 # PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
 # PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
 ```
 
-##### NIMBLE
+###### Linear
+```{r tmb sr linear, echo=FALSE, warning=FALSE, message=FALSE}
+# what is r2
+PlotSRLinear(srdat=srdat2, 
+             pars=IWAM_WCVI_noEnh$modelpars, 
+             r2=IWAM_WCVI_noEnh$r2, 
+             removeSkagit = FALSE)
 
+# can i label axes globally for this?
+```
+###### Curve
+```{r tmb sr curve, echo=FALSE, warning=FALSE, message=FALSE}
+PlotSRCurve(srdat=srdat2, 
+            pars=IWAM_WCVI_noEnh$modelpars, 
+            r2=IWAM_WCVI_noEnh$r2, 
+            removeSkagit = FALSE,
+            mod = mod)
+
+# why is there no legend for this?
+# What is the line?
+# what is the grey bar?
+# what is the secondary dashed line?
+
+# can i label axes globally for this?
+```
+
+##### NIMBLE {.tabset}
 ```{r stock-recruit curve code nimble, include=FALSE}
 # PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
 # PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
+
+# For comparison call on:
+    # pars=IWAM_WCVI_noEnh$modelpars, 
+    # r2=IWAM_WCVI_noEnh$r2,
 ```
 
-#### Stock-wise Comparisons of Benchmarkss {.tabset}
+###### Linear
+```{r nimble sr linear,  echo=FALSE, warning=FALSE, message=FALSE}
+# PlotSRLinear(srdat=srdat,
+#              pars=pars,
+#                 # logB, logA, SMSY NEEDED
+#                 # Estimate, Std.error, param, stocknumber, name, lh
+#              r2=r2, # correlation matrix?
+#                 # r2 <- all_pred %>% group_by(Stocknumber) %>% summarize(r2=cor(ObslogRS,Pred)^2)
+#                 # contains: stocknumber and r2 values
+#              removeSkagit = FALSE)
+```
+
+###### Curve
+```{r nimble sr curve,  echo=FALSE, warning=FALSE, message=FALSE}
+# PlotSRCurve(srdat=srdat,
+#             pars=pars, # NEED
+#             r2=r2, # NEED
+#             removeSkagit = FALSE,
+#             mod=mod)
+```
+
+#### Stock-wise Comparisons of Benchmarks {.tabset}
 
 ##### SREP
 
 ```{r stockwise SREP, echo=FALSE, message=FALSE}
 # config options: fig.align = 'centre'
+nimble_bench <- sum.pred %>%
+  pivot_wider(names_from = type, values_from = c(Mean, SD,LowerCI, Median, UpperCI))
 
 benchmarks <- eval_dat %>% 
-  full_join(WAin, by="Stock")
+  full_join(nimble_bench, by=c("Stock"))
+# pivot_wider
+
+
 
 benchmarks_srep <- ggplot(benchmarks, aes(x=Stock, y = SREP)) +
   geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`, color='TMB',), width = 0.2, position = position_nudge(0.2)) +
@@ -840,8 +962,8 @@ benchmarks_srep <- ggplot(benchmarks, aes(x=Stock, y = SREP)) +
   geom_point(aes(x = Stock, y = PA_SREP, color='Parken'), position = position_nudge(-0.2)) + 
   geom_errorbar(aes(x = Stock, ymax = PA_UL_SREP, ymin = PA_LL_SREP, color='Parken'), width = 0.2, position = position_nudge(-0.2)) +
   
-  geom_point(aes(x = Stock, y = Srep_Mean, color='Nimble')) +
-  geom_errorbar(aes(x = Stock, ymax = `Srep_97.5%`, ymin = `Srep_2.5%`, color='Nimble'), width = 0.2, inherit.aes = FALSE) +
+  geom_point(aes(x = Stock, y = Mean_Srep, color='Nimble')) +
+  geom_errorbar(aes(x = Stock, ymax = UpperCI_Srep, ymin = LowerCI_Srep, color='Nimble'), width = 0.2, inherit.aes = FALSE) +
   theme_classic() + 
   ylab(TeX("$S_{REP}$ Estimate")) + 
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
@@ -865,8 +987,8 @@ benchmarks_smsy <- ggplot(benchmarks, aes(x=Stock, y = SMSY)) +
   geom_point(aes(x = Stock, y = PA_SMSY, color='Parken'), position = position_nudge(-0.2)) + 
   geom_errorbar(aes(x = Stock, ymax = PA_UL_SMSY, ymin = PA_LL_SMSY, color='Parken'), width = 0.2, position = position_nudge(-0.2)) +
   
-  geom_point(aes(x = Stock, y = Smsy_Mean, color='Nimble')) +
-  geom_errorbar(aes(x = Stock, ymax = `Smsy_97.5%`, ymin = `Smsy_2.5%`, color='Nimble'), width = 0.2, inherit.aes = FALSE) +
+  geom_point(aes(x = Stock, y = Mean_Smsy, color='Nimble')) +
+  geom_errorbar(aes(x = Stock, ymax = UpperCI_Smsy, ymin = LowerCI_Smsy, color='Nimble'), width = 0.2, inherit.aes = FALSE) +
   theme_classic() + 
   ylab(TeX("$S_{MSY}$ Estimate")) + 
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
@@ -885,15 +1007,15 @@ benchmarks_smsy
 ```{r tmb reg prep, echo=FALSE}
 # IWAM_
   # pars: 
-mod <- "IWAM_Liermann" 
-lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
-  group_by(Stocknumber) %>% 
-  summarize(lh=max(Stream)) %>% 
-  arrange (Stocknumber)
+# mod <- "IWAM_Liermann" 
+# lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+#   group_by(Stocknumber) %>% 
+#   summarize(lh=max(Stream)) %>% 
+#   arrange (Stocknumber)
+# pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
 pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
-
 # re-create the correct srdat w/ scale - just copy in the Iwam code for it
-srdat2 <- IWAM_WCVI_noEnh$srdat
+# srdat2 <- IWAM_WCVI_noEnh$srdat
 ```
 
 ###### SREP
@@ -931,6 +1053,8 @@ plotWAregressionSMSY(pars=IWAM_WCVI_noEnh$modelpars,
   # everything is fitted the same
   # seemed to improve convergence with Liermann
   # typically scaling technique
+
+# NOW USING: sum.line
 
 ggplot(data = WAline, aes(x = logWA, y = log(`Srep_50%`), colour = lh, fill = lh)) +
   geom_line() + 

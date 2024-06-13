@@ -1,0 +1,649 @@
+---
+title: "IWAM Model Description and Comparison"
+author: "Tor Kitching"
+date: "2024-06-03"
+output: 
+  bookdown::html_document2:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    number_sections: true
+---
+
+<!-- Note/comment syntax for html -->
+
+<!--
+Equation numbering protocol
+\begin{equation}
+(\#eq:nameoneline)
+\end{equation}
+-->
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(nimble)
+library(coda)
+library(dplyr)
+library(MCMCvis)
+library(DHARMa)
+library(ggplot2)
+library(TMB)
+
+library(rsample)
+library(cowplot)
+library(gridExtra)
+library(reshape2)
+library(zoo)
+library(viridis)
+library(hrbrthemes)
+library(gsl)
+
+library(knitr) # Tables
+library(latex2exp) # For adding latex into plot labels
+
+# library(geomtextpath)
+```
+
+```{r custom library, echo=FALSE, warning=FALSE, message=FALSE}
+source(here::here("R/helperFunctions.R"))
+source(here::here("R/PlotFunctions.R"))
+source(here::here("R/IWAM_model.R"))
+```
+
+```{r custom Lambertw, echo=FALSE, warning=FALSE, message=FALSE}
+## This seems like the best LambertsW function so far:
+## https://github.com/cran/lamW/blob/master/R/lamW.R
+nimLambertsW <- nimbleFunction(
+  run = function(x = double()) {
+    REXP <- 2.718281828459045090795598298427648842334747314453125 ## exp(1)
+    REXPI <- 0.367879441171442334024277442949824035167694091796875 # exp(-1)
+    EPS <- 2.2204460492503131e-16
+      
+    if (x == Inf) {
+      return(Inf)
+    } else if (x < -REXPI) {
+      return(NaN)
+    } else if (abs(x + REXPI) <= EPS) {
+      return(-1.0)
+    } else if (abs(x) <= 1e-16) {
+      return(x)
+    } else {
+      if (abs(x) <= 6.4e-3) {
+        ## When this close to 0 the Fritsch iteration may underflow. Instead,
+        ## function will use degree-6 minimax polynomial approximation of Halley
+        ## iteration-based values. Should be more accurate by three orders of
+        ## magnitude than Fritsch's equation (5) in this range.
+        ans <- (((((-1.0805085529250425e1 * x + 5.2100070265741278) * x -
+               2.6666665063383532) * x + 1.4999999657268301) * x -
+               1.0000000000016802) * x + 1.0000000000001752) * x +
+               2.6020852139652106e-18       
+        ## Minimax Approximation calculated using R package minimaxApprox 0.1.0
+        return(ans);
+
+      } else if (x <= REXP) {
+        p = sqrt(2.0 * (REXP * x + 1.0));
+        Numer = (0.2787037037037037 * p + 0.311111111111111) * p - 1.0;
+        Denom = (0.0768518518518518 * p + 0.688888888888889) * p + 1.0;
+        w = Numer / Denom;
+      } else {
+        w = log(x)
+        L_2 = log(w);
+        L_3 = L_2 / w;
+        L_3_sq = L_3 * L_3;
+        w <- w + -L_2 + L_3 + 0.5 * L_3_sq - L_3 / w + L_3 / (w * w) - 
+             1.5 * L_3_sq / w + L_3_sq * L_3 / 3.0;
+      }
+      ## Fritsch Iteration for up to 5 iterations.
+      MaxEval <- 5
+      CONVERGED <- FALSE
+      k <- 2.0 / 3.0;
+      i <- 0;
+      while (!CONVERGED & i < MaxEval){
+        z <- log(x / w) - w
+        w1 <- w + 1.0
+        q <- 2.0 * w1 * (w1 + k * z)
+        qmz <- q - z
+        e <- z / w1 * qmz / (qmz - z)
+        CONVERGED <- abs(e) <= EPS
+        w <- w*(1.0 + e)
+        i <- i + 1
+      }
+      return(w)
+    }
+    returnType(double())
+  }
+)
+```
+
+# Introduction
+
+The purpose of this report is to:
+
+-   Clearly and simply explain the background, usage, and differences of the IWAM-Ricker $S_{MAX}$ and $S_{REP}$ models
+-   Justify the usage of the new $S_{REP}$ parameterized model
+-   Introduce next steps in model development
+-   Walk through the outputs of both models
+
+
+
+# Datamap
+
+The following function vignette/example is from the IWAM Package Repo hosted publicly through the Pacific Salmon Assess organization available at [this link.](https://github.com/Pacific-salmon-assess/iwam-package)
+
+The package currently utilizes the following data sets:
+
+-   *SRinputfile (Private)*: Private data-sets developed by Parken et al. (2006). Required to run the complete function and is available upon request. To be updated with publicly available data. Life histories are included: 1 = ocean type, 0 = stream type. Contains stock names, year, spawners, recruits, and life history identification.
+-   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
+-   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s without bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *WCVIStocks (Public)*: User watershed area input file. Must contain watershed areas, life history identification, enhancement identification, and stock name. Aggregation within the IWAM function can be done with both CU and Inlet scales.
+
+
+
+# Over-arching Model Flow
+
+The model, regardless of its form between Parken et al., Leirmann et al., and Holt et al., follow the following three model stages:
+
+1.  Estimation of the Ricker model using 25 Chinook spawner and recruit time-series from across the NE Pacific
+
+2.  Regression of benchmarks derived from Ricker model parameters against the log(watershed areas) of the stocks included in the synoptic SR time series
+
+3.  Using the regression model, estimate *new* Ricker model parameters and benchmarks for stocks where only watershed area is known
+
+The main differences between the models occur in the for formulation of the Ricker model, and how error is propagated between steps. These differences will be explored in the following document.
+
+
+
+# Model Variants
+
+To describe the two main forms of the IWAM model, we will go step by step through the previously described steps, beginning with the core stock-recruitment model, the Ricker model.
+
+-   Clearly and simply explain the background and usage of
+    -   the IWAM-Ricker (SMAX) model 
+        -   Based on the Ricker model parameterizd from $\beta$ (or 1/$S_{MAX}$), as in Parken et al. (2006) and Holt et al. 2023 .
+        -   Written initially in TMB - translated currently to rTMB/tmbstan
+    -   the IWAM-Ricker (SREP) model
+        -   Based n the Ricker model parameterized from $S_{REP}$, as in  Liermann et al. (2010)
+        -   Written initially in NIMBLE by Paul and Tor - translated to rTMB/tmbstan
+    -   Identify the core differences between the two model variants
+        -   The parameterization of the Ricker model  with  $\beta$ (or 1/$S_{MAX}$) vs $S_{REP}$
+        -   Methods of estimation: frequentist vs. bayesian (maximum likelihood vs. mcmc)
+        -   Parameterized to estimate both benchmarks $S_{REP}$ and $S_{SMSY}$, or only $S_{REP}$
+        -   Both models variants are statistically integrated, in contrast to Parken et al. (2006) which is sequential
+
+
+
+## $S_{MAX}$ (IWAM-Ricker)
+
+Following Parken et al. 2006 and Holt et al. 2023 the SMAX Ricker model is predominantly expressed in the following form:
+<!--CH: suggest putting alpha in the exponent here and call it alpha, since in the TMB code we estimate 'loga' which is the a parameter in the exponent, and it would be easier to  align wiht Leirman's r parameter which is also in the exponent. Then remove the log from the linearized form below, and heirachcal prior eqn. -->
+
+\begin{equation}
+R = S e^{log(\alpha)- \beta S}e^\tau
+(\#eq:eq01)
+\end{equation}
+
+<!--
+$$
+R = S e^{log(\alpha)- \beta S}e^\tau
+$$
+-->
+
+Where $R$ is the abundance of adult recruits expressed as a $numeric$,
+
+$S$ is  spawner abundance expressed as a $numeric$. Is it standard that both recruits and spawners be scaled values for modelling. In the case of the IWAM package, both recruits and spawners are transformed by divided by $10^x$ where $x$ is the maximum number of digits across the per-stock timeseries.
+
+$\alpha$ is the dimensionless number of recruits per spawner produced at  low spawner density (productivity), this may also be thought of as the intercept of the relationship between $\frac{R}{S}$ and $S$,
+
+$\beta$ is the strength of the density dependence expressed as $1/S_{MAX}$ $spawners^{-1}$, which can be described as the slope of the previously described relationship,
+
+and $\tau$ represents normally distributed random error which accounts for process and environmental variability.
+<!--TK: This needs a statement for exclusion from the final IWAM model.-->
+
+This is the form used in both the Parken et al. (2006) and the Holt et al. (2023) models.
+
+This model can be linearized for ease of estimation. Further, following Liermann et al. (2010), hierarchical structure is added to the productivity parameter to improve model fit for data-limited populations:
+
+\begin{equation}
+log(\frac{R_i}{S_i}) = log(\alpha)-\beta \cdot S_i - \frac{\sigma_{\tau,i}^2}{2}
+(\#eq:parkenricker)
+\end{equation}
+
+<!--
+$$
+log(\frac{R_i}{S_i}) = log(\alpha)-\beta \cdot S_i - \frac{\sigma_\tau^2}{2}
+$$
+-->
+
+<!-- Where $\tau \sim Normal(-\sigma_\tau^2/2, \sigma_\tau)$, -->
+<!--CH : see line 123 of IWAM_Liermann.cpp-->
+
+Where $i$ is the year class per stock,
+<!--TK: There was a form where both \alpha and \beta had _i subscripts. 
+Where are those from?-->
+
+and,
+
+\begin{equation}
+log(\frac{R}{S}) \sim N(log(\frac{R}{S}), \sigma_{\tau, i})
+(\#eq:logrspred)
+\end{equation}
+<!--TK: Not sure if this is actually needed here, or if this is already explicit -->
+
+and the mean is adjusted by $\frac{-\sigma_{\tau,i}^2}{2}$ to account for the log back-transformation adjustment with the following distribution:
+<!--TK: Define distribution used and associated justification of choice.-->
+
+\begin{equation}
+\frac{1}{\sigma_{\tau, i}^2} \sim Gamma(0.1, 10)
+(\#eq:rickersigmatransformprior)
+\end{equation}
+
+$\alpha$ is the intercept and $\beta$ is the slope of the spawner-recruit relationship, where $log(\alpha)$ has a hierarchical prior:
+<!--TK: Define distribution used and associated justification of choice.-->
+
+\begin{equation}
+log(\alpha) \sim N(\mu_{\alpha,Stream} + \mu_{\alpha,Ocean} \cdot LH, \sigma_\alpha)
+(\#eq:logalphaprior)
+\end{equation}
+
+<!--
+$$
+log(\alpha_i) \sim Normal(\mu_\alpha, \sigma_\alpha)
+$$
+-->
+
+$\mu_\alpha$ varies between stream and ocean life histories ($LH$), a 0-1 binary offset, where,
+
+\begin{equation}
+\mu_{\alpha,Stream} \sim N(1.5,2)
+(\#eq:mualphastreamprior)
+\end{equation}
+
+\begin{equation}
+\mu_{\alpha,Ocean} \sim N(0,2)
+(\#eq:mualphaoceanprior)
+\end{equation}
+
+<!--
+$$
+\mu_{\alpha_i} \sim Normal(1.5,5)
+$$
+-->
+
+<!--TK: Should it not just be \sigma - why alpha associated with this parameter?-->
+\begin{equation}
+\frac{1}{\sigma_{\alpha}^2} \sim Gamma(0.1,10)
+(\#eq:sigmaalphprior)
+\end{equation}
+
+<!--
+$$
+\sigma_{\alpha_i} \sim InvGamma(0.01,0.01)
+$$
+-->
+
+<!--CH: I think we can exclude this given my addition above: Parken et al. (2006) include a log-transformation bias adjustment to productivity estimate $+\frac{\sigma^2}{2}$. -->
+
+Once the Ricker model parameters ($\alpha$ and $\beta$) have been estimated and used to calculate $S_{MSY}$ and $S_{REP}$ (for full equations see [Benchmark Estimation]. Using the synoptic benchmark estimates, the following regression model is estimated with watershed area:
+
+<!-- To move elsewhere below: Both Parken and Holt form a total of 4 regression models, while Liermann forms two. Between both methods, there are two models - one for stream and one for ocean life histories. The difference is that Liermann only regresses $S_{REP}$ against watershed area, instead of also using $S_{MSY}$ as per Parken. The below equations show the Parken forms: -->
+
+\begin{equation}
+log(S_{MSY}) = log(\delta_0) + \delta_1 \cdot log(WA) + \delta_\epsilon
+(\#eq:rickerregsmsy)
+\end{equation}
+
+<!--
+$$
+ln(S_{MSY}) = ln(\delta_0) + \delta_1 \cdot ln(WA) + \delta_\epsilon
+$$
+-->
+
+\begin{equation}
+ln(S_{REP}) = ln(\gamma_o) + \gamma_1 \cdot ln(WA) + \gamma_\epsilon
+(\#eq:rickerregsrep)
+\end{equation}
+
+<!--
+$$
+ln(S_{REP}) = ln(\gamma_o) + \gamma_1 \cdot ln(WA) + \gamma_\epsilon
+$$
+-->
+
+\begin{equation}
+\delta_\epsilon \sim N(0,\sigma_\delta^2)
+(\#eq:deltaepsilonprior)
+\end{equation}
+
+<!--
+$$
+\delta_\epsilon \sim N(0,\sigma_\delta^2)
+$$
+-->
+
+\begin{equation}
+\gamma_\epsilon \sim N(0,\sigma_\gamma^2)
+(\#eq:gammaepsilonprior)
+\end{equation}
+
+<!--
+$$
+\delta_\gamma \sim N(0,\sigma^2_\gamma)
+$$
+-->
+
+\begin{equation}
+\frac{1}{\sigma_{\delta,\epsilon}^2} \sim Gamma(1,1)
+(\#eq:sigmagammadeltaepsilonprior)
+\end{equation}
+
+Where $\delta_0$ is the intercept and $\delta_1$ is the slope for the relationship between the natural logarithm of watershed area (WA) and either $S_{MSY}$ and $S_{REP}$. These are then adapted further to separate stream-type and ocean-type fish in the watershed area model. This is done by creating an offset with the baseline as the stream type population. This is an expansion of equations (number). 
+
+\begin{equation}
+log(S_{MSY}) = log(\delta_{0,stream}) + log(\delta_{0,ocean}) \cdot X + (\delta_{1,stream} + \delta_{1,ocean} \cdot X) \cdot log(WA) + \delta_\epsilon
+(\#eq:smaxwaregex)
+\end{equation}
+
+<!--
+$$
+ln(S_{MSY}) = ln(\delta_{0,stream}) + ln(\delta_{0,ocean}) \cdot X + (\delta_{1,stream} + \delta_{1,ocean} \cdot X) \cdot ln(WA) + \delta_\epsilon
+$$
+-->
+
+\begin{equation}
+\delta_\epsilon \sim N(0,\sigma_\epsilon^2)
+(\#eq:deltaepsilon)
+\end{equation}
+
+<!--
+$$
+\delta_\epsilon \sim Normal(0,\sigma_\epsilon)
+$$
+-->
+
+where, $X = 0$ for stream type and $X = 1$ is for ocean type populations. This form is then repeated with a new set of parameters to estimate $S_{REP}$ from watershed area.
+
+Once these regression models are estimated, the $\delta$ parameters are used to predict $S_{REP}$ or $S_{MSY}$ for populations where only watershed area is known. When both $S_{REP}$ or $S_{MSY}$ are predicted for a given population (as in Parken et al. 2006), the productivity parameter can be inferred as it is determined exactly from the two benchmarks. This inference of productivity is informed by the underlying spawner-recruitment time-series used to parameterize the model, and can be used to estimate other benchmarks, e.g., $S_{gen}$.
+
+When implementing this model for WCVI Chinook (Holt et al. 2023), the inference of productivity was identified as being implausible (recruits/spawner >7) given low estimates of productivity determined from life-cycle models on these populations (recruits/spawners 2-3). Instead of using watershed-area derived estimate of $S_{MSY}$, Holt et al. (2023) derived bootstrapped distributions of benchmarks $S_{MSY}$ and $S_{gen}$ by drawing from independent distributions of productivity derived either from a life-cycle model or a run-reconstruction and a distribution of $\S_{REP}$ values from the watershed-area model. In future model updates, $\alpha$ could instead be estimated as a regionally hierarchical parameter within the IWAM model and the watershed area regression could use regional groupings as co-variates to predict benchmarks, thereby explicitly accounting for differences in productivities among areas. Alternatively, Liermann et al. (2010) used the formulation of the Ricker based on $S_{REP}$ and predicted only $S_{REP}$ from watershed area, avoiding inferences about productivity.
+
+Here, we follow Holt et al. (2023) to derive bootstrapped uncertainty intervals drawing from distributions for $\alpha$ and the regression model estimates of $S_{REP}$, following these steps:
+
+-   Re-estimate $\beta$ as $\beta = log(\alpha)/S_{REP}$
+-   Re-estimate $S_{MSY}$ with the above $\beta$
+-   Optimize for an estimate of $S_{GEN}$ using the supplied $\alpha$ and new $\beta$ (See Benchmark estimation for complete equation)
+
+With the optimization complete, we are now supplied with our final estimates of $S_{GEN}$, $S_{MSY}$, and $S_{REP}$.
+
+<!-- Tor: Question: Why is SMSY re-estimated a total of three times? Would the value change a little each time? Does it matter?
+CH: My thinking is that we don't use the watershed-area estimate of SMSY because it makes improper inferences about productivity. Instead we use the bootstrapped distbution of SMSY based on alpha and SREP-->
+
+
+
+## $S_{REP}$ (IWAM-Ricker)
+
+The following model is based off of Liermann et al. 2010. The main difference between this formulation of the Ricker model and the one used by Parken et al. (2006) and Holt et al. (2023) is parameterization of $S_{REP}$ instead of $\beta$ (1/$S_{MAX}$). <!--CH suggest removing:  is the scale of $\alpha$. Being either on the real or log-scale, and the parameterization of the watershed area regression to $S_{rep}$. The implication of these differences will be discussed further in the model differences section.-->
+
+<!--CH: I suggest keeping the model parameters as in the equation, and not introduction r and E, this adds confusion as r is equivalent to alpha and SREP to E-->
+
+\begin{equation}
+R_{ij} = S_{ij}e^{log(\alpha_j)(1-\frac{S}{S_{REP_{ij}}})+w_{ij}}
+(\#eq:sreprickerliermann)
+\end{equation}
+
+<!--
+$$
+R_{ij}=S_{ij}e^{log(\alpha_j)(1-\frac{S}{S_{REP_{ij}}})+w_{ij}}
+$$
+-->
+
+where $i$ is year class,
+
+$j$ is population,
+
+where $R$ is the number of recruits,
+
+$S$ is the number of spawners,
+
+and, $S_{REP}$ is the point on the curve where $R = S$, also defined as the unfished equilibrium point, $S_{REP} = \frac{log\alpha}{\beta}$.
+
+$\alpha_j$ is the $log(slope)$ where $S_{ij} = 0$, with the following prior of:
+
+\begin{equation}
+\alpha_j \sim N(\alpha_m, h_j)
+(\#eq:alphajprior)
+\end{equation}
+
+<!--
+$$
+\alpha_j \sim N(\alpha_m, h_j)
+$$
+-->
+
+\begin{equation}
+\alpha_m \sim N(0.6, 0.45)
+(\#eq:alphamprior)
+\end{equation}
+
+<!--
+$$
+\alpha_m \sim N(0.6, 0.45)
+$$
+-->
+
+\begin{equation}
+h_j \sim N(0, E_{SD})
+(\#eq:jhprior)
+\end{equation}
+
+<!--
+$$
+h_j \sim N(0, E_{SD})
+$$
+-->
+
+\begin{equation}
+E_{SD} \sim Uniform(0,100)
+(\#eq:Esdprior)
+\end{equation}
+
+<!--
+$$
+E_{SD} \sim Uniform(0,100)
+$$
+-->
+
+and, $w_{ij}$ is the normally distributed independent random variable with mean 0 and population specific standard deviation.
+<!--TK: Is this actually used in the NIMBLE model?-->
+
+To avoid confusion, please keep in mind that Liermann substitutes $\alpha$ for $r$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation. This also goes for the reference to $S_{REP}$, which you will see is renamed as $E$ in the Liermann notation. All nomenclature across the model types has been made as close as possible to aid in comparison and evaluation.
+
+This is evaluated as:
+
+\begin{equation}
+log(\frac{R}{S}) \sim N(log(\frac{R}{S}_{pred}), \tau_{obs})
+(\#eq:liermanRSprior)
+\end{equation}
+
+<!--
+$$
+log(\frac{R}{S}) \sim N(log(\frac{R}{S}_{pred}), \tau_{obs})
+$$
+-->
+
+where $\tau$ is the stock-specific precision defined as,
+
+\begin{equation}
+\tau_{obs} \sim Gamma(0.001, 0.001)
+(\#eq:tauobsprior)
+\end{equation}
+
+<!--
+$$
+\tau_{obs} \sim Gamma(0.001, 0.001)
+$$
+-->
+
+With the Ricker parameters defined, the regression is then evluated based on $E$. 
+<!--CH: I see this prior on tau is different than for the IWAM-SMAX version of the model. why?-->
+<!--TK: We don't define a Tau prior in the IWAM-SMAX version?-->
+
+\begin{equation}
+log(S_{REP_j}) =  b0_{stream,ocean} + bWA_{stream,ocean}*log(WA_j) + log(E0_j)
+(\#eq:srepregwaex)
+\end{equation}
+
+<!--
+$$
+log(S_{REP_j}) =  b0_{stream,ocean} + bWA_{stream,ocean}*log(WA_j) + log(E0_j)
+$$
+-->
+
+<!--CH: I'm not sure why the lob(E0_j) term is needed. Why this instead of a random normal deviate as in  Liermann et al. - looking at their eqn 2. In preditions, this is set to zero, correct?-->
+
+where $b0$ is the intercept (either river or ocean),
+
+\begin{equation}
+b0 \sim N(0, \tau = 0.001)
+(\#eq:bnotprior)
+\end{equation}
+
+<!--
+$$
+b0 \sim N(0, \tau = 0.001)
+$$
+-->
+
+$bWA$ is the slope (either river or ocean),
+
+\begin{equation}
+bWA \sim N(0, \tau = 0.001)
+(\#eq:bWAprior)
+\end{equation}
+
+<!--
+$$
+bWA \sim N(0, \tau = 0.001)
+$$
+-->
+
+where $WA$ is the watershed area $(km^2)$ for the population
+
+and $E0$ is the stock-level random-effect, with the following prior:
+
+\begin{equation}
+log(E0_j) \sim N(0, log(E_{SD}))
+(\#eq:Enotprior)
+\end{equation}
+
+<!--
+$$
+log(E0_j) \sim N(0, log(E_{SD}))
+$$
+-->
+
+<!--TK: Rename this equation - as it seems like a duplicate -->
+
+\begin{equation}
+log(E_{SD}) \sim Uniform(0, 100)
+(\#eq:Esd2prior)
+\end{equation}
+
+<!--
+$$
+log(E_{SD}) \sim Uniform(0, 100)
+$$
+-->
+
+Armed now with the regression coefficients $b0$ and $bWA$ we estimate new stock $S_{REP}$'s, and assuming the same global $\alpha$ estimate $S_{MSY}$ and $S_{GEN}$.
+
+
+
+## Benchmark Estimation
+
+The final outcome of the IWAM model is the calculation of stock assessment benchmarks, either $S_{MSY}$, $S_{REP}$, or $S_{GEN}$. If the $S_{MAX}$ model form is used, $S_{REP}$ can be calculated using the Ricker estimated $\alpha$ and $\beta$. The $S_{REP}$ model requires no additional calculation.
+
+\begin{equation}
+S_{REP} = \frac{log(\alpha)}{\beta}
+(\#eq:srepcalc)
+\end{equation}
+
+<!--
+$$
+S_{REP} = \frac{log(\alpha)}{\beta}
+$$
+-->
+
+For both the $S_{MAX}$ and $S_{REP}$ models the solution to $S_{MSY}$ is solved with a Lambert W equation defined by Schueurel (2016). The only exceptions are that we use an explicit form of LambertW, where the original SMAX model form had a non-explicit optimization method.
+<!--TK: Notice that this may be a updated in the future to reference Catarina/Paul/Tor's paper on an updated solution.-->
+
+\begin{equation}
+S_{MSY} = \frac{1-LambertW(e^{1-(\alpha)})}{\beta}
+(\#eq:smsycalc)
+\end{equation}
+
+<!--
+$$
+S_{MSY} = \frac{1-LambertW(e^{1-(\alpha)})}{\beta}
+$$
+-->
+
+$S_{MSY}$, $\beta$, and $\alpha$ are then used in the final calculation of $S_{GEN}$, shown explicity here as:
+
+\begin{equation}
+S_{GEN} = \frac{-1}{\beta} \cdot LambertW(-\beta \cdot \frac{S_{MSY}}{\alpha})
+(\#eq:sgencalc)
+\end{equation}
+
+The alternative version requires an optimisation of 
+
+<!--
+$$
+S_{GEN} = -1/\beta*LambertW(-\beta*\frac{S_{MSY}}{\alpha})
+$$
+-->
+
+
+
+# Comparison of Model Steps and Main Model Differences
+<!-- Tor: how am I going to show the differences?-->
+
+-   Identify the core differences between the two model variants
+    -   The parameterization of $S_{REP}$, and by that measure the exclusion of $\beta$
+    -   Methods of estimation: frequentist vs. bayesian (maximum likelihood vs. mcmc)
+    -   Propagation of error: sequential versus statistical integration approaches
+
+The core difference between the two model types stems from the difference in the parameterization of the watershed are regression model. In the first approach applied in Parken et al. (2006), regression models are estimated for $S_{REP}$ and $S_{MSY}$, whereas the Liermann et al. (2010) only estimate a regression model for $S_{REP}$ and uses a version of the Ricker model that estimates this directly. While these model forms often given similar parameter values, Liermann et al. (2010) argues that isolating for $S_{REP}$ is simpler,  more biologically interpretable, and is often required for assessment and management purposes.  <!--CH: not sure what this means, suggest omitting: We can ask the question, what would the difference between the regressions of $S_{REP}$ and $S_{MSY}$ be, given that they are both estimated from the same $\alpha$ and $\beta$.-->
+
+
+
+# Justification for continued usage of the $S_{REP}$ model
+
+-   Justify the usage of the new $S_{REP}$ model and how to choose between them:
+    -   The Liermann method is a direct method of estimation of $S_{REP}$
+    -   The Holt method is a direct estimation of $S_{MSY}$ or $S_{MAX}$
+    -   Model implementation in the future e.g. design matrix formatting for the inclusion of a) more model parameters, and b) varying model structures
+    -   What does the client want in terms of benchmarks?
+    
+
+
+# Next Steps
+
+-   Next steps in model development
+    -   Model analysis and investigation (posterior predictive checks)
+    -   Consideration and discussion around $S_{REP}$ and $S_{MAX}$ as management benchmarks. This would include a potential re-parameterization of the model for $S_{MAX}$
+    -   Translations of both models into RTMB
+    -   Incorporation of a regionally hierarchical $\alpha$ parameter
+    -   Consider Parken's implementation of an internal productivity covariate
+    -   Consider implementation of the Liermann random-walk $\alpha$
+    -   Development of packages/functions for ease of use by managers
+
+
+# Model Usage
+
+...
+

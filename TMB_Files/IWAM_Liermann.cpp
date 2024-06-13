@@ -131,6 +131,7 @@ Type objective_function<Type>:: operator() ()
   for(int i=0; i<N_stks; i++){
     // add prior on logA, 
     ans += -dnorm(logA(i), logMuA_stream + logMuA_ocean * lifehist(i), sigmaA, true );
+    
      // add prior on sigma, 
     if (SigRicPriorGamma == 1) {
        ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true);
@@ -179,6 +180,8 @@ Type objective_function<Type>:: operator() ()
   SREP = logA / exp(logB);
  // SMSY(i) =  (1 - LambertW( exp (1- logA(i) - sigma^2/2) ) ) / exp(logB(i)) ; // non-bias correction version
   
+  
+  
   // Liermann's model with both stream and ocean type =================
   vector <Type> pred_lnSMSY(N_stks);
   vector <Type> pred_lnSREP(N_stks);
@@ -194,6 +197,7 @@ Type objective_function<Type>:: operator() ()
     ans += -dnorm( pred_lnSREP(i), log(SREP(i) * scale(i) ),  sigma_nu, true);
   }
   // Stream-type is the base and deviation for the ocean
+  // How is process error shown in this model?
   
   // Normal prior on sigma_delta and sigma_nu
   if (SigDeltaPriorNorm == 1) {
@@ -215,6 +219,8 @@ Type objective_function<Type>:: operator() ()
     ans += -( dt( sigma_delta, Type(1), true));
     ans += -( dt( sigma_nu, Type(1), true ));
   }
+  
+  
   
     // Get predicted values for plotting WA regresssion with CIs
   int N_pred = pred_lnWA.size();
@@ -274,15 +280,16 @@ Type objective_function<Type>:: operator() ()
   ADREPORT(SMSY); // Removed _std
   ADREPORT(SREP); // Removed _std
   ADREPORT(logRS_pred);
-  ADREPORT(pred_lnSMSY);
+  ADREPORT(pred_lnSMSY); // lnSMSY for synoptic set
   ADREPORT(pred_lnSREP);
   ADREPORT(lnSMSY);
-  ADREPORT(lnSREP);
-  ADREPORT(pred_lnSMSY_stream_CI);
+  ADREPORT(lnSREP); 
+  ADREPORT(pred_lnSMSY_stream_CI); // synoptic "predicted" lnSMSY along a line
   ADREPORT(pred_lnSMSY_ocean_CI);
   ADREPORT(pred_lnSREP_stream_CI);
   ADREPORT(pred_lnSREP_ocean_CI);
-  ADREPORT(target_lnSMSY_ocean);
+  
+  ADREPORT(target_lnSMSY_ocean); // actual predicted lnSMSY and lnSREP from watershed model for WCVI examples
   ADREPORT(target_lnSREP_ocean);
   ADREPORT(target_lnSMSY_stream);
   ADREPORT(target_lnSREP_stream);

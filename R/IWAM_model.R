@@ -244,7 +244,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   
   
   # Read in log(watershed area) for additional stocks
-  # Predicted lnWA for plottig CIs:
+  # Predicted lnWA for plotting CIs:
   data$pred_lnWA <- seq(min(log(WAbase$WA)), max(log(WAbase$WA)), 0.1)
   # TestlnWAo
   
@@ -1045,11 +1045,12 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   }
   
   #### Return function ####
-  return(list(dataname = datain, dfout, modelpars = pars, 
+  return(list(opt = opt, dataname = datain, dfout, modelpars = pars, 
               all_Deltas = all_Deltas, srdat = srdat, lh = lifehist, 
               WAbase = WAbase, pred_lnSREP = pred_lnSREP, pred_lnSMSY = pred_lnSMSY, 
               pred_lnSREP_pi = pred_lnSREP_pi, pred_lnSMSY_pi = pred_lnSMSY_pi,
-              pred_lnWA = data$pred_lnWA, SRes = SRes))
+              pred_lnWA = data$pred_lnWA, SRes = SRes,
+              r2 = r2))
   # used to contain SREP_out, SGEN_out, SMSY_out
   
   # need equations for the WA regression lines + intervals

@@ -113,7 +113,7 @@ IWAM_backcalc <- IWAM_func(WAin = "DataIn/Ordered_backcalculated_noagg.csv", # D
                        remove.EnhStocks = FALSE, # Remove Enhancement stocks (INPUT)
                        run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process
                        bs_seed = 1, # Change the internal seed for the bootstrap (INPUT)
-                       bs_nBS = 100, # Change the internal number of trials for the bootstrap (INPUT)
+                       bs_nBS = 10, # Change the internal number of trials for the bootstrap (INPUT)
                        # Run 10 for testing purposes - otherwise 20000
                        plot = FALSE, # Print plots to DataOut/
                        est.table = FALSE # Store tables
@@ -662,6 +662,8 @@ kable(nimble_estimates, caption = "NIMBLE: SGEN, SREP, and SMSY Estimates for Al
 ``` {r Table output, echo=FALSE, message=FALSE}
 # output the above kable table into a csv in DataOut
   # Call it: Backcalculation_stockestimates_table.csv
+
+# Tor: combine nimble and iwam outputs??
 write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
 ```
 
