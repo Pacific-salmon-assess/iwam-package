@@ -1,7 +1,6 @@
 # NIMBLE --> RTMB Version
 
 # Libaries ####
-
 library(RTMB)
 library(ggplot2)
 library(dplyr)
@@ -16,7 +15,6 @@ srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 
 # Target's
-
 WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
 # WAin$WA is raw watershed areas
   # Contains CU and Inlet information - but number of rows is equal to number of stocks/rivers
@@ -32,7 +30,7 @@ srdatwna <- srdatwna %>%
 srdat <- srdatwna %>% 
   filter(!Name %in% c("Hoko","Hoh")) %>% 
   filter(Rec != "NA") %>%
-  filter( !(Name == "Cowichan" & (Yr < 1985 | Yr == 1986 | Yr == 1978))) %>%
+  filter( !(Name == "Cowichan" & (Yr < 1985 | Yr == 1986 | Yr == 1987))) %>%
   group_by(Name, Stocknumber, Stream) %>%
   arrange(Yr) %>%
   mutate(yr_num = 0:(n()-1)) %>%
@@ -53,30 +51,16 @@ WAbase <- WAbase %>%
 mean_logWA <- mean(WAbase$logWA)
 WAbase$logWAshifted <- WAbase$logWA - mean_logWA
 
-## Old Nimble Setups ####
-
-    # data <- list(
-    #   logRS = log(srdat$Rec) - log(srdat$Sp)  
-    # )
-    # 
-    # constants <- list()
-    # constants$N_Stk = max(srdat$Stocknumber + 1)
-    # constants$stk = srdat$Stocknumber + 1
-    # constants$N_Obs = nrow(srdat)
-    # constants$S = srdat$Sp
-    # constants$betaPriorMean = c(10,10,0,0)
-    # # constants$betaPriorMean = c(10, 0,0,0)
-    # 
-    # ## Build a linear model:
-    # # constants$X <- model.matrix( ~ -1+lh+lh:logWAshifted, data = WAbase)
-    # constants$X <- model.matrix( ~ lh*logWAshifted, data = WAbase)
-    # constants$nbeta <- ncol(constants$X)
+lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+  group_by(Stocknumber) %>% 
+  summarize(lh=max(Stream))
 
 ## RTMB dat and par setup ####
 
 dat <- list(srdat = srdat,
             WAbase = WAbase,
-            WAin = WAin, # is this risky?
+            WAin = WAin,
+            # type = lifehist$lh + 1,
             logRS = log(srdat$Rec) - log(srdat$Sp))
   # what about WAbase? Do they just need to be joined?
 
@@ -88,7 +72,7 @@ par <- list(logAlpha_re = numeric(nrow(dat$WAbase)),
             logAlphaSD = 10,
             logE0 = numeric(nrow(dat$WAbase)), # random
             logESD = 1,
-            tauobs = 0.01 + numeric(nrow(dat$WAbase)),
+            tauobs = 0.01 + numeric(nrow(dat$WAbase)), # Why is this 0.01 + 
             beta = c(10,0,0,0) # 4 beta's for inprod? - ocean, stream - a and b
             ) 
 
@@ -98,8 +82,8 @@ dat$tarX <- model.matrix( ~ lh*logtarWAshifted, data = dat$WAin) # I think these
 # RTMB function ####
 # This is a fully MLE model parameterized for SREP (E)
 
-f_rs <- function(par){
-  RTMB::getAll(dat, par)
+f_nim <- function(par){
+  getAll(dat, par)
 
   N_Stk = max(srdat$Stocknumber + 1)
   stk = srdat$Stocknumber + 1
@@ -142,7 +126,6 @@ f_rs <- function(par){
     logRS[i] %~% dnorm(logRS_pred, sd = sqrt(1/tauobs[stk[i]]))
   }
   
-  
   #### Predictions of E for WCVI watershed areas
   for (i in 1:N_Pred){
     # create a predicted line
@@ -151,6 +134,8 @@ f_rs <- function(par){
     # can I just evaluate a new tarlogE using a new value of X?
     logtarE <- sum(beta[1:nbeta] * tarX[i,1:nbeta]) + logE0[i]
     tarE[i] <- exp(logtarE)
+    
+    # How does the indexing work on the below calculations?
     # tarBeta[i] <- logAlpha[stk[i]]/tarE[i]
     # tarSMSY[i] <- (1-LambertW0(exp(1-logAlpha[stk[i]])))/tarBeta[i]
     # tarSMAX[i] <- 1/tarBeta[i]
@@ -162,8 +147,11 @@ f_rs <- function(par){
   ADREPORT(logAlpha)
     # Between Srep and alpha I can get beta
     # TK: Is it worth doing any calculations internally? Or leave that space for the targets?
-
+  
   ADREPORT(tarE)
+  # ADREPORT(tarBeta)
+  # ADREPORT(tarSMSY)
+  # ADREPORT(tarSMAX)
   
   # REPORT # just gives you the error
   
@@ -174,12 +162,92 @@ f_rs <- function(par){
   # -sum(dnorm(log(RS), logRS_pred, sigma = sqrt(1/tauobs[stk[i]]), log=TRUE))
 }
 
-## MakeADFun ####
 
-obj <- RTMB::MakeADFun(f_rs, par, random = c("logAlpha_re", "logE0")) # silent=TRUE
+
+# New RTMB Function - testing old method without matrix ####
+
+N_Stk <- max(srdat$Stocknumber + 1)
+
+# parameters
+par2 <- list(b0 = c(10, 10), # b0 = c(9, 9)
+       bWA = c(0, 0), # bWA = c(0.83, 1)
+       logAlpha = numeric(N_Stk),
+       logE0 = numeric(N_Stk),
+       tauobs = 0.001 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
+       logAlpha0 = 1.5, # Same
+       logESD = 1, # Same
+       logAlphaSD = 1 # Same
+       )
+
+f_nim2 <- function(par2){
+  getAll(dat, par2)
+   
+  N_Stk = max(srdat$Stocknumber + 1)
+  stk = srdat$Stocknumber + 1
+  N_Obs = nrow(srdat)
+  S = srdat$Sp
+  type = lifehist$lh + 1
+  
+  E <- numeric(N_Stk)
+  log_E <- numeric(N_Stk) 
+  
+  # Alpha0 <- exp(logAlpha0)
+  
+  ## Initialize joint negative log likelihood
+  nll <- 0
+  
+  # Priors - Now a penalty term?
+  nll <- nll - sum(dnorm(logAlpha0, 0.6, 0.45, log = TRUE))
+  
+  # nll <- nll - sum(dunif(logAlphaSD, 0, 100, log = TRUE)) # error
+  # nll <- nll - sum(dunif(logESD, 0, 100, log = TRUE))
+  
+  # Slope and intercept priors
+  nll <- nll - sum(dnorm(b0[1], 0, sd = 31.6, log = TRUE))
+  nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE))
+  nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE))
+  nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE))
+  
+  ## Watershed Model
+  for ( i in 1:N_Stk){
+    # logAlpha_re[i] %~% dnorm(0, sd = logAlphaSD) # random effect
+    nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD, log = TRUE)) # random effect
+    # logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    
+    # logE0[i] %~% dnorm(mean = 0, sd = logESD) # random effect
+    nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE)) # random effect
+    
+    # logE <- sum(beta[1:nbeta] * X[i,1:nbeta]) + logE0[i]
+    log_E[i] <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i] ## Stock level regression
+    E[i] <- exp(log_E[i])
+    
+    # tauobs[i] ~ dgamma(0.001, 0.001) # stock specific precision
+    nll <- nll - sum(dgamma(tauobs[i], shape = 0.001, scale = 0.001))
+  }
+  # After this point nll is -Inf
+  
+  ## Ricker Model
+  for (i in 1:N_Obs){
+    logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
+    nll <- nll - sum(dnorm(logRS[i], logRS_pred, sd = sqrt(1/tauobs[stk[i]]), log = TRUE))
+    # logRS[i] %~% dnorm(logRS_pred, sd = sqrt(1/tauobs[stk[i]]))
+  }
+
+  nll
+}
+
+## MakeADFun ####
+obj <- RTMB::MakeADFun(f_nim, par, random = c("logAlpha_re", "logE0")) # silent=TRUE
+obj2 <- RTMB::MakeADFun(f_nim2, par2, random = c("logAlpha", "logE0"))
 
 opt <- nlminb(obj$par, obj$fn, obj$gr) # THIS HAS TO BE RUN for stan?
+opt2 <- nlminb(obj2$par, obj2$fn, obj2$gr)
+
 sdr <- sdreport(obj)
+sdr2 <- sdreport(obj2)
+
+sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
+sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard erro
 
 # HOW DO YOU GET OUT ALL THE NECESSARY things?
   # ADREPORT vs. REPORT
@@ -232,6 +300,18 @@ initf1 <- function(){
   )
 }
 
+initf2 <- function(){
+  list(b0 = c(10, 10), # b0 = c(9, 9)
+       bWA = c(0, 0), # bWA = c(0.83, 1)
+       logAlpha = numeric(N_Stk),
+       logE0 = numeric(N_Stk),
+       tauobs = 0.001 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
+       logAlpha0 = 1.5, # Same
+       logESD = 1, # Same
+       logAlphaSD = 1 # Same
+  )
+}
+
 # fit <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
 #                chains=1, open_progress=FALSE, silent=TRUE)
 
@@ -240,6 +320,8 @@ fitcores <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
   # errors include: can't find getAll function
   # can't find dat
 
+fitcores2 <- tmbstan(obj2, iter=2000, warmup=200, init=initf2,
+                    chains=4, open_progress=FALSE, silent=TRUE)
 
 
 # Alternative version with multiple chains
@@ -265,7 +347,7 @@ fitcores <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
 # pairs(fit, pars=names(obj$par)) # this is a massive plot
 # ggpairs()
 
-rstan::traceplot(fitcores, pars=names(obj$par), inc_warmup=TRUE)
+rstan::traceplot(fitcores2, pars=names(obj2$par), inc_warmup=TRUE)
 # stan_trace(fit, pars=names(obj$par), inc_warmup=TRUE) # the same? just a ggplot object?
 #TK: logAlpha trace is shit
 

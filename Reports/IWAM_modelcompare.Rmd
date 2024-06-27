@@ -447,7 +447,7 @@ IWAM_WCVI_noEnh <- IWAM_func(WAin = "DataIn/WCVIStocks.csv", # Input data
 ```
 
 ```{r tmb ouputs, echo=FALSE, message=FALSE, warning=FALSE}
-SMSY_tmb <- IWAM_WCVI_noEnh[[3]] %>%
+SMSY_tmb <- IWAM_WCVI_noEnh[[3]] %>% # return: "dfout"
   filter(RP=='SMSY')
 SREP_tmb <-IWAM_WCVI_noEnh[[3]] %>%
   filter(RP=='SREP')

@@ -79,7 +79,7 @@ srdatwna <- srdatwna %>%
 srdat <- srdatwna %>% 
   filter(!Name %in% c("Hoko","Hoh")) %>% 
   filter(Rec != "NA") %>%
-  filter( !(Name == "Cowichan" & (Yr < 1985 | Yr == 1986 | Yr == 1978))) %>%
+  filter( !(Name == "Cowichan" & (Yr < 1985 | Yr == 1986 | Yr == 1987))) %>%
   group_by(Name, Stocknumber, Stream) %>%
   arrange(Yr) %>%
   mutate(yr_num = 0:(n()-1)) %>%
@@ -117,10 +117,12 @@ constants$betaPriorMean = c(10,10,0,0)
 constants$X <- model.matrix( ~ lh*logWAshifted, data = WAbase)
 constants$nbeta <- ncol(constants$X)
 
+
+
 inits <- function(){
   list(beta = c(10,0,0,0),
   # list(beta = c(10,10,0,0),
-    logAlpha0 = 1.5,
+    logAlpha0 = 1.5, 
     logESD = 1,
     logAlphaSD = 1)
 }
@@ -148,9 +150,11 @@ stock_recruit_srep_biasCor <- nimbleCode({
   ## Model and residuals:  
   for(i in 1:N_Obs){ # 501 iterations - number of base observations
     logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
-    logRS[i] ~ dnorm( logRS_pred[i], tau = tauobs[stk[i]]) # stock specific precision
+    logRS[i] ~ dnorm(logRS_pred[i], tau = tauobs[stk[i]]) # stock specific precision
   }
 })
+
+
 
 model <- nimbleModel(stock_recruit_srep_biasCor, data = data, constants = constants,
   inits = inits(), buildDerivs=FALSE) # Build derivs if you want MLE

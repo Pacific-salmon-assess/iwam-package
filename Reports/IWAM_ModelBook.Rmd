@@ -144,7 +144,7 @@ The package currently utilizes the following data sets:
 
 
 
-# Over-arching Model Flow
+# Overarching Model Flow
 
 The model, regardless of its form between Parken et al., Leirmann et al., and Holt et al., follow the following three model stages:
 
@@ -578,7 +578,7 @@ S_{REP} = \frac{log(\alpha)}{\beta}
 $$
 -->
 
-For both the $S_{MAX}$ and $S_{REP}$ models the solution to $S_{MSY}$ is solved with a Lambert W equation defined by Schueurel (2016). The only exceptions are that we use an explicit form of LambertW, where the original SMAX model form had a non-explicit optimization method.
+For both the $S_{MAX}$ and $S_{REP}$ models the solution to $S_{MSY}$ is solved with a Lambert W equation defined by Schueurel (2016). The only exceptions are that we use an explicit form of Lambert's W, where the original SMAX model form had a non-explicit optimization method.
 <!--TK: Notice that this may be a updated in the future to reference Catarina/Paul/Tor's paper on an updated solution.-->
 
 \begin{equation}
@@ -592,14 +592,14 @@ S_{MSY} = \frac{1-LambertW(e^{1-(\alpha)})}{\beta}
 $$
 -->
 
-$S_{MSY}$, $\beta$, and $\alpha$ are then used in the final calculation of $S_{GEN}$, shown explicity here as:
+$S_{MSY}$, $\beta$, and $\alpha$ are then used in the final calculation of $S_{GEN}$, shown in its explicit form here as:
 
 \begin{equation}
 S_{GEN} = \frac{-1}{\beta} \cdot LambertW(-\beta \cdot \frac{S_{MSY}}{\alpha})
 (\#eq:sgencalc)
 \end{equation}
 
-The alternative version requires an optimisation of 
+The alternative version requires an optimization of ...
 
 <!--
 $$
@@ -607,7 +607,61 @@ S_{GEN} = -1/\beta*LambertW(-\beta*\frac{S_{MSY}}{\alpha})
 $$
 -->
 
+<!--TK: Add in code and sample for logalphaproof, to discuss assumptions about productivity. Nothing you can do with training data can avoid the high-productivity assumption. -->
 
+```{r logalphaproof}
+
+# Proving the relationship between logalpha and logWA
+
+logalpha <- 1.5 # 1.5
+
+beta <- 0.0001
+
+
+Srep <- logalpha/beta
+
+Smsy <- (1-gsl::lambert_W0(exp(1-logalpha)))/beta
+
+a <- Smsy/Srep
+
+logalpha.hat <- (a*(-gsl::lambert_W0(((a-1)*exp(1-1/a))/a)) + a - 1)/((a-1)*a)
+  # back-simulated alpha based on predicted Srep and Smsy
+
+beta.hat <- logalpha.hat/Srep
+  # back-simulated beta
+
+beta.hat - beta
+  # back-simulated beta
+
+logalpha.hat - logalpha
+  # the difference between back-simulated alpha and alpha (Ricker from SR curve)
+  # functionally the same - so we can recover our estimate of alpha from the SR curve
+  # and more importantly the WA regression
+
+  # can I simulate variable alpha's?
+    # how much does the difference between recoverable alpha's change depending on the prior?
+
+
+predictAlpha <- function(logWA = 4:12, b0 = c(0,0), b1 = c(0,0)){
+  resalpha <- resbeta <- NULL
+  for( x in logWA ){
+    Srep <- b0[1] + b1[1]*x
+    Smsy <- b0[2] + b1[2]*x
+    
+    a <- exp(Smsy-Srep)
+    logalpha.hat <- (a*(-gsl::lambert_W0(((a-1)*exp(1-1/a))/a)) + a - 1)/((a-1)*a)
+    beta.hat <- logalpha.hat/Srep
+    resalpha <- c(resalpha, logalpha.hat)
+    resbeta <- c(resbeta, beta.hat)
+  }
+  data.frame(logWA = logWA, logalpha=resalpha, beta=resbeta)
+}
+
+ans <- predictAlpha(logWA = 1:20, b0 = c(4.18, 3.21), b1 = c(exp(-0.409), exp(-0.411)))
+plot(ans$logWA, ans$logalpha)
+lm(ans$logalpha~ans$logWA)
+
+```
 
 # Comparison of Model Steps and Main Model Differences
 <!-- Tor: how am I going to show the differences?-->

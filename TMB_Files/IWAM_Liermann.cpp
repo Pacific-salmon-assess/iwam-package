@@ -71,7 +71,6 @@ Type objective_function<Type>:: operator() ()
   DATA_SCALAR(Tau_D_dist);
   //DATA_SCALAR(logDeltaSigma);
   //DATA_SCALAR(logNuSigma);
-  
   DATA_SCALAR(SigDelta_mean);
   DATA_SCALAR(SigDelta_sig);
   DATA_SCALAR(SigNu_mean);
@@ -80,6 +79,7 @@ Type objective_function<Type>:: operator() ()
   DATA_VECTOR(pred_lnWA);
   DATA_VECTOR(target_lnWA_ocean);
   DATA_VECTOR(target_lnWA_stream);
+  
   
   // Remove all _std
   PARAMETER_VECTOR(logA); // Org _std
@@ -122,7 +122,6 @@ Type objective_function<Type>:: operator() ()
     if(biasCor == 1) { // correcting for the back-calculation bias - from log transform to raw
       logRS_pred(i) = logA(stk(i)) - exp(logB(stk(i))) * S(i) - pow(sigma(stk(i)),2) / Type(2);
     } // power function - squared sigma / 2
-    // look up TMB pow
     ans += -dnorm(logRS_pred(i), logRS(i),  sigma(stk(i)), true);    
     nLL(i) = -dnorm(logRS_pred(i), logRS(i),  sigma(stk(i)), true);
   }
@@ -222,7 +221,7 @@ Type objective_function<Type>:: operator() ()
   
   
   
-    // Get predicted values for plotting WA regresssion with CIs
+  // Get predicted values for plotting WA regresssion with CIs
   int N_pred = pred_lnWA.size();
   vector <Type> pred_lnSMSY_stream_CI(N_pred);
   vector <Type> pred_lnSMSY_ocean_CI(N_pred);
@@ -235,9 +234,7 @@ Type objective_function<Type>:: operator() ()
     pred_lnSREP_stream_CI(i) = logNu1 + exp(logNu2) * pred_lnWA(i);
     pred_lnSREP_ocean_CI(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * pred_lnWA(i);
   }
-  
-  
-  
+
   //// Get predicted values for stream-type target stocks with CIs
   int N_target_stream = target_lnWA_stream.size();
   vector <Type> target_lnSMSY_stream(N_target_stream);
