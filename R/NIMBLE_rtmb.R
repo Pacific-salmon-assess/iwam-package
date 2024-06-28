@@ -107,6 +107,7 @@ f_nim <- function(par){
   for ( i in 1:N_Stk){
     logAlpha_re[i] %~% dnorm(0, sd = logAlphaSD) # random effect
     logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    # logAlpha0 %~% dnorm(0.6, sd = 0.45) # Isn't this how it should be written?
       
     logE0[i] %~% dnorm(mean = 0, sd = logESD) # random effect
   
@@ -166,17 +167,38 @@ f_nim <- function(par){
 
 # New RTMB Function - testing old method without matrix ####
 
+# Notes from Paul
+  # Starting with question about uniform distributions in TMB
+# You don't need to explicitly ever include a uniform distribution unless the end points are random.
+# It's just 1/(upper-lower) - the log its just -log(upper-lower)
+
+# You aren't bayesian so you don't put a distribution on a parameter in RTMB
+# But the uniform is important to know the values the parameter can take on.
+# So if you had an untransformed variable then you'd want to include it to make sure it couldn't find an impossible value.
+
+# Q: I would have to state that those 4 beta parameters in rtmb are initial parameters that are then constrained?
+# No I think that's a linear model so the beta parameters don't need to be transformed.
+# In a Frequentist world you just have them as par and don't add them to the likelihood.
+
+# Well you can kind of think of all your pars being "uniformly" distributed and don't contribute to the likelihood. 
+# When this is the case the posterior mode and MLE are the same.
+# **When all priors are uniform then MLE and MAP are equal.
+
+# The above notes are disjointed - but I wanted them for safe-keeping (Tor)
+
 N_Stk <- max(srdat$Stocknumber + 1)
 
 # parameters
 par2 <- list(b0 = c(10, 10), # b0 = c(9, 9)
        bWA = c(0, 0), # bWA = c(0.83, 1)
-       logAlpha = numeric(N_Stk),
+       
+       # logAlpha = numeric(N_Stk),
+       logAlpha_re = numeric(nrow(dat$WAbase)),
        logE0 = numeric(N_Stk),
-       tauobs = 0.001 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
+       tauobs = 0.01 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
        logAlpha0 = 1.5, # Same
        logESD = 1, # Same
-       logAlphaSD = 1 # Same
+       logAlphaSD = 10 # 1 in the nimble version - no effect changing between them
        )
 
 f_nim2 <- function(par2){
@@ -191,28 +213,29 @@ f_nim2 <- function(par2){
   E <- numeric(N_Stk)
   log_E <- numeric(N_Stk) 
   
-  # Alpha0 <- exp(logAlpha0)
+  logAlpha <- numeric(N_Stk) # comment on or off
   
   ## Initialize joint negative log likelihood
   nll <- 0
   
-  # Priors - Now a penalty term?
-  nll <- nll - sum(dnorm(logAlpha0, 0.6, 0.45, log = TRUE))
+  # Prior - Now a penalty term?
+  # nll <- nll - sum(dnorm(logAlpha0, 0.6, 0.45, log = TRUE))
   
-  # nll <- nll - sum(dunif(logAlphaSD, 0, 100, log = TRUE)) # error
-  # nll <- nll - sum(dunif(logESD, 0, 100, log = TRUE))
+  # Alternative version of alpha terms - see f_nim's translation
   
   # Slope and intercept priors
-  nll <- nll - sum(dnorm(b0[1], 0, sd = 31.6, log = TRUE))
-  nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE))
-  nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE))
-  nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE))
+  # nll <- nll - sum(dnorm(b0[1], 0, sd = 31.6, log = TRUE))
+  # nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE))
+  # nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE))
+  # nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE))
   
   ## Watershed Model
   for ( i in 1:N_Stk){
-    # logAlpha_re[i] %~% dnorm(0, sd = logAlphaSD) # random effect
-    nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD, log = TRUE)) # random effect
-    # logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    # New version
+    # nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD, log = TRUE)) # random effect - is this the bayesian way?
+    # Alternative version of alpha terms - see f_nim's translation
+    nll <- nll - sum(dnorm(logAlpha_re[i], 0, sd = logAlphaSD, log = TRUE)) # random effect
+    logAlpha[i] <- logAlpha0 + logAlpha_re[i]
     
     # logE0[i] %~% dnorm(mean = 0, sd = logESD) # random effect
     nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE)) # random effect
@@ -238,7 +261,7 @@ f_nim2 <- function(par2){
 
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_nim, par, random = c("logAlpha_re", "logE0")) # silent=TRUE
-obj2 <- RTMB::MakeADFun(f_nim2, par2, random = c("logAlpha", "logE0"))
+obj2 <- RTMB::MakeADFun(f_nim2, par2, random = c("logAlpha_re", "logE0"))
 
 opt <- nlminb(obj$par, obj$fn, obj$gr) # THIS HAS TO BE RUN for stan?
 opt2 <- nlminb(obj2$par, obj2$fn, obj2$gr)

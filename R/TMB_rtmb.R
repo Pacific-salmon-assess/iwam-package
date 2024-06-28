@@ -225,6 +225,7 @@ f_tmb <- function(par){
   ## Initialize joint negative log likelihood
   nll <- 0
   
+  # PENALTY TERMS???
   ## Add priors for hyperpars:
     ## MuA prior for stream type
   # logMuA_stream %~% dnorm(logMuA_stream_mean, sd = logMuA_stream_sig)
