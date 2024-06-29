@@ -392,6 +392,7 @@ opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 5)) # optimization
 
 # Summarize
 sdr <- sdreport(obj)
+# sdr_full <- summary(sdreport(obj)) # Includes all ADREPORTS
 
 # Example for how to get ADREPORTS out
 sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
@@ -401,8 +402,34 @@ sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
 
 
 ## MCMC run through tmbstan ####
+# Create a par function
+initf1 <- function(){
+  list(logA = (srdat %>% group_by (Stocknumber) %>% 
+                 summarise(yi = lm(log(Rec / Sp) ~ Sp)$coef[1]))$yi, # random effect
+       logB = log ( 1/ ( (1/B$m)/dat$scale )), # fixed effect
+       logSigma = rep(-2, length(unique(srdat$Name))),
+       logSigmaA = -2,
+       
+       logMuA_stream = 1.5,
+       logMuA_ocean = 0,
+       
+       logDelta1 = 3,
+       logDelta1_ocean = 0,
+       logDelta2 = log(0.72),
+       Delta2_ocean = 0,
+       
+       logNu1 = 3,
+       logNu1_ocean = 0,
+       logNu2 = log(0.72),
+       Nu2_ocean = 0,
+       
+       logNuSigma = -0.412,
+       logDeltaSigma = -0.412
+  )
+}
 
-
+fitcores <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
+                    chains=4, open_progress=FALSE, silent=TRUE)
 
 ## Traceplots ####
 

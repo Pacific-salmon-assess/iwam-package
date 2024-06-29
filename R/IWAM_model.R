@@ -61,7 +61,7 @@ library(hrbrthemes)
 # from *.Proj files, a simple source("R/helperFunctions.R") should work.Correct?
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
-source(here::here("R/Get_LRP_bs.R"))
+source(here::here("R/Get_LRP_bs.R")) # Now no longer includes TMB
 
 #### Test wrapper function objects for internal usage  ----------------------------------------
 
@@ -80,14 +80,15 @@ WAin <- c("DataIn/WCVIStocks.csv")
 
 #### New Wrapper function ------------------------------------------------------
 
+# Defaults changed to be most basic run
 IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
                         # NEEDS RENAMING to _____
-                      remove.EnhStocks = TRUE,
+                      remove.EnhStocks = FALSE, # was originally TRUE as default
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
                       plot = FALSE, # whether or not to create plots stored in DataOut/
-                      est.table = TRUE # store kable tables as per wcvi_workedexample.RMD
+                      est.table = FALSE # store kable tables as per wcvi_workedexample.RMD
 )
   {
   
@@ -1045,11 +1046,20 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   }
   
   #### Return function ####
-  return(list(opt = opt, dataname = datain, dfout = dfout, modelpars = pars, 
-              all_Deltas = all_Deltas, srdat = srdat, lh = lifehist, 
-              WAbase = WAbase, pred_lnSREP = pred_lnSREP, pred_lnSMSY = pred_lnSMSY, 
-              pred_lnSREP_pi = pred_lnSREP_pi, pred_lnSMSY_pi = pred_lnSMSY_pi,
-              pred_lnWA = data$pred_lnWA, SRes = SRes,
+  return(list(opt = opt, 
+              dataname = datain, 
+              dfout = dfout, 
+              modelpars = pars, 
+              all_Deltas = all_Deltas, 
+              srdat = srdat, 
+              lh = lifehist, 
+              WAbase = WAbase, 
+              pred_lnSREP = pred_lnSREP, 
+              pred_lnSMSY = pred_lnSMSY, 
+              pred_lnSREP_pi = pred_lnSREP_pi, 
+              pred_lnSMSY_pi = pred_lnSMSY_pi,
+              pred_lnWA = data$pred_lnWA, 
+              SRes = SRes,
               r2 = r2))
   # used to contain SREP_out, SGEN_out, SMSY_out
   
@@ -1063,6 +1073,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
 
 
 #### Ouput checks ####
+
+original_test <- IWAM_func()
+original_test <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv")
 
 # # # Check that the function runs: 
 store_NoAgg <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository

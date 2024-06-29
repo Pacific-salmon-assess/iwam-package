@@ -273,7 +273,6 @@ Type objective_function<Type>:: operator() ()
   // It's only if you are exponentiating it back that it would be bad
   vector <Type> lnSREP = log(SREP*scale);
   
-  
   ADREPORT(SMSY); // Removed _std
   ADREPORT(SREP); // Removed _std
   ADREPORT(logRS_pred);
@@ -281,6 +280,7 @@ Type objective_function<Type>:: operator() ()
   ADREPORT(pred_lnSREP);
   ADREPORT(lnSMSY);
   ADREPORT(lnSREP); 
+  
   ADREPORT(pred_lnSMSY_stream_CI); // synoptic "predicted" lnSMSY along a line
   ADREPORT(pred_lnSMSY_ocean_CI);
   ADREPORT(pred_lnSREP_stream_CI);
@@ -290,6 +290,7 @@ Type objective_function<Type>:: operator() ()
   ADREPORT(target_lnSREP_ocean);
   ADREPORT(target_lnSMSY_stream);
   ADREPORT(target_lnSREP_stream);
+  
   REPORT(nLL); // Removed _std
   return ans;
 }

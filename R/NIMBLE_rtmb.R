@@ -9,6 +9,10 @@ library(tidybayes)
 library(tmbstan) # loads rstan and StanHeaders
 # library(rstan)
 
+# Wrapper Function ####
+
+
+
 # Data ####
 
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
@@ -219,8 +223,10 @@ f_nim2 <- function(par2){
   nll <- 0
   
   # Prior - Now a penalty term?
-  # nll <- nll - sum(dnorm(logAlpha0, 0.6, 0.45, log = TRUE))
-  
+  # if (penalized = TRUE){
+  #   nll <- nll - sum(dnorm(logAlpha0, 0.6, 0.45, log = TRUE))
+  # }
+
   # Alternative version of alpha terms - see f_nim's translation
   
   # Slope and intercept priors
@@ -231,8 +237,12 @@ f_nim2 <- function(par2){
   
   ## Watershed Model
   for ( i in 1:N_Stk){
-    # New version
-    # nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD, log = TRUE)) # random effect - is this the bayesian way?
+    # if (penalized = TRUE){
+      # Run logAlpha0 as a penalty term/prior
+      # New version
+      # nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD, log = TRUE)) # random effect - is this the bayesian way?
+    # }
+    
     # Alternative version of alpha terms - see f_nim's translation
     nll <- nll - sum(dnorm(logAlpha_re[i], 0, sd = logAlphaSD, log = TRUE)) # random effect
     logAlpha[i] <- logAlpha0 + logAlpha_re[i]
@@ -276,6 +286,7 @@ sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard erro
   # ADREPORT vs. REPORT
   # CI's included - which do I want them for?
   # Make a list of everything NIMBLE ouputs and replicate them
+all_pars <- summary(RTMB::sdreport(obj2))
 
 # NIMBLE_2 OUTPUTS
   # Calculate reference points - POSTERIOR PREDICTIVE

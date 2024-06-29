@@ -166,7 +166,7 @@ mcmc <- buildMCMC(conf)
 cmodel <- compileNimble(model)
 
 cmcmc <- compileNimble(mcmc, project = model)
-mcmc.out <- runMCMC(cmcmc, niter=50000, nburnin=5000, nchains=3, samplesAsCodaMCMC = TRUE)
+mcmc.out <- runMCMC(cmcmc, niter=50000, nburnin=5000, nchains=3, samplesAsCodaMCMC=TRUE)
 
 MCMCtrace(object = mcmc.out, params = "beta")
 # Can I see the logAlpha traces
