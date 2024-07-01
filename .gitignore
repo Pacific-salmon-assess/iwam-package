@@ -19,3 +19,9 @@ DataIn/lux_torkitchingxllidandwatershed.xls
 MCMCtrace.pdf
 MCMCtrace.pdf
 R/tmbstan_vignetteexample.R
+DataOut/ACF_rtmb_IWAM_Liermann.png
+DataOut/SR_rtmb_IWAM_Liermann.png
+DataOut/SRLin_rtmb_IWAM_Liermann.png
+DataOut/StdResid_rtmb_IWAM_Liermann.png
+DataOut/WAregSMSY_rtmb_IWAM_Liermann_wBC.png
+DataOut/WAregSREP_rtmb_IWAM_Liermann_wBC.png

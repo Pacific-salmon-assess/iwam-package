@@ -49,9 +49,9 @@ library(latex2exp) # For adding latex into plot labels
 ```
 
 ```{r custom library, echo=FALSE, warning=FALSE, message=FALSE}
-source(here::here("R/helperFunctions.R"))
-source(here::here("R/PlotFunctions.R"))
-source(here::here("R/IWAM_model.R"))
+# source(here::here("R/helperFunctions.R"))
+# source(here::here("R/PlotFunctions.R"))
+# source(here::here("R/IWAM_model.R"))
 ```
 
 ```{r custom Lambertw, echo=FALSE, warning=FALSE, message=FALSE}

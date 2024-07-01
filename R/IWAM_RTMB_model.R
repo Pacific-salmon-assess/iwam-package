@@ -33,7 +33,7 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
-                      plot = FALSE, # whether or not to create plots stored in DataOut/
+                      plot = FALSE # whether or not to create plots stored in DataOut/
 )
 {
   
@@ -478,10 +478,9 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   SRes <- SRes %>% mutate (StdRes = Res/exp(logSig))
   
   ## PLOTTING ####
-  
   mod <- "IWAM_Liermann" 
   
-  #### * Plot SR Curves ----------------------------------------------------------
+  #### * Plot SR Curves --------------------------------------------------------
   if (plot==TRUE){
     png(paste("DataOut/SR_rtmb_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
     PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
@@ -497,7 +496,7 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     dev.off()
   }
   
-  #### * Plot WA Regression ------------------------------------------------------
+  #### * Plot WA Regression ----------------------------------------------------
   if(plot==TRUE){
     png(paste("DataOut/WAregSMSY_rtmb_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
@@ -823,7 +822,7 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 } # End IWAM_rtmb function
 
 # Test run IWAM_rtmb func
-test <- IWAM_rtmb() # default run
+test <- IWAM_rtmb(plot = TRUE) # default run
   # confirmed same objective value - code matches - we are good
 
 
