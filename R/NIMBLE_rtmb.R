@@ -9,10 +9,6 @@ library(tidybayes)
 library(tmbstan) # loads rstan and StanHeaders
 # library(rstan)
 
-# Wrapper Function ####
-
-
-
 # Data ####
 
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))

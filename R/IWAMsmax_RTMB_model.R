@@ -1,4 +1,4 @@
-# IWAM 2 ####
+# IWAMsmax RTMB Model ####
 
 # This is the rtmb version of the IWAM model.
 # The primary reason of this re-compilation is to check if the rtmb model can be processed
@@ -28,7 +28,7 @@ compiler::enableJIT(0)
 # WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
 # WAin <- c("DataIn/WCVIStocks.csv")
 
-IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
+IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                       remove.EnhStocks = FALSE,
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bs_seed = 1, # seed for bootstrapping
@@ -228,7 +228,7 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   
   ## RTMB function ####
 
-  f_tmb <- function(par){
+  f_smax <- function(par){
     getAll(dat, par)
   
     N_stk = max(srdat$Stocknumber + 1)
@@ -355,13 +355,13 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     ADREPORT(target_lnSREP_stream)
   
     ## Return
-    return(nll)
+    return(nll) # Does this actually need a return function call?
   }
   
   ## MakeADFun ####
     # NOTE: If you run f_tmb - before you run obj - there will be math errors
     # TK: I have no idea why
-  obj <- RTMB::MakeADFun(f_tmb, par, random = c("logA"), silent = TRUE) # create the rtmb object
+  obj <- RTMB::MakeADFun(f_smax, par, random = c("logA"), silent = TRUE) # create the rtmb object
   
   opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 5)) # optimization
   
@@ -822,7 +822,7 @@ IWAM_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 } # End IWAM_rtmb function
 
 # Test run IWAM_rtmb func
-test <- IWAM_rtmb(plot = TRUE) # default run
+test <- IWAMsmax_rtmb(plot = TRUE) # default run
   # confirmed same objective value - code matches - we are good
 
 
