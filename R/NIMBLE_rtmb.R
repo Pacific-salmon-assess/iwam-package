@@ -81,7 +81,6 @@ dat$tarX <- model.matrix( ~ lh*logtarWAshifted, data = dat$WAin) # I think these
 
 # RTMB function ####
 # This is a fully MLE model parameterized for SREP (E)
-
 f_nim <- function(par){
   getAll(dat, par)
 
