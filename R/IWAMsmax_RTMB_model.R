@@ -798,7 +798,8 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     
     # Add a function for IWAM_func to rename outputs?
     write.csv(dfout, here::here("DataOut/rtmb_getLRP-BootstrappedRPs.csv"))
-  }
+    print("Bootstrapping complete.")
+  } else {print("No bootstrapping.")}
   
   # This is where the old table function used to be. RIP.
   

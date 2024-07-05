@@ -7,6 +7,13 @@
   # using explicit betas (intercepts and slopes)
 # The following wrapper function will initially focus only on the explicit model.
 
+# MODEL DESCRIPTION ####
+
+# This is the model from Liermann et al. (CITATION YEAR).
+# ....
+
+
+
 # Libaries ####
 library(RTMB)
 library(ggplot2)
@@ -250,8 +257,11 @@ dat <- list(srdat = srdat,
 N_Stk <- max(srdat$Stocknumber + 1)
 
 # Parameters
-par <- list(b0 = c(10, 10), # b0 = c(9, 9)
-             bWA = c(0, 0), # bWA = c(0.83, 1)
+  # TK: Add in comments to say what the pars are - similar to ModelBook comparisons so it is easier to read first time
+par <- list(b0 = c(10, 10), # WA regression intercept initial value
+              # b0 = c(9, 9)
+             bWA = c(0, 0), 
+              # bWA = c(0.83, 1)
              # logAlpha = numeric(N_Stk), # comment on or off depending if using "nll" or not
              logAlpha_re = numeric(nrow(dat$WAbase)),
              logAlpha_re_pred = numeric(nrow(dat$WAin)),
@@ -261,6 +271,9 @@ par <- list(b0 = c(10, 10), # b0 = c(9, 9)
              logESD = 1,
              logAlphaSD = 10
 )
+
+# TK/CH: Add a version with a log-normal back-transformation adjustment. Unless there is a citable reference
+  # to explain why.
 
 f_srep <- function(par){
   getAll(dat, par)
@@ -311,7 +324,7 @@ f_srep <- function(par){
     
     nll <- nll - sum(dgamma(tauobs[i], shape = 0.001, scale = 0.001))
   }
-
+  
   ## Ricker Model
   for (i in 1:N_Obs){
     logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
@@ -329,6 +342,7 @@ f_srep <- function(par){
       # And would it need to be added to the nll
     nll <- nll - sum(dnorm(logAlpha_re_pred[i], 0, sd = logAlphaSD, log = TRUE)) # new random effect?
     logAlpha_tar[i] <- logAlpha0 + logAlpha_re_pred[i]
+    # Carrie: Use the MLE of the hyper-logalpha
     
     # Predict E for target watershed areas
     log_E_tar <- b0[type[i]] + bWA[type[i]]*WAin$logtarWAshifted[i] + logE0[i] ## Stock level regression
