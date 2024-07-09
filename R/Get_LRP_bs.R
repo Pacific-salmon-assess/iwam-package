@@ -9,7 +9,7 @@
 library(tidyverse)
 library(ggplot2)
 library(gsl)
-#library(TMB)
+#library(TMB) # Required if using: run_logReg
 library(viridis)
 
 # Functions
