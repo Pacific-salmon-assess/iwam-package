@@ -68,8 +68,8 @@ source(here::here("R/Get_LRP_bs.R")) # Now no longer includes TMB
 # Originally part of the main wrapper function stated outright
 # remove.EnhStocks <- FALSE # TRUE
 
-WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
-WAin <- c("DataIn/WCVIStocks.csv")
+# WAbase <- read.csv("DataIn/WatershedArea.csv") # PRIVATE
+# WAin <- c("DataIn/WCVIStocks.csv")
 
 # WAin <- c("DataIn/Backcalc_targetstocks_NoAgg.csv") # RUNS
   # Nothing - just Stock, WA, and lh
@@ -1074,16 +1074,16 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
 
 #### Ouput checks ####
 
-original_test <- IWAM_func()
-original_test <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv")
-
-# # # Check that the function runs: 
-store_NoAgg <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
-                   run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
-                   bs_seed = 1, # seed for bootstrapping
-                   bs_nBS = 10, # trials for bootstrapping
-                   # mod = "IWAM_Liermann", # TMB model name for .cpp
-                   remove.EnhStocks = FALSE,
-                   plot = FALSE, # whether or not to create plots stored in DataOut/
-                   est.table = FALSE
-                   )
+# original_test <- IWAM_func()
+# original_test <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv")
+# 
+# # # # Check that the function runs: 
+# store_NoAgg <- IWAM_func(WAin = "DataIn/WCVIStocks_NoAgg.csv", # insert Watershed areas file location within the base repository
+#                    run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+#                    bs_seed = 1, # seed for bootstrapping
+#                    bs_nBS = 10, # trials for bootstrapping
+#                    # mod = "IWAM_Liermann", # TMB model name for .cpp
+#                    remove.EnhStocks = FALSE,
+#                    plot = FALSE, # whether or not to create plots stored in DataOut/
+#                    est.table = FALSE
+#                    )

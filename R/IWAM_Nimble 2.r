@@ -172,6 +172,12 @@ MCMCtrace(object = mcmc.out, params = "beta")
 # Can I see the logAlpha traces
 MCMCtrace(object = mcmc.out, params = "logAlpha")
 
+# For reference
+  # beta1 - 8.913 vs. 9.00
+  # beta2 - 1.151 (10.064) vs. 10.2
+  # beta3 - 0.6850 vs. 0.674
+  # beta4 - 0.2834 (0.9684) vs. 1.00
+
 ## This is good to check how well your model works:
 posteriorPredictiveFunction <- nimbleFunction(
   setup = function(model, mcmc){
@@ -275,6 +281,7 @@ summarize_all_ref_pts <- function(predInfo){
 
 ## Prediction design matrix:
 WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
+WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv"))
 WAin$logWA <- log(WAin$WA)
 WAin$logWAshifted <- WAin$logWA-mean_logWA
 WAin <- WAin %>%
@@ -289,6 +296,8 @@ samples <- do.call("rbind", mcmc.out)[, getOrder] ## If this fails need to check
 cpredict$saveMCMC(samples)
 cpredict$calcRefPoints(Xpred) ## 45,000 x 5 this is a big operation.
 sum.pred <- summarize_all_ref_pts(WAin)
+
+view(sum.pred[sum.pred$type == "Srep",]) # to get all the predicted Srep's (E's)
 
 ## Make a prediction matrix for a line:
 WAline <- expand.grid(lh = c("stream", "ocean"), logWA = 2:14)

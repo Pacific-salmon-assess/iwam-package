@@ -15,7 +15,7 @@ digit_scaling <- function(input_data){ # THIS input_data IS SPECIFICALLY FOR SRD
   # count.dig() Creates a count [numeric] of the max number of digits 
   # of spawners as digits per stock
   # the function count.dig() can be found in the script: helperFunctions.R
-  input_data <- left_join(input_data, digits)
+  input_data <- left_join(input_data, digits, by = c('Stocknumber'))
   input_data <- input_data %>% mutate(scale = 10^(maxDigits-1))
   # data <- data %>% mutate(scale = 10^4)) # Alternate scale
   # using mutate; creates a per stock scale by taking the number of digits - 1,

@@ -5,13 +5,13 @@
 # using the same code as is in "IWAM_model.R".
 
 # Libaries ####
-
 library(RTMB)
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
-library(tidybayes)
-library(tmbstan)
+library(progress)
+# library(tidybayes)
+# library(tmbstan)
 
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
@@ -26,7 +26,7 @@ compiler::enableJIT(0)
 
 # remove.EnhStocks = FALSE # Just to make the bottom copied code run
 # WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
-# WAin <- c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/WCVIStocks.csv")
 
 IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                       remove.EnhStocks = FALSE,
@@ -36,6 +36,9 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                       plot = FALSE # whether or not to create plots stored in DataOut/
 )
 {
+  
+  # Progress bar
+  pb <- progress_bar$new(total = bs_nBS) # create
   
   ## Imported LambertW0 ####
   
@@ -145,7 +148,8 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     distinct()
   
   # Bring back scaling
-  srdat <- digit_scaling(srdat)
+  srdat <- digit_scaling(srdat) # Creates a JOIN message
+    # Added by = c('Stocknumber') to helperFunctions.R - in the event that things change
   srdat_scale <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
   srdat_scale <- srdat_scale$scale
   scale_TMB <- srdat$scale
@@ -363,7 +367,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     # TK: I have no idea why
   obj <- RTMB::MakeADFun(f_smax, par, random = c("logA"), silent = TRUE) # create the rtmb object
   
-  opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 5)) # optimization
+  opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0)) # optimization
   
   # sdr <- summary(sdreport(obj)) # This is missing something compared to the TMB version
   
@@ -392,7 +396,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   
   stnum <- unique(srdat$Stocknumber) 
   pars$Stocknumber <- rep(stnum) 
-  pars <- left_join(pars, unique(srdat[, c("Stocknumber", "Name")]))
+  pars <- left_join(pars, unique(srdat[, c("Stocknumber", "Name")]), by = c('Stocknumber'))
   
   logDeltaSigma <- all_pars %>% filter (Param %in% c("logDeltaSigma")) 
   DeltaSigmaUCL <- exp(logDeltaSigma$Estimate + logDeltaSigma$Std..Error*1.96)
@@ -472,7 +476,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # These are RE-SCALED values
   SRes <- all_pred %>% mutate ( Res = ObslogRS- Pred) #%>% mutate (StdRes = Res/??)
   sigma <- pars %>% filter(Param=="logSigma") %>% dplyr::select(Stocknumber, Estimate, Name)
-  SRes <- SRes %>% left_join(sigma) %>% rename(logSig = Estimate)
+  SRes <- SRes %>% left_join(sigma, by = c("Stocknumber", "Name")) %>% rename(logSig = Estimate)
   # Slight problem naming with Estimate - can produce clang errors due to overlap
   # with function name.
   SRes <- SRes %>% mutate (StdRes = Res/exp(logSig))
@@ -531,10 +535,10 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   
   #  First need to get the scale for each stock
   scale_pi <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
-  pred_lnSMSY_pi <- pred_lnSMSY_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
-    left_join(scale_pi)
-  pred_lnSREP_pi <- pred_lnSREP_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
-    left_join(scale_pi)
+  pred_lnSMSY_pi <- pred_lnSMSY_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")]), by = c("Stocknumber")) %>% 
+    left_join(scale_pi, by = c("Stocknumber")) # Creates a JOIN message
+  pred_lnSREP_pi <- pred_lnSREP_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")]), by = c("Stocknumber")) %>% 
+    left_join(scale_pi, by = c("Stocknumber")) # Creates a JOIN message
   
   # Then need to separate observed stream vs ocean type
   
@@ -544,23 +548,23 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # obs_lSMSY_ocean = observed log SMSY for ocean type
   # and same for SREP
   
-  pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
-    filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs
-  pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
-    filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-  obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
-    filter( lh== 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-  obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
-    filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
+  pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs # Creates a JOIN message
+  pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean # Creates a JOIN message
+  obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter( lh== 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream # Creates a JOIN message
+  obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean # Creates a JOIN message
   
-  pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
-    filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream
-  pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
-    filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-  obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
-    filter(lh == 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-  obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
-    filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
+  pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream # Creates a JOIN message
+  pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean # Creates a JOIN message
+  obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream # Creates a JOIN message
+  obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist, by = c("Stocknumber")) %>% 
+    filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean# Creates a JOIN message
   
   
   # Get watershed areas for synoptic data set to calculate PIs for stream and ocean
@@ -727,8 +731,8 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # bs_seed <- 1
   # bs_nBS <- 10
   # datain <- c("DataOut/rtmb_dataout_target_ocean_wEnh.csv")
-  
-  if (run.bootstraps == TRUE){
+
+    if (run.bootstraps == TRUE){
     # set.seed(1) #10#12#13 (work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
     set.seed(bs_seed)
     # nBS <- 10 # number trials for bootstrapping (original 20000), for testing use 10
@@ -736,6 +740,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     outBench <- list()
     
     for (k in 1:nBS) {
+      pb$tick() # progress bar
       # datain must match the above Step 6 for writing output target estimates
       out <- Get.LRP.bs(datain = datain, # "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
                         Bern_logistic=FALSE, 
@@ -823,7 +828,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 } # End IWAM_rtmb function
 
 # Test run IWAM_rtmb func
-test <- IWAMsmax_rtmb(plot = TRUE) # default run
+# test <- IWAMsmax_rtmb(bs_nBS = 1000, plot = FALSE) # default run
   # confirmed same objective value - code matches - we are good
 
 

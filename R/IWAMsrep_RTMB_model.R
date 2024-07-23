@@ -12,15 +12,14 @@
 # This is the model from Liermann et al. (CITATION YEAR).
 # ....
 
-
-
 # Libaries ####
 library(RTMB)
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
-library(tidybayes)
-library(tmbstan) 
+library(progress) # progress bar for iterative loops
+# library(tidybayes)
+# library(tmbstan) 
 
 # Imported LambertW0 ####
 # FritschIter <- function(x, w){
@@ -102,12 +101,18 @@ library(tmbstan)
 # LambertW0 <- RTMB:::ADjoint(LambertW0_internal, dLambertW0_internal)
  
 # Wrapper Function ####
-# compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
+compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
+  # seems not to run on the first attempt - answers [3] instead of [0]
 
 # Internal running
-WAin <- c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
 
-IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv") # ,
+
+
+
+IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
+                          nsim = 10 # default nsim for bootstrapping
                       # remove.EnhStocks = FALSE,
                       # run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       # bs_seed = 1, # seed for bootstrapping
@@ -117,7 +122,9 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv") # ,
 {
 
   # Just in case atm
-  compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
+  # compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
+  
+  pb <- progress_bar$new(total = nsim)
 
   FritschIter <- function(x, w){
     MaxEval <- 5
@@ -202,9 +209,7 @@ srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 # WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
 WAin <- read.csv(here::here(WAin))
-
-mean_logtarWA <- mean(log(WAin$WA))
-WAin$logtarWAshifted <- log(WAin$WA) - mean_logtarWA
+# WAin2 = read.csv(here::here(c("DataIn/Ordered_backcalculated_noagg.csv")))
 
 
 # Data setup ####
@@ -237,8 +242,12 @@ mean_logWA <- mean(WAbase$logWA)
 WAbase$logWAshifted <- WAbase$logWA - mean_logWA
 
 ## Shift log WA for the mean - targets
-mean_logtarWA <- mean(log(WAin$WA))
-WAin$logtarWAshifted <- log(WAin$WA) - mean_logtarWA
+# mean_logtarWA <- mean(log(WAin$WA))
+# WAin$logtarWAshifted <- log(WAin$WA) - mean_logtarWA
+
+WAin$logWA <- log(WAin$WA)
+WAin$logWAshifted_t <- WAin$logWA - mean_logWA
+
 
 lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
   group_by(Stocknumber) %>% 
@@ -266,6 +275,7 @@ par <- list(b0 = c(10, 10), # WA regression intercept initial value
              logAlpha_re = numeric(nrow(dat$WAbase)),
              logAlpha_re_pred = numeric(nrow(dat$WAin)),
              logE0 = numeric(N_Stk),
+             logE0_ = numeric(nrow(dat$WAin)),
              tauobs = 0.01 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
              logAlpha0 = 1.5,
              logESD = 1,
@@ -284,6 +294,7 @@ f_srep <- function(par){
   N_Pred = nrow(WAin) # number of predicted watershed areas
   S = srdat$Sp
   type = lifehist$lh + 1
+  type_ = WAin$lh + 1
   
   E <- numeric(N_Stk)
   # log_E <- numeric(N_Stk) 
@@ -328,6 +339,7 @@ f_srep <- function(par){
   ## Ricker Model
   for (i in 1:N_Obs){
     logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
+    # logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) - 1/tauobs[stk[i]]/2 # with bias corr.
     nll <- nll - sum(dnorm(logRS[i], logRS_pred, sd = sqrt(1/tauobs[stk[i]]), log = TRUE))
   }
   
@@ -338,14 +350,12 @@ f_srep <- function(par){
   SGEN = numeric(nrow(WAin))
   
   for (i in 1:N_Pred){
-    # Do I need to create a new alpha parameter to estimate here
-      # And would it need to be added to the nll
-    nll <- nll - sum(dnorm(logAlpha_re_pred[i], 0, sd = logAlphaSD, log = TRUE)) # new random effect?
+    nll <- nll - sum(dnorm(logAlpha_re_pred[i], 0, sd=logAlphaSD, log  = TRUE))
     logAlpha_tar[i] <- logAlpha0 + logAlpha_re_pred[i]
-    # Carrie: Use the MLE of the hyper-logalpha
     
     # Predict E for target watershed areas
-    log_E_tar <- b0[type[i]] + bWA[type[i]]*WAin$logtarWAshifted[i] + logE0[i] ## Stock level regression
+    nll <- nll - sum(dnorm(logE0_[i], 0, sd = logESD, log = TRUE)) # random effect again
+    log_E_tar <- b0[type_[i]] + bWA[type_[i]]*WAin$logWAshifted_t[i] + logE0_[i] ## Stock level regression
     E_tar[i] <- exp(log_E_tar)
     
     # Predict BETA
@@ -365,21 +375,63 @@ f_srep <- function(par){
   ADREPORT(E) # E (Srep) for all synotopic data set rivers (25)
   ADREPORT(logAlpha) # model logAlpha (25)
   
+  # ** THESE CONFIDENCE INTERVALS ARE NOT CORRECT **
+  
   # ADREPORT - predicted
   ADREPORT(E_tar) # target E (Srep) (21)
+  # ADREPORT(log_E_tar) # exponentiate these for the correct confidence intervals
   ADREPORT(logAlpha_tar)
-  ADREPORT(BETA)
-  ADREPORT(SMSY)
-  ADREPORT(SGEN)
+  
+  # ADREPORT(BETA)
+  # ADREPORT(SMSY)
+  # ADREPORT(SGEN)
+    # Symetrical - would need to get the confidence interval on the log-scale and then exponentiate
+  
+  REPORT(BETA)
+  REPORT(SMSY)
+  REPORT(SGEN)
+  
   # you need to do everything else internally so as to make sure of ADREPORT and se's
   
   nll # nll must be the final line of the function
 }
 
 ## MakeADFun ####
-obj <- RTMB::MakeADFun(f_srep, par, random = c("logAlpha_re", "logAlpha_re_pred", "logE0"))
-opt <- nlminb(obj$par, obj$fn, obj$gr)
+obj <- RTMB::MakeADFun(f_srep, par, random = c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_"), silent=TRUE)
+opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0))
+  # trace = 0 stops the printing of the traces
   # 463.0525 - reference target
+
+# Simulate ####
+sgen = smsy = beta = NULL
+# obj$simulate() # 1000 times in a for loop and then track it - as a bootstrap
+nsim <- nsim # number of sims
+for (i in 1:nsim){
+  pb$tick()
+  temp <- obj$simulate()
+  sgen <- rbind(sgen, temp$SGEN)
+  beta <- rbind(beta, temp$BETA)
+  smsy <- rbind(smsy, temp$SMSY)
+}
+# quantiles by row - apply
+SGEN_boot <- apply(sgen, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
+SMSY_boot <- apply(smsy, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
+BETA_boot <- apply(beta, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
+
+# bind together bootstrapped values
+  # transpose so that it is 115 rows instead of columns 
+  # and then add in an identifier
+  # and the rbind them together - since the columns will all be the same
+SGEN_boot_ <- t(as.data.frame(SGEN_boot)) # transpose SGEN_boot (once as a df)
+SMSY_boot_ <- t(as.data.frame(SMSY_boot))
+BETA_boot_ <- t(as.data.frame(BETA_boot))
+  # rename columns
+colnames(SGEN_boot_) <- c("Median","LQ","Mean","UQ")
+colnames(SMSY_boot_) <- c("Median","LQ","Mean","UQ")
+colnames(BETA_boot_) <- c("Median","LQ","Mean","UQ")
+  # now rows are just numbered - can just cbind into main df since they should be in same order
+    # and are of length (nrow(t(test))) for e.g.
+# nrow(SGEN_boot_)
 
 sdr <- sdreport(obj)
 sdr_full <- summary(RTMB::sdreport(obj))
@@ -401,26 +453,22 @@ sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
     # * SMSY = (1-LambertW0(exp(1-logalpha)))/beta # EXPLICIT
     # * SGEN = -1/beta*LambertW0(-beta*Smsy[i,j]/(exp(logalpha))) # EXPLICIT
 
-# Step 1: Create a dataframe for the target populations by joining WAin 
-  # with $E_tar
 WArefpoints <- cbind(WAin, 
                      E = sdr_est$E_tar,
                      E_se = sdr_se$E_tar,
                      logalpha = sdr_est$logAlpha_tar,
                      logalpha_se = sdr_se$logAlpha_tar,
-                     BETA = sdr_est$BETA,
-                     BETA_se = sdr_se$BETA,
-                     SMSY = sdr_est$SMSY,
-                     SMSY_se = sdr_se$SMSY,
-                     SGEN = sdr_est$SGEN,
-                     SGEN_se = sdr_se$SGEN)
-
-# Step 2: Calculate the new columns of BETA, SMAX, SMSY, and SGEN to populate
-  # df with
-  # * Are we using a mean/median global alpha?
-  # ** Or should that be a new parameter to be assessed in the model itself?
-
-# Step 3: Print out
+                     SGEN = SGEN_boot_,
+                     SMSY = SMSY_boot_,
+                     BETA = BETA_boot_
+                      # When BETA, SMSY, and SGEN were part of ADREPORT
+                     # BETA = sdr_est$BETA,
+                     # BETA_se = sdr_se$BETA,
+                     # SMSY = sdr_est$SMSY,
+                     # SMSY_se = sdr_se$SMSY,
+                     # SGEN = sdr_est$SGEN,
+                     # SGEN_se = sdr_se$SGEN
+)
 
 return(list(opt = opt,
             obj = obj,
@@ -433,4 +481,5 @@ return(list(opt = opt,
 
 } # End of IWAMsrep_rtmb
 
-test <- IWAMsrep_rtmb() # default test run for outputs
+# test <- IWAMsrep_rtmb(nsim = 1000) # default test run for outputs
+

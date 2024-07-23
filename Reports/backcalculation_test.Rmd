@@ -581,17 +581,17 @@ This code is a direct lift from the IWAM function vignette. Once the model and b
 The following tables (1-3) have been prepared for comparison to Holt et al. (2023) Res Doc (Table 9). The table will also be stored in your repository folder under the name of "Backcalculation_stockestimates_table.csv".
 
 ```{r prep iwam table, echo=FALSE, message=FALSE}
-SREP <- IWAM_backcalc[[2]] %>%
+SREP <- IWAM_backcalc[[3]] %>%
   filter(RP=='SREP') %>%
   rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
   mutate(RP = NULL) %>%
   relocate(Stock)
-SMSY <- IWAM_backcalc[[2]] %>%
+SMSY <- IWAM_backcalc[[3]] %>%
   filter(RP=='SMSY') %>%
   rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
   mutate(RP = NULL) %>%
   relocate(Stock)
-SGEN <- IWAM_backcalc[[2]] %>%
+SGEN <- IWAM_backcalc[[3]] %>%
   filter(RP=='SGEN') %>%
   rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
   mutate(RP = NULL) %>%
@@ -625,7 +625,7 @@ complete <- data.frame(SGEN, SREP, SMSY) %>%
          "SMSY LQ" = Lower.Quantile.2, "SMSY UQ" = Upper.Quantile.2)
 
 complete <- complete %>% left_join(WAin, by=join_by(Stock)) %>% 
-  select(-lh, -CU_INDEX, -PA_SMSY, -PA_SE_SMSY, -PA_SREP, -PA_SE_SREP, -Comments, -logWA)  %>% # remove life histories ID's
+  select(-lh, -CU_INDEX, -PA_SMSY, -PA_SE_SMSY, -PA_SREP, -PA_SE_SREP, -Comments)  %>% # remove life histories ID's
   relocate(WA, .after=Stock) #  %>% 
   # rel
   # rename("LH" = type)
@@ -664,7 +664,7 @@ kable(nimble_estimates, caption = "NIMBLE: SGEN, SREP, and SMSY Estimates for Al
   # Call it: Backcalculation_stockestimates_table.csv
 
 # Tor: combine nimble and iwam outputs??
-write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
+# write.csv(complete, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
 ```
 
 ## S4. Comparative Plotting
