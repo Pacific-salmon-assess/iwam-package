@@ -106,8 +106,8 @@ compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 
 # Internal running
 # WAin <- c("DataIn/WCVIStocks.csv")
-# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
-
+WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+nsim <- 10
 
 
 
@@ -299,6 +299,7 @@ f_srep <- function(par){
   E <- numeric(N_Stk)
   # log_E <- numeric(N_Stk) 
   E_tar <- numeric(N_Pred)
+  log_E_tar <- numeric(N_Pred)
   
   logAlpha <- numeric(N_Stk) # comment on or off
   logAlpha_tar <- numeric(N_Pred)
@@ -355,8 +356,8 @@ f_srep <- function(par){
     
     # Predict E for target watershed areas
     nll <- nll - sum(dnorm(logE0_[i], 0, sd = logESD, log = TRUE)) # random effect again
-    log_E_tar <- b0[type_[i]] + bWA[type_[i]]*WAin$logWAshifted_t[i] + logE0_[i] ## Stock level regression
-    E_tar[i] <- exp(log_E_tar)
+    log_E_tar[i] <- b0[type_[i]] + bWA[type_[i]]*WAin$logWAshifted_t[i] + logE0_[i] ## Stock level regression
+    E_tar[i] <- exp(log_E_tar[i])
     
     # Predict BETA
     BETA[i] <- logAlpha_tar[i]/E_tar[i]
@@ -379,19 +380,16 @@ f_srep <- function(par){
   
   # ADREPORT - predicted
   ADREPORT(E_tar) # target E (Srep) (21)
-  # ADREPORT(log_E_tar) # exponentiate these for the correct confidence intervals
+  ADREPORT(log_E_tar) # exponentiate these for the correct confidence intervals
   ADREPORT(logAlpha_tar)
   
   # ADREPORT(BETA)
   # ADREPORT(SMSY)
   # ADREPORT(SGEN)
     # Symetrical - would need to get the confidence interval on the log-scale and then exponentiate
-  
   REPORT(BETA)
   REPORT(SMSY)
   REPORT(SGEN)
-  
-  # you need to do everything else internally so as to make sure of ADREPORT and se's
   
   nll # nll must be the final line of the function
 }
@@ -406,6 +404,7 @@ opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0))
 sgen = smsy = beta = NULL
 # obj$simulate() # 1000 times in a for loop and then track it - as a bootstrap
 nsim <- nsim # number of sims
+
 for (i in 1:nsim){
   pb$tick()
   temp <- obj$simulate()
@@ -439,6 +438,16 @@ sdr_full <- summary(RTMB::sdreport(obj))
 sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
 sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
 
+# Create the correct quantiles for E
+  # log_E_tar for sdr_est and sdr_se
+  # Must first calculate their quantile in log-space AND THEN exponentiate
+E_quant <- cbind(WAin,
+  E_tar = exp(sdr_est$log_E_tar),
+  E_LQ = exp(sdr_est$log_E_tar - (sdr_se$log_E_tar*1.96)), # E LQ
+  E_UQ = exp(sdr_est$log_E_tar + (sdr_se$log_E_tar*1.96)) # E UQ
+)
+
+
 ## Outputs and Plotting Preparations (interior)
   # IWAMsmax produces the following:
   # - SR curve
@@ -453,9 +462,9 @@ sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
     # * SMSY = (1-LambertW0(exp(1-logalpha)))/beta # EXPLICIT
     # * SGEN = -1/beta*LambertW0(-beta*Smsy[i,j]/(exp(logalpha))) # EXPLICIT
 
-WArefpoints <- cbind(WAin, 
-                     E = sdr_est$E_tar,
-                     E_se = sdr_se$E_tar,
+WArefpoints <- cbind(E_quant, # Now contains WAin's information
+                     # E = sdr_est$E_tar,
+                     # E_se = sdr_se$E_tar,
                      logalpha = sdr_est$logAlpha_tar,
                      logalpha_se = sdr_se$logAlpha_tar,
                      SGEN = SGEN_boot_,
