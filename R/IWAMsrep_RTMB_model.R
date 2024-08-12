@@ -237,22 +237,16 @@ WAbase <- WAbase %>%
   arrange(Stocknumber) %>%
   mutate(logWA = log(WA)) 
 
-## Shift log WA for the mean - base
+## Shift log WA for the mean - base - makes estimation easier
 mean_logWA <- mean(WAbase$logWA)
 WAbase$logWAshifted <- WAbase$logWA - mean_logWA
-
-## Shift log WA for the mean - targets
-# mean_logtarWA <- mean(log(WAin$WA))
-# WAin$logtarWAshifted <- log(WAin$WA) - mean_logtarWA
 
 WAin$logWA <- log(WAin$WA)
 WAin$logWAshifted_t <- WAin$logWA - mean_logWA
 
-
 lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
   group_by(Stocknumber) %>% 
   summarize(lh=max(Stream))
-
 
 ## RTMB dat and par setup ####
 
@@ -267,13 +261,13 @@ N_Stk <- max(srdat$Stocknumber + 1)
 
 # Parameters
   # TK: Add in comments to say what the pars are - similar to ModelBook comparisons so it is easier to read first time
-par <- list(b0 = c(10, 10), # WA regression intercept initial value
+par <- list(b0 = c(10, 10), # Initial values for WA regression intercepts
               # b0 = c(9, 9)
-             bWA = c(0, 0), 
+             bWA = c(0, 0), # Inital values for WA regression slopes
               # bWA = c(0.83, 1)
              # logAlpha = numeric(N_Stk), # comment on or off depending if using "nll" or not
-             logAlpha_re = numeric(nrow(dat$WAbase)),
-             logAlpha_re_pred = numeric(nrow(dat$WAin)),
+             logAlpha_re = numeric(nrow(dat$WAbase)), 
+             logAlpha_re_pred = numeric(nrow(dat$WAin)), 
              logE0 = numeric(N_Stk),
              logE0_ = numeric(nrow(dat$WAin)),
              tauobs = 0.01 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
@@ -293,7 +287,8 @@ f_srep <- function(par){
   N_Obs = nrow(srdat)
   N_Pred = nrow(WAin) # number of predicted watershed areas
   S = srdat$Sp
-  type = lifehist$lh + 1
+  # type = lifehist$lh + 1
+  type = lifehist + 1
   type_ = WAin$lh + 1
   
   E <- numeric(N_Stk)
@@ -311,41 +306,36 @@ f_srep <- function(par){
   # if (penalized = TRUE){
   #   nll <- nll - sum(dnorm(logAlpha0, 0.6, 0.45, log = TRUE))
   # }
-  
-  # Alternative version of alpha terms - see f_nim's translation
-  # Slope and intercept priors
-  # nll <- nll - sum(dnorm(b0[1], 0, sd = 31.6, log = TRUE))
-  # nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE))
-  # nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE))
-  # nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE))
+    # Alternative version of alpha terms - see f_nim's translation
   
   ## Watershed Model
   for ( i in 1:N_Stk){
-    # if (penalized = TRUE){
-    # Run logAlpha0 as a penalty term/prior
-    # New version
-    # nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD, log = TRUE)) # random effect - is this the bayesian way?
-    # }
+    # nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Test
+    # nll <- nll - sum(dunif(logAlphaSD, 0, 100, log = TRUE)) # Test
+    # nll <- nll - sum(dunif(logESD, 0, 100, log = TRUE)) # Test
+    # nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD)) # Test
+    # nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD)) # Test
     
-    nll <- nll - sum(dnorm(logAlpha_re[i], 0, sd = logAlphaSD, log = TRUE)) # random effect
-    logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    nll <- nll - sum(dnorm(logAlpha_re[i], 0, sd = logAlphaSD, log = TRUE)) # Random effect on logAlpha
+    logAlpha[i] <- logAlpha0 + logAlpha_re[i] # Moving the scale
     
-    nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE)) # random effect
-    log_E <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i] ## Stock level regression
+    nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE)) # Random effect
+    log_E <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i] # Stock level regression
     E[i] <- exp(log_E)
     
-    nll <- nll - sum(dgamma(tauobs[i], shape = 0.001, scale = 0.001))
+    nll <- nll - sum(dgamma(tauobs[i], shape = 0.001, scale = 0.001)) 
+      # Should be removed as a prior - given an initial value instead?
   }
   
   ## Ricker Model
   for (i in 1:N_Obs){
     logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
-    # logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) - 1/tauobs[stk[i]]/2 # with bias corr.
+    # logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) - 1/tauobs[stk[i]]/2 # with bias correction term
+      # How does this work if tauobs is removed as a prior?
     nll <- nll - sum(dnorm(logRS[i], logRS_pred, sd = sqrt(1/tauobs[stk[i]]), log = TRUE))
   }
   
   # PREDICTIONS
-    # Predict target watershed areas
   BETA = numeric(nrow(WAin))
   SMSY = numeric(nrow(WAin))
   SGEN = numeric(nrow(WAin))
@@ -367,7 +357,7 @@ f_srep <- function(par){
     SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logAlpha_tar[i])))
   }
   
-  # Predict along a preset line for plotting
+  # Predict along a preset line for plotting (see NIMBLE)
   
   # ADREPORT - internals
   # ADREPORT(logRS) # logRS for all 501 data points
@@ -376,9 +366,8 @@ f_srep <- function(par){
   ADREPORT(E) # E (Srep) for all synotopic data set rivers (25)
   ADREPORT(logAlpha) # model logAlpha (25)
   
-  # ** THESE CONFIDENCE INTERVALS ARE NOT CORRECT **
-  
   # ADREPORT - predicted
+    # Mean estimate of the median (without bias correction)
   ADREPORT(E_tar) # target E (Srep) (21)
   ADREPORT(log_E_tar) # exponentiate these for the correct confidence intervals
   ADREPORT(logAlpha_tar)
@@ -386,7 +375,7 @@ f_srep <- function(par){
   # ADREPORT(BETA)
   # ADREPORT(SMSY)
   # ADREPORT(SGEN)
-    # Symetrical - would need to get the confidence interval on the log-scale and then exponentiate
+    # Symetrical - would need to get the confidence interval on the log-scale and then exp()
   REPORT(BETA)
   REPORT(SMSY)
   REPORT(SGEN)
@@ -396,9 +385,8 @@ f_srep <- function(par){
 
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_srep, par, random = c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_"), silent=TRUE)
-opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0))
-  # trace = 0 stops the printing of the traces
-  # 463.0525 - reference target
+opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0)) 
+  # trace = 0 controls printing
 
 # Simulate ####
 sgen = smsy = beta = NULL
@@ -408,6 +396,7 @@ nsim <- nsim # number of sims
 for (i in 1:nsim){
   pb$tick()
   temp <- obj$simulate()
+  # Simulate one or more responses from the distribution corresponding to a fitted model object.
   sgen <- rbind(sgen, temp$SGEN)
   beta <- rbind(beta, temp$BETA)
   smsy <- rbind(smsy, temp$SMSY)
@@ -442,11 +431,10 @@ sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
   # log_E_tar for sdr_est and sdr_se
   # Must first calculate their quantile in log-space AND THEN exponentiate
 E_quant <- cbind(WAin,
-  E_tar = exp(sdr_est$log_E_tar),
+  E_tar = exp(sdr_est$log_E_tar), # Mean
   E_LQ = exp(sdr_est$log_E_tar - (sdr_se$log_E_tar*1.96)), # E LQ
   E_UQ = exp(sdr_est$log_E_tar + (sdr_se$log_E_tar*1.96)) # E UQ
 )
-
 
 ## Outputs and Plotting Preparations (interior)
   # IWAMsmax produces the following:
@@ -470,13 +458,6 @@ WArefpoints <- cbind(E_quant, # Now contains WAin's information
                      SGEN = SGEN_boot_,
                      SMSY = SMSY_boot_,
                      BETA = BETA_boot_
-                      # When BETA, SMSY, and SGEN were part of ADREPORT
-                     # BETA = sdr_est$BETA,
-                     # BETA_se = sdr_se$BETA,
-                     # SMSY = sdr_est$SMSY,
-                     # SMSY_se = sdr_se$SMSY,
-                     # SGEN = sdr_est$SGEN,
-                     # SGEN_se = sdr_se$SGEN
 )
 
 return(list(opt = opt,
@@ -488,7 +469,9 @@ return(list(opt = opt,
             refpoints = WArefpoints
 ))
 
-} # End of IWAMsrep_rtmb
+}
+
+# Testing ####
 
 # test <- IWAMsrep_rtmb(nsim = 1000) # default test run for outputs
 

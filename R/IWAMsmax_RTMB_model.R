@@ -33,94 +33,125 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
-                      plot = FALSE # whether or not to create plots stored in DataOut/
+                      plot = FALSE, # whether or not to create plots stored in DataOut/
+                      lamberts = "paul" # Paul's port from the nimble version of the Lambert's W function
+                        # "original" for the original IWAM double LambertW function
 )
 {
   
   # Progress bar
   pb <- progress_bar$new(total = bs_nBS) # create
   
-  ## Imported LambertW0 ####
-  
-  FritschIter <- function(x, w){
-    MaxEval <- 5
-    CONVERGED <- FALSE
-    k <- 2.0 / 3.0;
-    i <- 0;
-    eps <- 2.2204460492503131e-16    
-    while (!CONVERGED & i < MaxEval){
-      z <- log(x / w) - w
-      w1 <- w + 1.0
-      q <- 2.0 * w1 * (w1 + k * z)
-      qmz <- q - z
-      e <- z / w1 * qmz / (qmz - z)
-      CONVERGED <- abs(e) <= eps
-      w <- w*(1.0 + e)
-      i <- i + 1
-    }
-    return(w)
-  }
-  
-  LambertW0_internal <- function(x){
-    check <- 0.367879441171442334024277442949824035167694091796875 # exp(-1)
-    eps <- 2.2204460492503131e-16
-    if (x == Inf) {
-      return(Inf);
-    } else if (x < -check) {
-      return(NaN);
-    } else if (abs(x - check) <= eps) {
-      return(-1.0);
-    } else if (abs(x) <= 1e-16) {
-      ## This close to 0 the W_0 branch is best estimated by its Taylor/Pade
-      ## expansion whose first term is the value x and remaining terms are below
-      ## machine double precision. See
-      ## https://math.stackexchange.com/questions/1700919
-      
-      return(x);
-    } else {
-      w <- 0
-      if (abs(x) <= 6.4e-3) {
-        ## When this close to 0 the Fritsch iteration may underflow. Instead,
-        ## function will use degree-6 minimax polynomial approximation of Halley
-        ## iteration-based values. Should be more accurate by three orders of
-        ## magnitude than Fritsch's equation (5) in this range.
-        return((((((-1.0805085529250425e1 * x + 5.2100070265741278) * x -
-                     2.6666665063383532) * x + 1.4999999657268301) * x -
-                   1.0000000000016802) * x + 1.0000000000001752) * x +
-                 2.6020852139652106e-18);
-        
-      } else if (x <= exp(1)) {
-        ## Use expansion in Corliss 4.22 to create (2, 2) Pade approximant.
-        ## Equation with a few extra terms is:
-        ## -1 + p - 1/3p^2 + 11/72p^3 - 43/540p^4 + 689453/8398080p^4 - O(p^5)
-        ## This is just used to estimate a good starting point for the Fritsch
-        ## iteration process itself.
-        
-        p <- sqrt(2.0 * (exp(1) * x + 1.0))
-        Numer <- (0.2787037037037037 * p + 0.311111111111111) * p - 1.0;
-        Denom <- (0.0768518518518518 * p + 0.688888888888889) * p + 1.0;
-        w <- Numer / Denom;
-      } else {
-        ## Use first five terms of Corliss et al. 4.19 */
-        w <- log(x)
-        L_2 <- log(w)
-        L_3 <- L_2 / w
-        L_3_sq <- L_3 * L_3
-        w <- w - L_2 + L_3 + 0.5 * L_3_sq - L_3 / w + L_3 / (w * w) - 1.5 * L_3_sq /
-          w + L_3_sq * L_3 / 3.0;
+  ## Lambert's versions ####
+  if (lamberts == "paul"){
+    ## Imported LambertW0 ####
+    FritschIter <- function(x, w){
+      MaxEval <- 5
+      CONVERGED <- FALSE
+      k <- 2.0 / 3.0;
+      i <- 0;
+      eps <- 2.2204460492503131e-16    
+      while (!CONVERGED & i < MaxEval){
+        z <- log(x / w) - w
+        w1 <- w + 1.0
+        q <- 2.0 * w1 * (w1 + k * z)
+        qmz <- q - z
+        e <- z / w1 * qmz / (qmz - z)
+        CONVERGED <- abs(e) <= eps
+        w <- w*(1.0 + e)
+        i <- i + 1
       }
-      return(FritschIter(x, w));
+      return(w)
     }
+    
+    LambertW0_internal <- function(x){
+      check <- 0.367879441171442334024277442949824035167694091796875 # exp(-1)
+      eps <- 2.2204460492503131e-16
+      if (x == Inf) {
+        return(Inf);
+      } else if (x < -check) {
+        return(NaN);
+      } else if (abs(x - check) <= eps) {
+        return(-1.0);
+      } else if (abs(x) <= 1e-16) {
+        ## This close to 0 the W_0 branch is best estimated by its Taylor/Pade
+        ## expansion whose first term is the value x and remaining terms are below
+        ## machine double precision. See
+        ## https://math.stackexchange.com/questions/1700919
+        
+        return(x);
+      } else {
+        w <- 0
+        if (abs(x) <= 6.4e-3) {
+          ## When this close to 0 the Fritsch iteration may underflow. Instead,
+          ## function will use degree-6 minimax polynomial approximation of Halley
+          ## iteration-based values. Should be more accurate by three orders of
+          ## magnitude than Fritsch's equation (5) in this range.
+          return((((((-1.0805085529250425e1 * x + 5.2100070265741278) * x -
+                       2.6666665063383532) * x + 1.4999999657268301) * x -
+                     1.0000000000016802) * x + 1.0000000000001752) * x +
+                   2.6020852139652106e-18);
+          
+        } else if (x <= exp(1)) {
+          ## Use expansion in Corliss 4.22 to create (2, 2) Pade approximant.
+          ## Equation with a few extra terms is:
+          ## -1 + p - 1/3p^2 + 11/72p^3 - 43/540p^4 + 689453/8398080p^4 - O(p^5)
+          ## This is just used to estimate a good starting point for the Fritsch
+          ## iteration process itself.
+          
+          p <- sqrt(2.0 * (exp(1) * x + 1.0))
+          Numer <- (0.2787037037037037 * p + 0.311111111111111) * p - 1.0;
+          Denom <- (0.0768518518518518 * p + 0.688888888888889) * p + 1.0;
+          w <- Numer / Denom;
+        } else {
+          ## Use first five terms of Corliss et al. 4.19 */
+          w <- log(x)
+          L_2 <- log(w)
+          L_3 <- L_2 / w
+          L_3_sq <- L_3 * L_3
+          w <- w - L_2 + L_3 + 0.5 * L_3_sq - L_3 / w + L_3 / (w * w) - 1.5 * L_3_sq /
+            w + L_3_sq * L_3 / 3.0;
+        }
+        return(FritschIter(x, w));
+      }
+    }
+    
+    ## Derivatives of LamW
+    dLambertW0_internal <- function(x, y, dy) {
+      dy / (exp(y) * (1. + y))
+    }
+    
+    LambertW0 <- RTMB:::ADjoint(LambertW0_internal, dLambertW0_internal)
+  } else if (lamberts == "original") {
+    ## Original TMB LambertW ####
+    LambertW_internal <- function(x) {
+      logx <- log(x)
+      y <- ifelse(logx > 0, logx, 0)
+      niter <- 100
+      
+      for (i in 1:niter){
+        if (abs(logx - log(y) - y) < 1e-9) break
+        y <- y - (y - exp(logx - y)) / (1 + y)
+      }
+      
+      if (i == niter) warning("W: failed convergence")
+      
+      return(y)
+    }
+    
+    dLambertW_internal <- function(x, y, dy){
+      # W <- LambertW(x)
+      # DW <- 1 / (exp(W) * (1 + W))
+      # list(value = W, gradient = DW)
+      DW <- 1 / (exp(y) * (1 + y))
+      return(DW * dy)
+    }
+    
+    # RTMB::registerAtomics(list(LambertW = rtmb_atomic))
+    LambertW_org <- RTMB:::ADjoint(LambertW_internal, dLambertW_internal)
+    # TK: What is the difference between reigsterAtomics and ADjoint?
+    # translation supplied from chat
   }
-  
-  ## Derivatives of LamW
-  dLambertW0_internal <- function(x, y, dy) {
-    dy / (exp(y) * (1. + y))
-  }
-  
-  LambertW0 <- RTMB:::ADjoint(LambertW0_internal, dLambertW0_internal)
-  
-  
   
   ## Data ####
   srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
@@ -165,9 +196,9 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     arrange(Stocknumber) %>%
     mutate(logWA = log(WA)) 
   
-  ## Shift log WA for the mean.
-  mean_logWA <- mean(WAbase$logWA)
-  WAbase$logWAshifted <- WAbase$logWA - mean_logWA
+  ## Shift log WA for the mean - easier to estimate
+  # mean_logWA <- mean(WAbase$logWA)
+  # WAbase$logWAshifted <- WAbase$logWA - mean_logWA
   
   ## RTMB dat and par setup ####
   # Create Dat list
@@ -207,31 +238,30 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   B <- srdat %>% group_by(Stocknumber) %>% 
     summarise(m = -lm(log(Rec/Sp) ~ Sp)$coef[2])
   
+      # Matched same order as original TMB
   par <- list(logA = (srdat %>% group_by (Stocknumber) %>% 
                         summarise(yi = lm(log(Rec / Sp) ~ Sp)$coef[1]))$yi, # random effect
               logB = log ( 1/ ( (1/B$m)/dat$scale )), # fixed effect
               logSigma = rep(-2, length(unique(srdat$Name))),
-              logSigmaA = -2,
               
               logMuA_stream = 1.5,
+              logSigmaA = -2,
               logMuA_ocean = 0,
               
               logDelta1 = 3,
               logDelta1_ocean = 0,
               logDelta2 = log(0.72),
               Delta2_ocean = 0,
+              logDeltaSigma = -0.412,
               
               logNu1 = 3,
               logNu1_ocean = 0,
               logNu2 = log(0.72),
               Nu2_ocean = 0,
-              
-              logNuSigma = -0.412,
-              logDeltaSigma = -0.412
+              logNuSigma = -0.412
   )
   
   ## RTMB function ####
-
   f_smax <- function(par){
     getAll(dat, par)
   
@@ -263,6 +293,9 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     ## sigmaA prior
     nll <- nll - sum(dgamma(1/sigmaA^2, shape = Tau_dist, scale = 1/Tau_dist, log=TRUE)) # nll V.
       # Should this be in log space?
+      # For testing priors:
+        # half normal
+        # half cauchy
   
     ## Add hierarchical structure to A:
     for (i in 1:N_stk){
@@ -270,24 +303,39 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
       nll <- nll - sum(dgamma(1/sigma[i]^2, shape = Tau_dist, scale = 1/Tau_dist, log=TRUE)) # nll V.
         # Should this be in log space?
     }
+      # For testing priors:
+        # dnorm with a halfnorm (mean and sig)
+        # halfcauchy - dt? check TMB's documentation
   
     ## Standard Ricker model:
     for (i in 1:N_obs){
       logRS_pred[i] <- logA[stk[i]] - exp(logB[stk[i]]) * S[i] - sigma[stk[i]]^2/2 # BIAS CORRECTION
-  
-      nll <- nll - sum(dnorm(logRS_pred[i], logRS[i], sd=sigma[stk[i]], log=TRUE)) # nll V.
+
+      # nll <- nll - sum(dnorm(logRS_pred[i], logRS[i], sd=sigma[stk[i]], log=TRUE)) # *** Error - dnorm should be x, then mean
+      nll <- nll - sum(dnorm(logRS[i], logRS_pred[i], sd = sigma[stk[i]], log=TRUE)) # TK: I don't think it actually makes a difference in this case
+        # which is weird.
+        # RTMB's dnorm must know the difference between x and mu, which I don't think I love.
     }
   
     ## Calculate SMSY and SREP
-    for(i in 1:N_stk){
-      SMSY[i] =  (1 - LambertW0(exp(1-logA[i]))) / exp(logB[i]) # Using Paul's new function
+      # Create a switch for the old versus new LambertW's
+    if (lamberts == "original"){
+      # add in the original double LambertW function from IWAM_Liermann.cpp
+      for(i in 1:N_stk){
+        SMSY[i] =  (1 - LambertW_org(exp(1-logA[i]))) / exp(logB[i]) # Using Paul's new function
+      }
+    } else if (lamberts == "paul") {
+      for(i in 1:N_stk){
+        SMSY[i] =  (1 - LambertW0(exp(1-logA[i]))) / exp(logB[i]) # Using Paul's new function
+      }
     }
     SREP = logA / exp(logB)
   
     ## Inverse gamma prior on sigma_delta and sigma_nu
     nll <- nll - sum(dgamma(1/sigma_delta^2, shape = Tau_D_dist, scale = 1/Tau_D_dist, log=TRUE)) # nll V.
-  
     nll <- nll - sum(dgamma(1/sigma_nu^2, shape = Tau_D_dist, scale = 1/Tau_D_dist, log=TRUE))# nll V.
+      # For prior testing:
+        
   
     ## Watershed Model
     for (i in 1:N_stk){
@@ -368,6 +416,20 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   obj <- RTMB::MakeADFun(f_smax, par, random = c("logA"), silent = TRUE) # create the rtmb object
   
   opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0)) # optimization
+  
+  # Testing optimization differences
+  # upper <- unlist(obj$par)
+  # upper[1:length(upper)]<- Inf
+  # 
+  # lower <- unlist(obj$par)
+  # lower[1:length(lower)]<- -Inf
+  # 
+  # opt <- nlminb(obj$par, # starting values + rnorm 
+  #               obj$fn, 
+  #               obj$gr, 
+  #               control = list(eval.max = 1e5, iter.max = 1e5), 
+  #               lower=lower, 
+  #               upper=upper)
   
   # sdr <- summary(sdreport(obj)) # This is missing something compared to the TMB version
   
@@ -486,30 +548,30 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   
   #### * Plot SR Curves --------------------------------------------------------
   if (plot==TRUE){
-    png(paste("DataOut/SR_rtmb_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
+    png(paste("DataOut/SR_rtmbsmax_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
     PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
     dev.off()
-    png(paste("DataOut/SRLin_rtmb_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+    png(paste("DataOut/SRLin_rtmbsmax_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
     PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
     dev.off()
-    png(paste("DataOut/StdResid_rtmb_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+    png(paste("DataOut/StdResid_rtmbsmax_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
     PlotStdResid(SRes)
     dev.off()
-    png(paste("DataOut/ACF_rtmb_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+    png(paste("DataOut/ACF_rtmbsmax_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
     Plotacf(SRes)
     dev.off()
   }
   
   #### * Plot WA Regression ----------------------------------------------------
   if(plot==TRUE){
-    png(paste("DataOut/WAregSMSY_rtmb_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+    png(paste("DataOut/WAregSMSY_rtmbsmax_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigma and prior WA regression sigma"
     plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
                           pred_lnWA = dat$pred_lnWA, title1=title_plot, mod)
     dev.off()
     
-    png(paste("DataOut/WAregSREP_rtmb_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+    png(paste("DataOut/WAregSREP_rtmbsmax_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
     plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
@@ -732,6 +794,8 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # bs_nBS <- 10
   # datain <- c("DataOut/rtmb_dataout_target_ocean_wEnh.csv")
 
+  # Could we run obj$simulate in the same fashion as below?
+  
     if (run.bootstraps == TRUE){
     # set.seed(1) #10#12#13 (work for 1000), for 100, 200, 300, (for 5000trials), 1, 2, 3 (for 20000trials)
     set.seed(bs_seed)
@@ -802,7 +866,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
       mutate (upr=signif(upr,2))
     
     # Add a function for IWAM_func to rename outputs?
-    write.csv(dfout, here::here("DataOut/rtmb_getLRP-BootstrappedRPs.csv"))
+    write.csv(dfout, here::here("DataOut/rtmbsmax_getLRP-BootstrappedRPs.csv"))
     print("Bootstrapping complete.")
   } else {print("No bootstrapping.")}
   
@@ -831,7 +895,10 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 # test <- IWAMsmax_rtmb(bs_nBS = 1000, plot = FALSE) # default run
   # confirmed same objective value - code matches - we are good
 
-
+# Test run
+# fat_run <- IWAMsmax_rtmb(bs_nBS = 200000,
+#                          bs_seed = 1,
+#                          plot = TRUE)
 
 
 

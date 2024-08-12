@@ -384,7 +384,7 @@ CH: My thinking is that we don't use the watershed-area estimate of SMSY because
 
 
 
-## $S_{REP}$ (IWAM-Ricker)
+## $S_{REP}$ (IWAM-Ricker) *MCMC*
 
 The following model is based off of Liermann et al. 2010. The main difference between this formulation of the Ricker model and the one used by Parken et al. (2006) and Holt et al. (2023) is parameterization of $S_{REP}$ instead of $\beta$ (1/$S_{MAX}$). <!--CH suggest removing:  is the scale of $\alpha$. Being either on the real or log-scale, and the parameterization of the watershed area regression to $S_{rep}$. The implication of these differences will be discussed further in the model differences section.-->
 
@@ -460,6 +460,19 @@ $$
 and, $w_{ij}$ is the normally distributed independent random variable with mean 0 and population specific standard deviation.
 <!--TK: Is this actually used in the NIMBLE model?-->
 
+*FOR MLE:*
+
+- E_{SD} = 1
+- h_j = DNE
+- alpha_m = DNE
+- alpha_j = DNE
+- logAlpha = logAlpha0 + logAlpha_re
+  - logAlpha0 = 1.5
+  - logAlpha_re is N(0, logAlphaSD)
+    - logAlphaSD = 10
+--> logAlpha ~ 1.5 + N(0,10)
+- TK: As alpha's hyper prior is a random effect - should it's hyper-priors change for MLE?
+
 To avoid confusion, please keep in mind that Liermann substitutes $\alpha$ for $r$ as a the productivity parameter. We have opted to maintain the nomenclature of $\alpha$ as per the original Ricker equation. This also goes for the reference to $S_{REP}$, which you will see is renamed as $E$ in the Liermann notation. All nomenclature across the model types has been made as close as possible to aid in comparison and evaluation.
 
 This is evaluated as:
@@ -488,7 +501,10 @@ $$
 $$
 -->
 
-With the Ricker parameters defined, the regression is then evluated based on $E$. 
+*FOR MLE:*
+- Prior should be removed.
+
+With the Ricker parameters defined, the regression is then evaluated based on $E$. 
 <!--CH: I see this prior on tau is different than for the IWAM-SMAX version of the model. why?-->
 <!--TK: We don't define a Tau prior in the IWAM-SMAX version?-->
 
@@ -531,7 +547,12 @@ bWA \sim N(0, \tau = 0.001)
 $$
 -->
 
-where $WA$ is the watershed area $(km^2)$ for the population
+where $WA$ is the watershed area $(km^2)$ for the population,
+
+*FOR MLE:*
+- Both priors are removed and given initial values:
+  - b0 of c(10,10)
+  - bWA of c(0,0)
 
 and $E0$ is the stock-level random-effect, with the following prior:
 
@@ -559,7 +580,20 @@ log(E_{SD}) \sim Uniform(0, 100)
 $$
 -->
 
+*FOR MLE:*
+- LogE0 keeps it prior as a random effect in MLE
+--> logE0 ~ N(0,1) # Random effect
+- TK: Should it maintain its uniform hyper-prior?
+
 Armed now with the regression coefficients $b0$ and $bWA$ we estimate new stock $S_{REP}$'s, and assuming the same global $\alpha$ estimate $S_{MSY}$ and $S_{GEN}$.
+
+
+
+## $S_{REP}$ (IWAM-Ricker) *MLE*
+
+The following model is a translation of the previous model with adjustments for MLE.
+
+
 
 
 

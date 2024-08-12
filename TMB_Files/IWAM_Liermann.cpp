@@ -46,6 +46,7 @@ Type objective_function<Type>:: operator() ()
   // REMOVE ALL _std objects
   DATA_VECTOR(S); // Org _std 
   DATA_VECTOR(logRS); // Org _std
+  
   DATA_IVECTOR(stk); // stock number // Org _std
   DATA_IVECTOR(yr); // only occurs once
   
@@ -60,13 +61,13 @@ Type objective_function<Type>:: operator() ()
   DATA_VECTOR(WAbase); 
   DATA_VECTOR(scale);
   DATA_IVECTOR(lifehist);
-  DATA_INTEGER(SigRicPriorNorm);
-  DATA_INTEGER(SigRicPriorGamma);
-  DATA_INTEGER(SigRicPriorCauchy);
+  DATA_INTEGER(SigRicPriorNorm); // on/off
+  DATA_INTEGER(SigRicPriorGamma); // on/off
+  DATA_INTEGER(SigRicPriorCauchy); // on/off
   DATA_INTEGER(biasCor);
-  DATA_INTEGER(SigDeltaPriorNorm);
-  DATA_INTEGER(SigDeltaPriorGamma);
-  DATA_INTEGER(SigDeltaPriorCauchy);
+  DATA_INTEGER(SigDeltaPriorNorm); // on/off
+  DATA_INTEGER(SigDeltaPriorGamma); // on/off
+  DATA_INTEGER(SigDeltaPriorCauchy); // on/off
   DATA_SCALAR(Tau_dist);
   DATA_SCALAR(Tau_D_dist);
   //DATA_SCALAR(logDeltaSigma);
