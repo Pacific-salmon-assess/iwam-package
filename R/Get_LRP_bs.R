@@ -158,13 +158,15 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     # (assuming range 0-2.0, mean=1). 0.510*1.96 = 1.0
     
     Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
-    if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
+    
     if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
     
-    sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE))
-    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
-                                         SREP_SE$SE))
-    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
+    # sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE)) # **
+    sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, SREP_logSE$SE)) # **
+    
+    # if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
+    #                                      SREP_SE$SE))
+    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, 
                                          SREP_SE$SE))
     
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)

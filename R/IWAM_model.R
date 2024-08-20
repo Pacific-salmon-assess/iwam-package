@@ -104,6 +104,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
   
   # Add your watershed data
+  WAin <- c("DataIn/WCVIStocks.csv")
   WAin <- read.csv(here::here(WAin))
   
   # * Data Removals and Cleaning ----
@@ -229,7 +230,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   data$SigRicPriorNorm <- as.numeric(F)
   data$SigRicPriorGamma <- as.numeric(T)
   data$SigRicPriorCauchy <- as.numeric(F)
-  data$biasCor <- as.numeric(TRUE)
+  data$biasCor <- as.numeric(TRUE) # TRUE = 1, FALSE = 0
   data$SigDeltaPriorNorm <- as.numeric(F)
   data$SigDeltaPriorGamma <- as.numeric(T)
   data$SigDeltaPriorCauchy <- as.numeric(F)
@@ -414,7 +415,8 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
       # and thus the run continues WITHOUT compiling.
   dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   
-  obj <- MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
+  # obj <- MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
+  obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE) # Non-logA testing
   
   upper <- unlist(obj$par)
   upper[1:length(upper)]<- Inf
@@ -564,15 +566,19 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   
   if (plot==TRUE){
     png(paste("DataOut/SR_", mod, ".png", sep=""), width=7, height=7, units="in", res=500)
+    print(paste("DataOut/SR_", mod, ".png", sep=""))
     PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
     dev.off()
     png(paste("DataOut/SRLin_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+    print(paste("DataOut/SRLin_", mod, ".png", sep=""))
     PlotSRLinear(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE)
     dev.off()
     png(paste("DataOut/StdResid_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+    print(paste("DataOut/StdResid_", mod, ".png", sep=""))
     PlotStdResid(SRes)
     dev.off()
     png(paste("DataOut/ACF_", mod, ".png", sep=""), width=7, height=7, units="in", res=1000)
+    print(paste("DataOut/ACF_", mod, ".png", sep=""))
     Plotacf(SRes)
     dev.off()
   }
@@ -582,6 +588,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   
   if(plot==TRUE){
     png(paste("DataOut/WAregSMSY_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+    print(paste("DataOut/WAregSMSY_", mod, "_wBC.png", sep=""))
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigma and prior WA regression sigma"
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
@@ -590,6 +597,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     dev.off()
     
     png(paste("DataOut/WAregSREP_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+    print(paste("DataOut/WAregSREP_", mod, "_wBC.png", sep=""))
     #png(paste("DataOut/WAreg_Liermann_SepRicA_UniformSigmaAPrior.png", sep=""), width=7, height=7, units="in", res=500)
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"

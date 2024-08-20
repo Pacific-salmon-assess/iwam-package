@@ -16,17 +16,23 @@ source(here::here("R/IWAM_model.R"))
 source(here::here("R/IWAMsmax_RTMB_model.R"))
 
 # Run's
-smaxrun <- IWAMsmax_rtmb(bs_nBS = 20000,
-                         bs_seed = 1)
+# smaxrun <- IWAMsmax_rtmb(bs_nBS = 20000,
+#                          bs_seed = 1)
+smaxruntest2 <- IWAMsmax_rtmb(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+                             bs_nBS = 20000,
+                             lamberts = "tmb")
+# smaxruntest <- IWAMsmax_rtmb()
 
-smaxruntest <- IWAMsmax_rtmb(WAin = c("DataIn/WCVIStocks_NoAgg.csv"))
-
-iwamrun <- IWAM_func(bs_nBS = 20000,
-                     bs_seed = 1)
-
-iwamruntest <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"))
+# iwamrun <- IWAM_func(bs_nBS = 20000,
+#                      bs_seed = 1)
+iwamruntest2 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+                         bs_nBS = 20000,
+                         plot = TRUE)
+# iwamruntest <- IWAM_func()
 # model opt's converge
   # tmb vs. rtmb model by itself is the same
+
+
 
 # bootstrap convergence:
   # Tor:Seems like there is not exact convergence for bootstraps
@@ -61,3 +67,14 @@ SMSY_parken <- SMSY_pl +
                 width = 0.2,                     
                 position = position_nudge(-0.3), 
                 inherit.aes = FALSE) 
+
+
+
+# Lambert Testing ####
+compile(here::here("TMB_Files/lambert.cpp"))
+dyn.load(dynlib(here::here("TMB_Files/lambert")))
+
+objlw <- MakeADFun(data=list(), parameters=list(x=1), DLL="lambert")
+objlw$fn(7 * exp(7))
+lambert_W0(7 * exp(7)) # eg
+

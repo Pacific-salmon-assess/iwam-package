@@ -39,6 +39,8 @@ px[0] = DW * py[0];                 // Reverse mode chain rule
     return LambertW(tx)[0];
   }
   
+  
+  
 // REAL CODE STARTS  
 template<class Type>
 Type objective_function<Type>:: operator() ()
@@ -102,7 +104,7 @@ Type objective_function<Type>:: operator() ()
   PARAMETER(Nu2_ocean);
   PARAMETER(logNuSigma);
   
-
+  
   
   Type ans=0.0; // ans is the log-likelihood - is then additive for each of the distributions
   int N_Obs = S.size(); //size() gives the size of the vector - TMB function
