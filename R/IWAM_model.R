@@ -82,13 +82,17 @@ source(here::here("R/Get_LRP_bs.R")) # Now no longer includes TMB
 
 # Defaults changed to be most basic run
 IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
-                        # NEEDS RENAMING to _____
                       remove.EnhStocks = FALSE, # was originally TRUE as default
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
                       plot = FALSE, # whether or not to create plots stored in DataOut/
-                      est.table = FALSE # store kable tables as per wcvi_workedexample.RMD
+                      est.table = FALSE, # store kable tables as per wcvi_workedexample.RMD
+                      # Norm, Gamma, Cauchy
+                      SigRicPrior = c(F, T, F), # Default invgamma
+                      SigDeltaPrior = c(F, T, F), # Default invgamma
+                      # Tau_dist, Tau_D_dist
+                      TauPrior = c(0.1, 1) # Defaults
 )
   {
   
@@ -153,7 +157,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   # - Undesired stocks removed
   # - Data has a continuous year list
   
-  # * Scale Calculation ----------------------------------------------------------
+  # * Scale Calculation --------------------------------------------------------
   # Desired scale: 1000 - 0.1 to 100 - responsible for scaling the spawners
   # Points of scaling application and removal:
     # - This scaling is APPLIED in section 2. Create data and parameter lists
@@ -197,7 +201,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     arrange (Stocknumber)
   
   
-  #### 2. Create data and parameter lists for TMB --------------------------------
+  #### 2. Create data and parameter lists for TMB ------------------------------
   
   #### * DATA ####
   # Data list for TMB DATA and PARAMETER list - labelled as matches
@@ -227,15 +231,28 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   data$scale <- srdat_scale # Ordered by Stocknumber
   
   # Priors
-  data$SigRicPriorNorm <- as.numeric(F)
-  data$SigRicPriorGamma <- as.numeric(T)
-  data$SigRicPriorCauchy <- as.numeric(F)
+    # Tech Report Testing
+    # Change Tau_dist and Tau_D_dist to change between invgamma distributions
+    # Change as.numeric's on/off to turn on half normal and half cauchy
+  
+  # data$SigRicPriorNorm <- as.numeric(F) # SigRicPrior[1]
+  # data$SigRicPriorGamma <- as.numeric(T) # SigRicPrior[2]
+  # data$SigRicPriorCauchy <- as.numeric(F) # SigRicPrior[3]
   data$biasCor <- as.numeric(TRUE) # TRUE = 1, FALSE = 0
-  data$SigDeltaPriorNorm <- as.numeric(F)
-  data$SigDeltaPriorGamma <- as.numeric(T)
-  data$SigDeltaPriorCauchy <- as.numeric(F)
-  data$Tau_dist <- 0.1 # Consider changing to 0.01
-  data$Tau_D_dist <- 1 # *******************************************************************************************
+  # data$SigDeltaPriorNorm <- as.numeric(F) # SigDeltaPrior[1]
+  # data$SigDeltaPriorGamma <- as.numeric(T) # SigDeltaPrior[2]
+  # data$SigDeltaPriorCauchy <- as.numeric(F) # SigDeltaPrior[3]
+  # data$Tau_dist <- 0.1 # Consider changing to 0.01 # TauPrior[1]
+  # data$Tau_D_dist <- 1 # TauPrior[2]
+  data$SigRicPriorNorm <- as.numeric(SigRicPrior[1])
+  data$SigRicPriorGamma <- as.numeric(SigRicPrior[2])
+  data$SigRicPriorCauchy <- as.numeric(SigRicPrior[3])
+  data$SigDeltaPriorNorm <- as.numeric(SigDeltaPrior[1])
+  data$SigDeltaPriorGamma <- as.numeric(SigDeltaPrior[2])
+  data$SigDeltaPriorCauchy <- as.numeric(SigDeltaPrior[3])
+  data$Tau_dist <- TauPrior[1]
+  data$Tau_D_dist <- TauPrior[2]
+  # *******************************************************
   # logDeltaSigma # currently listed as param in R, but data_scalar in TMB
   # logNuSigma # currently listed as param in R, but data_scalar in TMB
   
@@ -415,14 +432,21 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
       # and thus the run continues WITHOUT compiling.
   dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   
-  # obj <- MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
-  obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE) # Non-logA testing
+  obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
+  # obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE) # Non-logA testing
   
   upper <- unlist(obj$par)
   upper[1:length(upper)]<- Inf
   
   lower <- unlist(obj$par)
   lower[1:length(lower)]<- -Inf
+  
+  # TK: I noted that current watershed_area_model repository there is the following
+    # additional code:
+  # upper[names(upper) == "logDeltaSigma"] <- log(1.39) # See KFrun.R, "SDlSMSYParken"
+  # upper[names(upper) == "logNuSigma"] <- log(1.38)# See KFrun.R, "SDlSREPParken"
+  # lower[names(lower) == "logDeltaSigma"] <- log(0.21) # See KFrun.R, "medSDlogSmsy"
+  # lower[names(lower) == "logNuSigma"] <- log(0.29) # See KFrun.R, "medSDlogSrep"
   
   
   #### RUN THE MODEL ---------------------------------------------------------
@@ -446,7 +470,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   
   #### 4. Compile model outputs --------------------------------------------------
   # Create Table of outputs
-  all_pars <- data.frame(summary(sdreport(obj)))
+  all_pars <- data.frame(summary(TMB::sdreport(obj)))
   all_pars$Param <- row.names(all_pars)
   # Rename parameter names
   all_pars$Param <- sapply(all_pars$Param, function(x) (unlist(strsplit(x, "[.]"))[[1]]))
@@ -586,22 +610,71 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   #### * Plot WA Regression ------------------------------------------------------
   # Plotted values are RE-SCALED within plot func()
   
+  isigricprior <- which(SigRicPrior)
+  isigdeltaprior <- which(SigDeltaPrior)
+  pngtitleobj_ric <- c("richalfnorm_", "ricgamma_", "riccauchy_")
+  pngtitleobj_wa <- c("wahalfnorm_", "wagamma_", "wacauchy_")
+  pngtitle_gammaricprior <- TauPrior[1]
+  pngtitle_gammawaprior <- TauPrior[2]
+  pngtitle_ricprior <- ifelse(length(isigricprior) > 0, pngtitleobj_ric[isigricprior], "")
+  pngtitle_waprior <- ifelse(length(isigdeltaprior) > 0, pngtitleobj_wa[isigdeltaprior], "")
+  
   if(plot==TRUE){
-    png(paste("DataOut/WAregSMSY_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-    print(paste("DataOut/WAregSMSY_", mod, "_wBC.png", sep=""))
+    # if statements to follow titles for png pasting titles - so they don't get overwritten
+    
+    # if index == 2 then
+      # add tau prior's to title
+    # if index is 1 or 3 then don't
+    
+    if (isigricprior & isigdeltaprior == 2) { # if both are default
+      # combine the titles
+      pngcombotitle <- paste(pngtitle_ricprior, pngtitle_gammaricprior, "_", pngtitle_waprior, pngtitle_gammawaprior, "_", sep="")
+      # png(paste("DataOut/WAregSMSY_", pngcombotitle, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+      print(paste("DataOut/WAregSMSY_", pngcombotitle, mod, "_wBC.png", sep=""))
+    } else {
+      png(paste("DataOut/WAregSMSY_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+      print(paste("DataOut/WAregSMSY_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))  
+    }
+    
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
-    title_plot <- "Prior Ricker sigma and prior WA regression sigma"
+    # change title depending on prior
+    if (SigRicPrior[1] == TRUE) {title_plot <- "Half normal Prior Ricker sigma and prior WA regression sigma"}
+    if (SigRicPrior[2] == TRUE) {title_plot <- "Gamma Prior Ricker sigma and prior WA regression sigma"}
+    if (SigRicPrior[3] == TRUE) {title_plot <- "Half cauchy Prior Ricker sigma and prior WA regression sigma"}
+    if (SigDeltaPrior[1] == TRUE) {title_plot <- "Prior Ricker sigma and half normal prior WA regression sigma"}
+    if (SigDeltaPrior[2] == TRUE) {title_plot <- "Prior Ricker sigma and gamma prior WA regression sigma"}
+    if (SigDeltaPrior[3] == TRUE) {title_plot <- "Prior Ricker sigma and half cauchy prior WA regression sigma"}
+    else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
     plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
     
-    png(paste("DataOut/WAregSREP_", mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-    print(paste("DataOut/WAregSREP_", mod, "_wBC.png", sep=""))
+    # if statements to follow titles for png pasting titles - so they don't get overwritten
+    
+    if (isigricprior & isigdeltaprior == 2) { # if both are default
+      # combine the titles
+      png(paste("DataOut/WAregSREP_", pngcombotitle, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+      print(paste("DataOut/WAregSREP_", pngcombotitle, mod, "_wBC.png", sep=""))
+    } else {
+      png(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+      print(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))  
+    }
+    
+    # png(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+    # print(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))
     #png(paste("DataOut/WAreg_Liermann_SepRicA_UniformSigmaAPrior.png", sep=""), width=7, height=7, units="in", res=500)
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
-    title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
-    #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
+    # change title depending on prior
+    if (SigRicPrior[1] == TRUE) {title_plot <- "Half normal Prior Ricker sigma and prior WA regression sigma"}
+    if (SigRicPrior[2] == TRUE) {title_plot <- "Gamma Prior Ricker sigma and prior WA regression sigma"}
+    if (SigRicPrior[3] == TRUE) {title_plot <- "Half cauchy Prior Ricker sigma and prior WA regression sigma"}
+    if (SigDeltaPrior[1] == TRUE) {title_plot <- "Prior Ricker sigma and half normal prior WA regression sigma"}
+    if (SigDeltaPrior[2] == TRUE) {title_plot <- "Prior Ricker sigma and gamma prior WA regression sigma"}
+    if (SigDeltaPrior[3] == TRUE) {title_plot <- "Prior Ricker sigma and half cauchy prior WA regression sigma"}
+    else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
+    # title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
+    # title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
     plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
