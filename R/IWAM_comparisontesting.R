@@ -26,7 +26,7 @@ smaxruntest2 <- IWAMsmax_rtmb(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
 # iwamrun <- IWAM_func(bs_nBS = 20000,
 #                      bs_seed = 1)
 iwamruntest2 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                         bs_nBS = 20000,
+                         bs_nBS = 10,
                          plot = TRUE)
 # iwamruntest <- IWAM_func()
 # model opt's converge

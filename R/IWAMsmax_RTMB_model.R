@@ -35,8 +35,9 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
                       plot = FALSE, # whether or not to create plots stored in DataOut/
-                      lamberts = "gsl" # Paul's port from the nimble version of the Lambert's W function
+                      lamberts = "gsl", # Paul's port from the nimble version of the Lambert's W function
                         # "tmb" for the original IWAM double LambertW function
+                      biascor = 1 # defaults to bias correction
 )
 {
   
@@ -205,13 +206,28 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
         # halfcauchy - dt? check TMB's documentation
   
     ## Standard Ricker model:
-    for (i in 1:N_obs){
-      logRS_pred[i] <- logA[stk[i]] - exp(logB[stk[i]]) * S[i] - sigma[stk[i]]^2/2 # BIAS CORRECTION
-
-      # nll <- nll - sum(dnorm(logRS_pred[i], logRS[i], sd=sigma[stk[i]], log=TRUE)) # *** Error - dnorm should be x, then mean
-      nll <- nll - sum(dnorm(logRS[i], logRS_pred[i], sd = sigma[stk[i]], log=TRUE)) # TK: I don't think it actually makes a difference in this case
-        # which is weird.
-        # RTMB's dnorm must know the difference between x and mu, which I don't think I love.
+    # Core code
+    # for (i in 1:N_obs){
+    #   logRS_pred[i] <- logA[stk[i]] - exp(logB[stk[i]]) * S[i] - sigma[stk[i]]^2/2 # BIAS CORRECTION
+    # 
+    #   # nll <- nll - sum(dnorm(logRS_pred[i], logRS[i], sd=sigma[stk[i]], log=TRUE)) # *** Error - dnorm should be x, then mean
+    #   nll <- nll - sum(dnorm(logRS[i], logRS_pred[i], sd = sigma[stk[i]], log=TRUE)) # TK: I don't think it actually makes a difference in this case
+    #     # which is weird.
+    #     # RTMB's dnorm must know the difference between x and mu, which I don't think I love.
+    # }
+    
+    # Added in bias cor loop
+    if (biascor == 0) { # no correction
+      for (i in 1:N_obs){
+        logRS_pred[i] <- logA[stk[i]] - exp(logB[stk[i]]) * S[i]
+        nll <- nll - sum(dnorm(logRS[i], logRS_pred[i], sd = sigma[stk[i]], log=TRUE)) 
+      }
+    }
+    if (biascor == 1) { # bias correction term
+      for (i in 1:N_obs){
+        logRS_pred[i] <- logA[stk[i]] - exp(logB[stk[i]]) * S[i] - sigma[stk[i]]^2/2 # BIAS CORRECTION
+        nll <- nll - sum(dnorm(logRS[i], logRS_pred[i], sd = sigma[stk[i]], log=TRUE)) 
+      }
     }
   
     ## Calculate SMSY and SREP
@@ -229,12 +245,33 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     SREP = logA / exp(logB)
   
     ## Watershed Model
-    for (i in 1:N_stk){
-      pred_lnSMSY[i] <- logDelta1 + logDelta1_ocean * lifehist[i] + (exp(logDelta2) + Delta2_ocean * lifehist[i]) * log(WAbase$WA[i])
-      pred_lnSREP[i] <- logNu1 + logNu1_ocean * lifehist[i] + (exp(logNu2) + Nu2_ocean * lifehist[i]) * log(WAbase$WA[i])
-  
-      nll <- nll - sum(dnorm(pred_lnSMSY[i], log(SMSY[i]*scale[i]), sd = sigma_delta, log=TRUE))
-      nll <- nll - sum(dnorm(pred_lnSREP[i], log(SREP[i]*scale[i]), sd = sigma_nu, log=TRUE))
+    # Core code
+    # for (i in 1:N_stk){
+    #   pred_lnSMSY[i] <- logDelta1 + logDelta1_ocean * lifehist[i] + (exp(logDelta2) + Delta2_ocean * lifehist[i]) * log(WAbase$WA[i])
+    #   pred_lnSREP[i] <- logNu1 + logNu1_ocean * lifehist[i] + (exp(logNu2) + Nu2_ocean * lifehist[i]) * log(WAbase$WA[i])
+    # 
+    #   nll <- nll - sum(dnorm(pred_lnSMSY[i], log(SMSY[i]*scale[i]), sd = sigma_delta, log=TRUE))
+    #   nll <- nll - sum(dnorm(pred_lnSREP[i], log(SREP[i]*scale[i]), sd = sigma_nu, log=TRUE))
+    # }
+    
+    # Added bias cor loop
+    if (biascor == 0) { # no correction
+      for (i in 1:N_stk){
+        pred_lnSMSY[i] <- logDelta1 + logDelta1_ocean * lifehist[i] + (exp(logDelta2) + Delta2_ocean * lifehist[i]) * log(WAbase$WA[i])
+        pred_lnSREP[i] <- logNu1 + logNu1_ocean * lifehist[i] + (exp(logNu2) + Nu2_ocean * lifehist[i]) * log(WAbase$WA[i])
+        
+        nll <- nll - sum(dnorm(pred_lnSMSY[i], log(SMSY[i]*scale[i]), sd = sigma_delta, log=TRUE))
+        nll <- nll - sum(dnorm(pred_lnSREP[i], log(SREP[i]*scale[i]), sd = sigma_nu, log=TRUE))
+      }
+    }
+    if (biascor == 1) { # bias correction term
+      for (i in 1:N_stk){
+        pred_lnSMSY[i] <- logDelta1 + logDelta1_ocean * lifehist[i] + (exp(logDelta2) + Delta2_ocean * lifehist[i]) * log(WAbase$WA[i]) - sigma_delta^2/2
+        pred_lnSREP[i] <- logNu1 + logNu1_ocean * lifehist[i] + (exp(logNu2) + Nu2_ocean * lifehist[i]) * log(WAbase$WA[i]) - sigma_nu^2/2
+        
+        nll <- nll - sum(dnorm(pred_lnSMSY[i], log(SMSY[i]*scale[i]), sd = sigma_delta, log=TRUE))
+        nll <- nll - sum(dnorm(pred_lnSREP[i], log(SREP[i]*scale[i]), sd = sigma_nu, log=TRUE))
+      }
     }
     
     ## Inverse gamma prior on sigma_delta and sigma_nu
