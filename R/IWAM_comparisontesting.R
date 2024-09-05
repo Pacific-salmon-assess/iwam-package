@@ -27,61 +27,67 @@ smaxruntest2 <- IWAMsmax_rtmb(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
 #                      bs_seed = 1)
 iwamruntest2 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
                          bs_nBS = 10,
-                         plot = TRUE)
+                         plot = FALSE)
+iwamtest_noinlet <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoInlet.csv"),
+                          bs_nBS = 10,
+                          plot = FALSE)
+iwamtest_full <- IWAM_func(WAin = c("DataIn/WCVIStocks.csv"),
+                          bs_nBS = 10,
+                          plot = FALSE)
 # iwamruntest <- IWAM_func()
 # model opt's converge
   # tmb vs. rtmb model by itself is the same
 
 # IWAM PRIOR TESTING ####
-  # Add in the save RDS files for the plotRicA boxplot
+    # only 10 iter's as no bootstrapping occurs before the plotting or RDS creation
 # Ricker Log A prior tests
 iwam_r_default <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                            bs_nBS = 20000,
+                            bs_nBS = 10,
                             plot = TRUE,
                             SigRicPrior = c(F,T,F), # Ric
                             SigDeltaPrior = c(F,T,F), # WA default
                             TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
 iwam_r_halfnorm <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                          bs_nBS = 20000,
+                          bs_nBS = 10,
                           plot = TRUE,
                           SigRicPrior = c(T,F,F), # Ric half normal
                           SigDeltaPrior = c(F,T,F),
                           TauPrior = c(0.1, 1)) 
 iwam_r_halfcauchy <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                             bs_nBS = 20000,
+                             bs_nBS = 10,
                              plot = TRUE,
                              SigRicPrior = c(F,F,T), # Ric half cauchy
                              SigDeltaPrior = c(F,T,F), # WA Default
                              TauPrior = c(0.1, 1))  # default
 
 # RIC Gamma Priors x 3
-iwam_r_gamma0.1 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                           bs_nBS = 20000,
-                           plot = TRUE,
-                           SigRicPrior = c(F,T,F), # Ric half cauchy
-                           SigDeltaPrior = c(F,T,F), # WA Default
-                           TauPrior = c(0.1, 1))  # default
+# iwam_r_gamma0.1 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+#                            bs_nBS = 20000,
+#                            plot = TRUE,
+#                            SigRicPrior = c(F,T,F), 
+#                            SigDeltaPrior = c(F,T,F), # WA Default
+#                            TauPrior = c(0.1, 1))  # default
 iwam_r_gamma0.01 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                            bs_nBS = 20000,
+                            bs_nBS = 10,
                             plot = TRUE,
-                            SigRicPrior = c(F,T,F), # Ric half cauchy
+                            SigRicPrior = c(F,T,F), 
                             SigDeltaPrior = c(F,T,F), # WA Default
                             TauPrior = c(0.01, 1))  # default
 iwam_r_gamma0.001 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                             bs_nBS = 20000,
+                             bs_nBS = 10,
                              plot = TRUE,
-                             SigRicPrior = c(F,T,F), # Ric half cauchy
+                             SigRicPrior = c(F,T,F), 
                              SigDeltaPrior = c(F,T,F), # WA Default
                              TauPrior = c(0.001, 1))  # default
 
 # WA Priors x 3
   # half normal and half cauchy models do not run
-iwam_wa_default <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                          bs_nBS = 10,
-                          plot = TRUE,
-                          SigRicPrior = c(F,T,F), # Ric
-                          SigDeltaPrior = c(F,T,F), # WA default
-                          TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
+# iwam_wa_default <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+#                           bs_nBS = 10,
+#                           plot = TRUE,
+#                           SigRicPrior = c(F,T,F), # Ric
+#                           SigDeltaPrior = c(F,T,F), # WA default
+#                           TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
 iwam_wa_halfnorm <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
                           bs_nBS = 10,
                           plot = TRUE,
@@ -99,12 +105,12 @@ iwam_wa_cauchy <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
 
 # WA Gamma Priors x 3
   # All models compile, run, and converge
-iwam_wa_gamma1 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-                          bs_nBS = 10,
-                          plot = TRUE,
-                          SigRicPrior = c(F,T,F), # Ric
-                          SigDeltaPrior = c(F,T,F), # WA default
-                          TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
+# iwam_wa_gamma1 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+#                           bs_nBS = 10,
+#                           plot = TRUE,
+#                           SigRicPrior = c(F,T,F), # Ric
+#                           SigDeltaPrior = c(F,T,F), # WA default
+#                           TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
 iwam_wa_gamma0.1 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
                             bs_nBS = 10,
                             plot = TRUE,
@@ -117,6 +123,16 @@ iwam_wa_gamma0.01 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
                             SigRicPrior = c(F,T,F), # Ric
                             SigDeltaPrior = c(F,T,F), # WA default
                             TauPrior = c(0.1, 0.01)) # [1] is Ric, [2] is WA
+
+# A total of 12 runs
+  # Removed 3 runs due to being the same as default - 9 runs in total
+  # 9 RDS files to find
+
+# RicA Boxplot call ####
+
+png(paste("DataOut/RicADist_ComparePriors_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+plotRicA_reduc()
+dev.off()
 
 
 # bootstrap convergence: ####
@@ -163,3 +179,8 @@ objlw <- MakeADFun(data=list(), parameters=list(x=1), DLL="lambert")
 objlw$fn(7 * exp(7))
 lambert_W0(7 * exp(7)) # eg
 
+#
+temp <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+          bs_nBS = 10,
+          plot = FALSE,
+          mod = "IWAM_Liermann_srep")

@@ -567,6 +567,90 @@ plotRicA <- function (){#pars_Liermann, pars_Ricker_AllMod, pars_Liermann_SepRic
 # plotRicA()
 # dev.off()
 
+plotRicA_reduc <- function (){
+  # Old read-ins
+  All_Est_Liermann <- readRDS("DataOut/All_Est_Liermann.RDS")
+  All_Est_Ricker_AllMod <- readRDS("DataOut/All_Est_Ricker_AllMod.RDS")
+  All_Est_Ricker_std <- readRDS("DataOut/All_Est_Ricker_std_wBC.RDS")
+  All_Est_Ricker_std_noWAreg <- readRDS("DataOut/All_Est_Ricker_std_noWAreg_wBC.RDS")#From CheckAR1.r
+  All_Est_Liermann_SepRicA <- readRDS("DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_invGamma0.01_wBC.RDS")#readRDS("DataOut/All_Est_Liermann_SepRicA.RDS")#r
+  All_Est_Liermann_HalfNormRicVar <-readRDS( "DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_HalfNormRicVar_wBC.RDS")#readRDS("DataOut/All_Est_Liermann_HalfNormRicVar.RDS")
+  All_Est_Liermann_HalfCauchyRicVar <- readRDS( "DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_HalfCauchyRicVar_wBC.RDS")#readRDS("DataOut/All_Est_Liermann_HalfCauchyRicVar.RDS")
+  All_Est_Liermann_SepRicA_uniformSigmaPrior <- readRDS( "DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_uniformSigmaPrior_wBC.RDS")#readRDS("DataOut/All_Est_Liermann_SepRicA_uniformSigmaPrior.RDS")
+  All_Est_Liermann_SepRicA_noSigmaPrior <- readRDS( "DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_noPriorRicVar_wBC.RDS")# readRDS("DataOut/All_Est_Liermann_SepRicA_noSigmaPrior.RDS")
+  All_Est_Liermann_SepRicA_invGamma0.001 <- readRDS("DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_invGamma0.001_wBC.RDS")#readRDS("DataOut/All_Est_Liermann_SepRicA_invGamma0.001.RDS")
+  All_Est_Liermann_SepRicA_invGamma0.1 <- readRDS("DataOut/All_Est_Liermann_PriorRicSig_PriorDeltaSig_invGamma0.1_wBC.RDS")
+  All_Est_Liermann_SepRicA_invGamma0.01_invGammaA0.001 <- readRDS("DataOut/All_Est_Liermann_SepRicA_invGamma0.01_invGammaA0.001.RDS")
+  All_Est_Liermann_SepRicA_invGamma0.001_invGammaA0.01 <- readRDS("DataOut/All_Est_Liermann_SepRicA_invGamma0.001_invGammaA0.01.RDS")
+  
+  # New read-ins
+  All_Est_Default <- readRDS("DataOut/pars_ricgamma_0.1_wagamma_1_wagamma_IWAM_Liermann")
+  RicDefault <-  All_Est_Default %>%  filter(Param=="logA")
+  
+  All_Est_riccauchy <- readRDS("DataOut/pars_riccauchy_0.1_wagamma_1_wagamma_IWAM_Liermann")
+  Ricriccauchy <-  All_Est_riccauchy %>%  filter(Param=="logA")
+  All_Est_richalfnorm <- readRDS("DataOut/pars_richalfnorm_0.1_wagamma_1_wagamma_IWAM_Liermann")
+  RicDefault <-  All_Est_richalfnorm %>%  filter(Param=="logA")
+  
+  All_Est_ricg0.001 <- readRDS("DataOut/pars_ricgamma_0.001_wagamma_1_wagamma_IWAM_Liermann")
+  RicDefault <-  All_Est_ricg0.001 %>%  filter(Param=="logA")
+  All_Est_ricg0.01 <- readRDS("DataOut/pars_ricgamma_0.01_wagamma_1_wagamma_IWAM_Liermann")
+  RicDefault <-  All_Est_ricg0.01 %>%  filter(Param=="logA")
+  
+  All_Est_wag0.01 <- readRDS("DataOut/pars_ricgamma_0.1_wagamma_0.01_wagamma_IWAM_Liermann")
+  RicDefault <-  All_Est_wag0.01 %>%  filter(Param=="logA")
+  All_Est_wag0.1 <- readRDS("DataOut/pars_ricgamma_0.1_wagamma_0.1_wagamma_IWAM_Liermann")
+  RicDefault <-  All_Est_wag0.1 %>%  filter(Param=="logA")
+  
+  All_Est_wacauchy <- readRDS("DataOut/pars_ricgamma_wacauchy_IWAM_Liermann")
+  RicDefault <-  All_Est_wacauchy %>%  filter(Param=="logA")
+  All_Est_wahalfnorm <- readRDS("DataOut/pars_ricgamma_wahalfnorm_IWAM_Liermann")
+  RicDefault <- All_Est_wahalfnorm %>%  filter(Param=="logA")
+  
+  # Calls and transforms
+  # RicAL <- All_Est_Liermann %>% filter (Param=="logA")
+  # nRicAL <- length(RicALsep$Estimate)
+  # nRicAstd <- length(RicARstd$Estimate)
+  
+  # Labelling:
+      # Fixed effects: nRicAstd
+      # InvGamma: nRicAL (all 3 variants)
+      # Half normal + Half cauchy: nRicAL (why these also?)
+  box.data <- data.frame(RicLogA = c(RicARstd_noWAreg$Estimate, RicARstd$Estimate, RicALsep_0.1$Estimate, RicALsep$Estimate, RicALsep_0.001$Estimate, 
+                                     RicALhNRV$Estimate, RicALhCRV$Estimate, RicALsep_uni$Estimate, RicALsep_none$Estimate), 
+                         Model = c(rep("Fixed\neffects\nNoWAreg",nRicAstd), rep("Fixed\neffects",nRicAstd), rep("InvGamma\n(0.1, 0.1)", nRicAL), 
+                                   rep("InvGamma\n(0.01,0.01)",nRicAL), rep("Inv\nGamma\n(0.001, 0.001)", nRicAL),
+                                   rep("Half\nNormal\n(0,1)",nRicAL), 
+                                   rep("Half\nCauchy\n(0,1)",nRicAL),  
+                                   rep("Uniform\n(0,2)",nRicAL), rep("No priors\nSigmas",nRicAL)), 
+                         lh = c(RicARstd$lh, RicARstd$lh, RicALsep_0.1$lh, RicALsep$lh, RicALsep_0.001$lh, 
+                                RicALhNRV$lh, RicALhCRV$lh, RicALsep_uni$lh, RicALsep_none$lh) )
+  
+  order <- data.frame(Model=unique(box.data$Model), order=1:9)
+  box.data <- box.data %>% left_join(order, by="Model")
+  #Add reorder to as.factor(Model), I think, but need to specify order as above 1:8. Add column to dataframe to do this, of length 200.
+  # see my old dplyr code on adding new columns with string of numbers aligned with a factor (IWAM.r)
+  cols<-viridis(4, alpha=0.9)
+  cols.order <- c(grey(0.2), grey(0.5), cols[3], cols[2], t_col(color=cols[1], percent=70), t_col(cols[1], percent=50), t_col(cols[1], percent=30), "white", cols[4])
+  #print cols.order and then cut and past into line: scale_fill_manual below. These are the colours I used in the plot of priors. can add a legend to quickly see how ggplot reorders this befor plotting
+  
+  ggplot(box.data, aes(x=reorder(as.factor(Model),order), y=RicLogA, fill=as.factor(Model))) +  
+    geom_boxplot(outlier.size=-1) + 
+    scale_fill_manual(values=c("#808080", "#808080", "#35B779E6", "#31688EE6", "#4401544C", "#4401547F", "#440154B2", "white", "#FDE725E6" )) +
+    geom_jitter(color="black", shape=as.factor(box.data$lh), size=2, alpha=0.9) + #,aes(shape=lh)?. I like shape 16,17
+    scale_shape_manual(values=c(16,17)) +
+    ggtitle("Distribution of Ricker LogA") +
+    theme(legend.position="none") +
+    theme(axis.text=element_text(size=10),
+          axis.title=element_text(size=20,face="bold"),
+          plot.title = element_text(size = 20)) + 
+    xlab("Model")
+}
+
+# png(paste("DataOut/RicADist_ComparePriors_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+# plotRicA()
+# dev.off()
+
 plotTestStocks <- function(data = ParkenTestSMSY){
   
   pd <- position_dodge(0.4)

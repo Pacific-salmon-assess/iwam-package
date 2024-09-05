@@ -92,7 +92,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
                       SigRicPrior = c(F, T, F), # Default invgamma
                       SigDeltaPrior = c(F, T, F), # Default invgamma
                       # Tau_dist, Tau_D_dist
-                      TauPrior = c(0.1, 1) # Defaults
+                      TauPrior = c(0.1, 1), # Defaults
+                      mod = "IWAM_Liermann", # TMB Model used
+                      prod = "LifeStageModel" # Productivity assumption used for bootstrapping
 )
   {
   
@@ -417,7 +419,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
 
   
   # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs ----------
-  mod <- "IWAM_Liermann" 
+  # mod <- "IWAM_Liermann" 
+  mod <- "IWAM_Liermann_srep"
+  
   # Compile model if changed:
     # Run a detect - if file is exist statement - then unload
   # if (file.exists(here::here("TMB_Files/"))){
@@ -621,11 +625,9 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
   
   if(plot==TRUE){
     # if statements to follow titles for png pasting titles - so they don't get overwritten
-    
     # if index == 2 then
       # add tau prior's to title
     # if index is 1 or 3 then don't
-    
     if (isigricprior & isigdeltaprior == 2) { # if both are default
       # combine the titles
       pngcombotitle <- paste(pngtitle_ricprior, pngtitle_gammaricprior, "_", pngtitle_waprior, pngtitle_gammawaprior, "_", sep="")
@@ -638,24 +640,23 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     # change title depending on prior
-    if (SigRicPrior[1] == TRUE) {title_plot <- "Half normal Prior Ricker sigma and prior WA regression sigma"}
-    if (SigRicPrior[2] == TRUE) {title_plot <- "Gamma Prior Ricker sigma and prior WA regression sigma"}
-    if (SigRicPrior[3] == TRUE) {title_plot <- "Half cauchy Prior Ricker sigma and prior WA regression sigma"}
-    if (SigDeltaPrior[1] == TRUE) {title_plot <- "Prior Ricker sigma and half normal prior WA regression sigma"}
-    if (SigDeltaPrior[2] == TRUE) {title_plot <- "Prior Ricker sigma and gamma prior WA regression sigma"}
-    if (SigDeltaPrior[3] == TRUE) {title_plot <- "Prior Ricker sigma and half cauchy prior WA regression sigma"}
-    else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
+    if (SigRicPrior[1] == TRUE) {SigRicPriorTitle <- "Half normal Prior Ricker sigma"}
+    if (SigRicPrior[2] == TRUE) {SigRicPriorTitle <- "Gamma Prior Ricker sigma"}
+    if (SigRicPrior[3] == TRUE) {SigRicPriorTitle <- "Half cauchy Prior Ricker sigma"}
+    if (SigDeltaPrior[1] == TRUE) {SigDeltaPriorTitle <- "Half normal prior WA regression sigma"}
+    if (SigDeltaPrior[2] == TRUE) {SigDeltaPriorTitle <- "Hamma prior WA regression sigma"}
+    if (SigDeltaPrior[3] == TRUE) {SigDeltaPriorTitle <- "Half cauchy prior WA regression sigma"}
+    title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, sep=" ")
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
     plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
     
     # if statements to follow titles for png pasting titles - so they don't get overwritten
-    
     if (isigricprior & isigdeltaprior == 2) { # if both are default
       # combine the titles
       png(paste("DataOut/WAregSREP_", pngcombotitle, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-      print(paste("DataOut/WAregSREP_", pngcombotitle, mod, "_wBC.png", sep=""))
+      print(paste("DataOut/WAregSREP_", pngcombotitle, pngtitle_waprior, mod, "_wBC.png", sep=""))
     } else {
       png(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
       print(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))  
@@ -666,13 +667,14 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     #png(paste("DataOut/WAreg_Liermann_SepRicA_UniformSigmaAPrior.png", sep=""), width=7, height=7, units="in", res=500)
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     # change title depending on prior
-    if (SigRicPrior[1] == TRUE) {title_plot <- "Half normal Prior Ricker sigma and prior WA regression sigma"}
-    if (SigRicPrior[2] == TRUE) {title_plot <- "Gamma Prior Ricker sigma and prior WA regression sigma"}
-    if (SigRicPrior[3] == TRUE) {title_plot <- "Half cauchy Prior Ricker sigma and prior WA regression sigma"}
-    if (SigDeltaPrior[1] == TRUE) {title_plot <- "Prior Ricker sigma and half normal prior WA regression sigma"}
-    if (SigDeltaPrior[2] == TRUE) {title_plot <- "Prior Ricker sigma and gamma prior WA regression sigma"}
-    if (SigDeltaPrior[3] == TRUE) {title_plot <- "Prior Ricker sigma and half cauchy prior WA regression sigma"}
-    else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
+    if (SigRicPrior[1] == TRUE) {SigRicPriorTitle <- "Half normal Prior Ricker sigma"}
+    if (SigRicPrior[2] == TRUE) {SigRicPriorTitle <- "Gamma Prior Ricker sigma"}
+    if (SigRicPrior[3] == TRUE) {SigRicPriorTitle <- "Half cauchy Prior Ricker sigma"}
+    if (SigDeltaPrior[1] == TRUE) {SigDeltaPriorTitle <- "Half normal prior WA regression sigma"}
+    if (SigDeltaPrior[2] == TRUE) {SigDeltaPriorTitle <- "Gamma prior WA regression sigma"}
+    if (SigDeltaPrior[3] == TRUE) {SigDeltaPriorTitle <- "Half cauchy prior WA regression sigma"}
+    # else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
+    title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, sep=" ")
     # title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
     # title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
     plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
@@ -680,6 +682,20 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
     dev.off()
     #plotWAregression (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, pred_lnWA = data$pred_lnWA, 
     # title1="Common, fixed yi (logDelta1), \nRandom slope (Delta2)")
+  }
+  
+  #... Save RDS ####
+  #saveRDS( All_Est, paste( "DataOut/All_Est_", mod, ".RDS", sep="") )
+  # Change paste to fit 
+  # What is All_Est? --> pars
+  # saveRDS(pars, paste( "DataOut/pars_", title_plot, sep="") )
+  # if statements to follow titles for png pasting titles - so they don't get overwritten
+  if (isigricprior & isigdeltaprior == 2) {
+    saveRDS(pars, paste( "DataOut/pars_", pngcombotitle, pngtitle_waprior, mod, sep="") )
+    print(paste("DataOut/WAregSREP_", pngcombotitle, pngtitle_waprior, mod, sep=""))
+  } else {
+    saveRDS(pars, paste( "DataOut/pars_", pngtitle_ricprior, pngtitle_waprior, mod, sep="") )
+    print(paste("DataOut/pars_", pngtitle_ricprior, pngtitle_waprior, mod, sep=""))  
   }
   
   #### 6. Calculate prediction intervals for SMSY and SREP for additional stocks ----
@@ -1027,7 +1043,7 @@ IWAM_func <- function(WAin = "DataIn/WCVIStocks.csv", # insert Watershed areas f
       # datain must match the above Step 6 for writing output target estimates
       out <- Get.LRP.bs(datain = datain, # "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
                         Bern_logistic=FALSE, 
-                        prod="LifeStageModel",
+                        prod = prod,
                         LOO = NA, 
                         run_logReg=FALSE) 
       outBench[[k]] <- out$bench

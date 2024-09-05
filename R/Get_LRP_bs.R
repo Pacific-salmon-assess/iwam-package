@@ -259,7 +259,60 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     
   } # if(prod == "RunReconstruction"){
   
-  
+  # PARKEN Method ####
+  if(prod == "Parken"){
+    est_loga <- function(SMSY, SREP, shortloga=FALSE){
+      
+      loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
+                     objective = calc_loga, # Try to fix with a Scheurel version of LW if possible
+                     SMSY= SMSY, 
+                     SREP=SREP)$par
+      if(shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
+      beta <- loga/SREP
+      return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
+    }
+    
+    if(!ExtInd) {
+      WCVIStocks <- read.csv("DataIn/WCVIStocks.csv") %>% 
+        filter (Stock != "Cypre") %>% rename(inlets=Inlet)  
+      if (remove.EnhStocks) wcviRPs_long <- 
+          read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
+      if (!remove.EnhStocks) wcviRPs_long <- 
+          read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
+    
+    }
+    if(ExtInd) {
+      WCVIStocks <- read.csv("DataIn/WCVIStocks_ExtInd.csv") %>% 
+        rename(inlets=Inlet)
+      wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_ExtInd.csv")
+    }
+    
+    wcvi_SMSY <- wcviRPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
+    wcvi_SREP <- wcviRPs_long %>% filter(Param == "SREP") %>% select(Estimate) 
+    lnalpha_Parkin <- purrr::map2_dfr (wcvi_SMSY, wcvi_SREP, shortloga=FALSE, 
+                                       est_loga)
+    
+    # Without log-normal bias correction when sampling log-beta
+    # sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP), SREP_logSE$SE))
+    # With a log-normal bias correction when sampling log-beta
+    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP) - 0.5*SREP_logSE$SE^2, 
+                      SREP_logSE$SE))
+    # if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), wcviRPs$SREP, SREP_SE$SE))
+    if(min(sREP)<0)    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP) - 
+                                           0.5*SREP_logSE$SE^2, SREP_logSE$SE))
+    
+    SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP/Scale, Sgen.fn2)
+    
+    wcviRPs <- wcviRPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
+      mutate(SGEN=round(SGEN*Scale,0))
+    wcviRPs <- wcviRPs %>% mutate (a.par = SGENcalcs$apar) %>% 
+      mutate(a.par=round(a.par,2))
+    wcviRPs <- wcviRPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
+      mutate(SMSY=round(SMSY*Scale,0))
+    
+    wcviRPs <- wcviRPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
+                         "SREPLL", "SREPUL", "a.par")]#"CU"
+  }
   
   #--------------------------------------------------------------------------- #
   # Add Sgen and revised SMSY to RPs data frame ----------------------------
