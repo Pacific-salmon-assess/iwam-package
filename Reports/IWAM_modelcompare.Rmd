@@ -954,7 +954,7 @@ benchmarks <- eval_dat %>%
 # pivot_wider
 
 
-
+ 
 benchmarks_srep <- ggplot(benchmarks, aes(x=Stock, y = SREP)) +
   geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`, color='TMB',), width = 0.2, position = position_nudge(0.2)) +
   geom_point(aes(color = 'TMB'), position = position_nudge(0.2)) +

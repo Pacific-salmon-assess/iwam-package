@@ -12,6 +12,12 @@ library(gsl)
 #library(TMB) # Required if using: run_logReg
 library(viridis)
 
+# library(future)
+# library(furrr)
+# future::plan(multisession, workers = availableCores() - 1)
+# future::plan(sequential)
+# plan(multisession, workers = 8)
+
 # Functions
 source (here::here("R/helperFunctions.R"))
 
@@ -57,6 +63,7 @@ source (here::here("R/helperFunctions.R"))
 # datain <- c("DataOut/dataout_target_wEnh.csv") # ERRORS BECAUSE CU DUPLICATES CAUSED BY TWO LH's
 
 Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file name/path of output of IWAM Model
+                       dataraw = WAinraw, # should be whatever the original input in IWAM_function is e.g. WAinraw
                        remove.EnhStocks = TRUE,  
                        Bern_logistic = FALSE, 
                        prod = "LifeStageModel", 
@@ -139,6 +146,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # DEFAULT
   # prod <-  "LifeStageModel"
   if(prod == "LifeStageModel"){
+    # print(paste("Productivity Assumption running: LifeStageModel"))
     Mean.Ric.A <- 1 # Derived from life-history model (Luedke pers.comm.) and 
     # WCVI CK run reconstruction SR analysis (Dobson pers. comm.)
     Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, 0))
@@ -168,11 +176,13 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     #                                      SREP_SE$SE))
     if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, 
                                          SREP_SE$SE))
-    
+
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
       # what are the default parameters of sgen.fn2?
       # explicit=TRUE by default
-    
+    # SGENcalcs <- future_map2_dfr(Ric.A, sREP/Scale, Sgen.fn2)
+
+
     RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>%
       mutate(SGEN=round(SGEN*Scale,0))
     RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
@@ -189,11 +199,13 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # Higher estimate of Ricker a (lower Sgen)  
   
   if(prod == "RunReconstruction"){
+    # print(paste("Productivity Assumption running: RunReconstruction"))
     lnalpha_inlet <- read.csv("DataIn/CUPars_wBC.csv") %>% 
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha=alpha)
     lnalpha_nBC_inlet <- read.csv("DataIn/CUPars_nBC.csv") %>% 
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha_nBC=alpha)
     targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% # Previously WCVIStocks - should this be the same as "datain"?
+        # now named WAinraw
       # filter (Stock != "Cypre") %>% 
       rename(inlets=Inlet)
     Ric.A <- lnalpha_inlet %>% left_join(targetstocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
@@ -261,6 +273,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   # PARKEN Method ####
   if(prod == "Parken"){
+    # print(paste("Productivity Assumption running: Parken"))
     est_loga <- function(SMSY, SREP, shortloga=FALSE){
       
       loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
@@ -272,30 +285,40 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
     }
     
-    if(!ExtInd) {
-      WCVIStocks <- read.csv("DataIn/WCVIStocks.csv") %>% 
-        filter (Stock != "Cypre") %>% rename(inlets=Inlet)  
-      if (remove.EnhStocks) wcviRPs_long <- 
-          read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
-      if (!remove.EnhStocks) wcviRPs_long <- 
-          read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
+    # Explicit solution for logA
+      # requires definition of SMSY, and SREP
+    loga_2 <- SREP*(SMSY*gsl::lambert_W0(-exp(1-SREP/SMSY)*(SREP-SMSY)/SMSY) + SREP - SMSY)/(SMSY*(SREP-SMSY))
+    beta_2 <- loga_2/SREP
     
-    }
-    if(ExtInd) {
-      WCVIStocks <- read.csv("DataIn/WCVIStocks_ExtInd.csv") %>% 
-        rename(inlets=Inlet)
-      wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_ExtInd.csv")
-    }
+    # Re-label csv's to make sure they are pulling the right ones
+      # See above
+    # if(!ExtInd) {
+    WCVIStocks <- read.csv(here::here(dataraw)) %>% 
+        filter (Stock != "Cypre") # %>% rename(inlets=Inlet)
+          # removed Inlet naming - as most of this code is done without CU's and Inlets
+      # if (remove.EnhStocks) wcviRPs_long <- 
+      #     read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
+      # if (!remove.EnhStocks) wcviRPs_long <- 
+      #     read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
+    if(remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
+    if(!remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
+    # }
+    # TK: I think ExtInd is FALSE for these runs
+    # if(ExtInd) {
+    #   WCVIStocks <- read.csv("DataIn/WCVIStocks_ExtInd.csv") %>% 
+    #     rename(inlets=Inlet)
+    #   wcviRPs_long <- read.csv("DataOut/WCVI_SMSY_ExtInd.csv")
+    # }
     
-    wcvi_SMSY <- wcviRPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
-    wcvi_SREP <- wcviRPs_long %>% filter(Param == "SREP") %>% select(Estimate) 
-    lnalpha_Parkin <- purrr::map2_dfr (wcvi_SMSY, wcvi_SREP, shortloga=FALSE, 
+    SMSY <- RPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
+    SREP <- RPs_long %>% filter(Param == "SREP") %>% select(Estimate) 
+    lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
                                        est_loga)
     
     # Without log-normal bias correction when sampling log-beta
     # sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP), SREP_logSE$SE))
     # With a log-normal bias correction when sampling log-beta
-    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP) - 0.5*SREP_logSE$SE^2, 
+    sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, 
                       SREP_logSE$SE))
     # if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), wcviRPs$SREP, SREP_SE$SE))
     if(min(sREP)<0)    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP) - 
@@ -303,15 +326,15 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     
     SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP/Scale, Sgen.fn2)
     
-    wcviRPs <- wcviRPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
+    RPs <- RPs %>% mutate (SGEN = SGENcalcs$SGEN) %>% 
       mutate(SGEN=round(SGEN*Scale,0))
-    wcviRPs <- wcviRPs %>% mutate (a.par = SGENcalcs$apar) %>% 
+    RPs <- RPs %>% mutate (a.par = SGENcalcs$apar) %>% 
       mutate(a.par=round(a.par,2))
-    wcviRPs <- wcviRPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
+    RPs <- RPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
       mutate(SMSY=round(SMSY*Scale,0))
     
-    wcviRPs <- wcviRPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
-                         "SREPLL", "SREPUL", "a.par")]#"CU"
+    RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
+                         "SREPLL", "SREPUL", "a.par")] #"CU"
   }
   
   #--------------------------------------------------------------------------- #
@@ -325,7 +348,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # # write.csv(RPs, "DataOut/wcviRPs.csv") # or "targetRPs"
   # if (remove.EnhStocks) write.csv(wcviRPs, "DataOut/wcviRPs_noEnh.csv")
   # if (!remove.EnhStocks) write.csv(wcviRPs, "DataOut/wcviRPs_wEnh.csv")
-  
+
   
   #--------------------------------------------------------------------------- #
   # Scenario if productivity is reducted by half, as in WSP SBC CK assessment ----
@@ -355,7 +378,6 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   run_logReg <- FALSE
   if(run_logReg==FALSE){
     return(list(bench= select(SGENcalcs, -apar, -bpar)*Scale))
-    
   }
   #--------------------------------------------------------------------------- #
   # Sum escapements across indicators within inlets ----------------------------
@@ -649,6 +671,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #             CU_Status=CU_Status, SMU_ppn=SMU_ppn,
   #             LRPppn= data$p, nLL=obj$report()$ans, LOO=LOO,
   #             bench= select(SGENcalcs,-apar, -bpar)*Scale)
+
 } 
 
 # Return statements are not working

@@ -108,12 +108,10 @@ Type objective_function<Type>:: operator() ()
   
   Type ans=0.0; // ans is the log-likelihood - is then additive for each of the distributions
   int N_Obs = S.size(); //size() gives the size of the vector - TMB function
-  int N_stks = scale.size(); // Removed _std
+  int N_stks = scale.size(); 
   
-  
-
-  vector <Type> logRS_pred(N_Obs); // Removed _std
-  vector <Type> sigma = exp(logSigma); // Removed _std
+  vector <Type> logRS_pred(N_Obs); 
+  vector <Type> sigma = exp(logSigma); 
   Type sigmaA = exp(logSigmaA);
   vector <Type> nLL(N_Obs); // negative log-likelihood to calculate AIC - not need for est.
 
@@ -177,9 +175,9 @@ Type objective_function<Type>:: operator() ()
   
   //For SMSY calculation, 
   for(int i=0; i<N_stks; i++){
-    SMSY(i) =  (1 - LambertW( exp (1- logA(i)) ) ) / exp(logB(i)) ; //
+    SMSY(i) =  (1 - LambertW( exp (1- logA(i)) ) ) / exp(logB(i)) ; // scaled SMSY
   }
-  SREP = logA / exp(logB);
+  SREP = logA / exp(logB); // scaled SREP
  // SMSY(i) =  (1 - LambertW( exp (1- logA(i) - sigma^2/2) ) ) / exp(logB(i)) ; // non-bias correction version
   
   
@@ -242,7 +240,6 @@ Type objective_function<Type>:: operator() ()
   }
   
   
-  
   // Get predicted values for plotting WA regresssion with CIs
   int N_pred = pred_lnWA.size();
   vector <Type> pred_lnSMSY_stream_CI(N_pred);
@@ -256,7 +253,7 @@ Type objective_function<Type>:: operator() ()
     pred_lnSREP_stream_CI(i) = logNu1 + exp(logNu2) * pred_lnWA(i);
     pred_lnSREP_ocean_CI(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * pred_lnWA(i);
   }
-
+  
   //// Get predicted values for stream-type target stocks with CIs
   int N_target_stream = target_lnWA_stream.size();
   vector <Type> target_lnSMSY_stream(N_target_stream);
@@ -271,12 +268,11 @@ Type objective_function<Type>:: operator() ()
   int N_target_ocean = target_lnWA_ocean.size();
   vector <Type> target_lnSMSY_ocean(N_target_ocean);
   vector <Type> target_lnSREP_ocean(N_target_ocean);
-
+  
   for (int i=0; i<N_target_ocean; i++){
     target_lnSMSY_ocean(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * target_lnWA_ocean(i);
     target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
   }
-  
   
   // ///Get predicted lines values
   // int N_target_ocean = target_lnWA_ocean.size();

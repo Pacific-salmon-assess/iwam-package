@@ -361,6 +361,8 @@ IWAM_r <- function(WAin = c("DataIn/WCVIStocks.csv"),
         # nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD)) # Test
         
         nll <- nll - sum(dnorm(logAlpha_re[i], 0, sd = logAlphaSD, log = TRUE)) # Random effect on logAlpha
+          # Shouldn't this have a Jacobian?
+          # TK: No because it isn't being transformed
         logAlpha[i] <- logAlpha0 + logAlpha_re[i] # Moving the scale
         
         nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE)) # Random effect
