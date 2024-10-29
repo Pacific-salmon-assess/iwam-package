@@ -31,11 +31,15 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   
   test <- seq(0.00001,9,len=10000)
   
-  #plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Ricker Sigma (or LogA sigma)" , ylim=c(0,0.8), xlim=c(0,2.5))
-  plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Sigma for watershed-area regression" , ylim=c(0,0.8), xlim=c(0,2.5))
+  if(Delta){
+    plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Sigma for watershed-area regression" , ylim=c(0,0.8), xlim=c(0,2.5))
+  }
+  # plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Sigma for watershed-area regression" , ylim=c(0,0.8), xlim=c(0,2.5))
   cols<-viridis(4, alpha=0.9)
   
-  if(!Delta){ # FLAG ***********************************************************
+  if(!Delta){ # DELTA IS FALSE FLAG ********************************************
+    plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Ricker Sigma (or LogA sigma)" , ylim=c(0,0.8), xlim=c(0,2.5))
+    
     # Add histogram of Ricker sigmas
     
     # Ricker sigma from Parken data, excluding Upper Columbia and Siluetz, where they included AR(1) term in model
@@ -60,8 +64,6 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   # Better to use external data to form priors, 
   # E.g., NCEAS State of Alaska Salmon and People project:	
   # Brendan Connors: Chinook (n = 75) most from US West Coast and of questionable quality, remaining ~20 stocks are from AK and of higher quality
-  
-  
   
   #Inverse gamma on sqrt(variance)=sigma
   if(!Delta){
@@ -120,8 +122,8 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
     if(Delta){
       # For Delta sigma, vertical line SD of SMSY among 25 stocks
       abline(v= sd(log(read.csv("DataIn/ParkenSMSY.csv")$SMSY)), col=grey(0.5))
-      abline(v= sqrt((0.293+0.146)/2), col=grey(0.5), lty="dashed")#See Parken et al. (2006)
-      abline(v= 0.21, col=grey(0.5), lty="dotted")#See KFrun.R
+      abline(v= sqrt((0.293+0.146)/2), col=grey(0.5), lty="dashed") #See Parken et al. (2006)
+      abline(v= 0.21, col=grey(0.5), lty="dotted") #See KFrun.R
     }
     
     if(!Delta){

@@ -53,6 +53,7 @@ source(here::here("R/IWAMsmax_RTMB_model.R"))
 # IWAM PRIOR TESTING ####
     # only 10 iter's as no bootstrapping occurs before the plotting or RDS creation
     # 20000 iterations for boostrapped values
+    # NEW BOOTSTRAP VALUE: 250,000 **********************************************
 # Ricker Log A prior tests
   # "DataOut/WAregSREP_target_ricgamma_0.1_wagamma_1_IWAM_Liermann"
 iwam_d <- IWAM_func(WAinraw = c("DataIn/WCVIStocks.csv"),
@@ -63,12 +64,13 @@ iwam_default <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                           targetname = "techreport",
                           run.predict = TRUE,
                           run.bootstraps = TRUE,
-                            bs_nBS = 10,
+                            bs_nBS = 250000,
                             plot = TRUE,
                             SigRicPrior = c(F,T,F), # Ric
                             SigDeltaPrior = c(F,T,F), # WA default
                             TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
   # "DataOut/WAregSREP_target_richalfnorm_0.1_wagamma_1_IWAM_Liermann"
+  # 11 minutes run time - 675.76 seconds (for bootstrapping)
 iwam_r_halfnorm <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                              targetname = "techreport",
                           bs_nBS = 10,
@@ -160,6 +162,7 @@ png(paste("DataOut/RicADist_ComparePriors_wBC.png", sep=""), width=7, height=7, 
 plotRicA_reduc()
 dev.off()
   # Only 1 variant
+  # x-axis label not working
 
 # PDF Prior Plotting ####
    # WA sigma priors - InvGamma
