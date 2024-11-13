@@ -90,6 +90,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
                       run.predict = TRUE,
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bias.cor = TRUE,
+                      random = TRUE, # Turn random = "logA" on by default - Turn off for the fixed effect model
                       bs_seed = 1, # seed for bootstrapping
                       bs_nBS = 10, # trials for bootstrapping
                       plot = TRUE, # whether or not to create plots stored in DataOut/
@@ -449,7 +450,14 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       # and thus the run continues WITHOUT compiling.
   dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   
-  obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
+  if (!random) { # if random = FALSE
+    obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE)
+  }
+  
+  if (random) { # if random = TRUE - default
+    obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
+  }
+  # obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE, random = c("logA"))
   # obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE) # Non-logA testing
   
   upper <- unlist(obj$par)
@@ -604,7 +612,6 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # plot <- TRUE
   # Plotted values are RE-SCALED either by plotting function or are already
     # scaled e.g., "SRes"
-  
   # PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
   
   isigricprior <- which(SigRicPrior) # value
@@ -687,10 +694,11 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       png(paste("DataOut/WAregSREP_", targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
       print(paste("DataOut/WAregSREP_", targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))  
     }
-    
+
     # png(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
     # print(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))
     #png(paste("DataOut/WAreg_Liermann_SepRicA_UniformSigmaAPrior.png", sep=""), width=7, height=7, units="in", res=500)
+    
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     # change title depending on prior
     if (SigRicPrior[1] == TRUE) {SigRicPriorTitle <- "Half normal Prior Ricker sigma"}
@@ -701,11 +709,13 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     if (SigDeltaPrior[3] == TRUE) {SigDeltaPriorTitle <- "Half cauchy prior WA regression sigma"}
     # else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
     title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, sep="\n")
+    # title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, collapse = "\n")
     # title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
     # title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
     plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
                           pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
     dev.off()
+    
     #plotWAregression (pars, all_Deltas, srdat, stream, WA, pred_lnSMSY, pred_lnWA = data$pred_lnWA, 
     # title1="Common, fixed yi (logDelta1), \nRandom slope (Delta2)")
   }

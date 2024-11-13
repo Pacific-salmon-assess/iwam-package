@@ -140,9 +140,8 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
   
 }
 
-
+# ------------------------------------------------------------------------------
 # Plot SR linearized model
-
 PlotSRLinear <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_surv=NULL, r2, removeSkagit) {
   Stks <- unique(srdat$Stocknumber)
   NStks <- length(Stks)
@@ -206,7 +205,7 @@ PlotSRLinear <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_su
   
 }
 
-#------------------------------------------------------------------------------- #
+#-------------------------------------------------------------------------------
 #Plot standardized residuals ####
 
 PlotStdResid <- function(SRes){
@@ -258,128 +257,293 @@ Plotacf <- function(Preds){
 # Cow.SMSY.ll <- Cow.SMSY.ll * srdat %>% filter (Name=="Cowichan") %>% select(scale) %>% distinct() %>% as.numeric()
 
 
-#------------------------------------------------------------------ #
+# ------------------------------------------------------------------------------
 # Plot  WA regression ####
+  # SREP is currently modded for loglog plotting
+  # 11/12/2024 - Working on SMSY
 
-plotWAregressionSMSY <- function (pars, all_Deltas, srdat, lifehist, WAbase,  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
+plotWAregressionSMSY <- function (pars, all_Deltas, srdat, lifehist, WAbase,  
+                                  pred_lnSMSY=NA, pred_lnWA, title1, mod) {
 
-  SMSY <- pars %>% filter(Param=="SMSY") %>% mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
+  options(scipen = 5) # for ticks without sci. notation
+  
+  SMSY <- pars %>% filter(Param=="SMSY") %>% 
+    mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
   # what is scale of SMSY?
-  Sc <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
-  SMSY <- SMSY %>% left_join(Sc, by="Stocknumber") %>% mutate(rawSMSY=Estimate*scale)
+  Sc <- srdat %>% dplyr::select(Stocknumber, scale) %>% 
+    distinct()
+  SMSY <- SMSY %>% left_join(Sc, by="Stocknumber") %>% 
+    mutate(rawSMSY=Estimate*scale)
   lnSMSY <- log(SMSY$rawSMSY)
   lnWA <- log(WAbase$WA)
   
-  par(cex=1.5)
+  par(cex=1.5, mar = c(5, 4, 2, 2) + 0.1)
+  # If you want a title - restore to default margins or just take "mar" out
   col.use <- NA
-  for(i in 1:length(SMSY$lh)) {if (SMSY$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
-  plot(y=lnSMSY, x=lnWA, pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
-  points(y=lnSMSY, x=lnWA, pch=20, col=col.use, cex=1.5)
+  for(i in 1:length(SMSY$lh)) {
+    if (SMSY$lh[i]==0) col.use[i] <- "forestgreen" 
+    else col.use[i] <- "dodgerblue3"
+    }
+  
+  # plot(y=lnSMSY, x=lnWA, pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SMSY)")
+  # points(y=lnSMSY, x=lnWA, pch=20, col=col.use, cex=1.5)
   #points(y=lnSMSY[18:length(SMSY$lh)], x=lnWA[18:length(SMSY$lh)], pch=3, col=col.use[18:length(SMSY$lh)], cex=1.5)
-  logD1 <- all_Deltas %>% filter(Param=="logDelta1") %>% dplyr::select(Estimate) %>% pull()
-  logD2 <- all_Deltas %>% filter(Param=="logDelta2") %>% dplyr::select(Estimate) %>% pull()
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="IWAM_FixedSep_Constm"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") {
-    logD1o <- all_Deltas %>% filter(Param=="logDelta1_ocean") %>% dplyr::select(Estimate) %>% pull() + logD1}
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="IWAM_FixedSep_Constyi"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") {
-    D2o <- exp(all_Deltas %>% filter(Param=="logDelta2_ocean") %>% dplyr::select(Estimate) %>% pull() ) + exp(logD2)
-    if(nrow(all_Deltas %>% filter(Param=="Delta2_ocean"))>=1)  D2o <- (all_Deltas %>% filter(Param=="Delta2_ocean") %>% dplyr::select(Estimate) %>% pull() ) + exp(logD2)
+  
+  # LOG LOG 
+  plot(y=exp(lnSMSY), x=exp(lnWA), pch=20, col=col.use, 
+       xlab= expression("Accessible Watershed Area, km"^2), 
+       ylab= expression(S[MSY]), log = 'xy',
+       # xlim = c(50,500000) , ylim=c(100,5000000))
+       xlim = c(50,200000) , ylim=c(200,2000000))
+  # 114434 is the max watershed area - shouldn't go further over that on the x axis
+  points(y=exp(lnSMSY), x=exp(lnWA), pch=20, col=col.use, cex=1.5)
+  
+  logD1 <- all_Deltas %>% 
+    filter(Param=="logDelta1") %>% 
+    dplyr::select(Estimate) %>% 
+    pull()
+  logD2 <- all_Deltas %>% 
+    filter(Param=="logDelta2") %>% 
+    dplyr::select(Estimate) %>% 
+    pull()
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="IWAM_FixedSep_Constm"|mod=="Liermann"|
+     mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|
+     mod=="Liermann_HalfNormRicVar_FixedDelta") {
+    logD1o <- all_Deltas %>% 
+      filter(Param=="logDelta1_ocean") %>% 
+      dplyr::select(Estimate) %>% 
+      pull() + logD1}
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="IWAM_FixedSep_Constyi"|mod=="Liermann"|
+     mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|
+     mod=="Liermann_HalfNormRicVar_FixedDelta") {
+    D2o <- exp(all_Deltas %>% filter(Param=="logDelta2_ocean") %>% 
+                 dplyr::select(Estimate) %>% 
+                 pull() ) + exp(logD2)
+    if(nrow(all_Deltas %>% 
+            filter(Param=="Delta2_ocean"))>=1)  D2o <- (all_Deltas %>% 
+                                                          filter(Param=="Delta2_ocean") %>% 
+                                                          dplyr::select(Estimate) %>% 
+                                                          pull() ) + exp(logD2)
   }
+  
   #if (mod=="IWAM_FixedCombined") D2 <- all_Deltas %>% filter(Param=="Delta2_bounded") %>% dplyr::select(Estimate) %>% pull()
   if(length(logD1)==1&length(logD2)==2){
     abline(a=logD1[1], b=exp(logD2[1]), col="forestgreen", lwd=2)
     abline(a=logD1[1], b=exp(logD2[2]), col="dodgerblue3", lwd=2)
   }
+  
   if(length(logD1)==2&length(logD2)==2){
     abline(a=logD1[1], b=exp(logD2[1]), col="forestgreen", lwd=2)
     abline(a=logD1[2], b=exp(logD2[2]), col="dodgerblue3", lwd=2)
   }
-  if(mod=="IWAM_FixedCombined") abline(a=logD1, b=exp(logD2), col="maroon", lwd=2)#Actually pulls Delta2_bounded, so no need to log
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") {
-    abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
-    abline(a=logD1o, b=D2o, col="dodgerblue3", lwd=2)
+  
+  if(mod=="IWAM_FixedCombined") abline(a=logD1, b=exp(logD2), col="maroon", lwd=2) # Actually pulls Delta2_bounded, so no need to log
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="Liermann"|mod=="IWAM_Liermann"|
+     mod=="Liermann_PriorRicSig_PriorDeltaSig"|
+     mod=="Liermann_HalfNormRicVar_FixedDelta") {
+    # abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
+    # abline(a=logD1o, b=D2o, col="dodgerblue3", lwd=2)
+    
+    simWA <- seq(3, 13, 0.5)
+    Preds <-  logD1 + simWA*exp(logD2) 
+    Predso <- logD1o + simWA*D2o
+    lines(x=exp(simWA), y=exp(Preds), col="forestgreen", lwd=2)
+    lines(x=exp(simWA), y=exp(Predso), col="dodgerblue3", lwd=2)
   }
+  
   if(mod=="IWAM_FixedSep_Constm") {
     abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
     abline(a=logD1o, b=exp(logD2), col="dodgerblue3", lwd=2)
   }
+  
   if(mod=="IWAM_FixedSep_Constyi") {
     abline(a=logD1, b=exp(logD2), col="forestgreen", lwd=2)
     abline(a=logD1, b=D2o, col="dodgerblue3", lwd=2)
   }
   
-  
   if(exists("pred_lnSMSY")){
-    pred_lnSMSY <- pred_lnSMSY %>% mutate (up = Estimate + 1.96 * Std..Error, lo=Estimate - 1.96*Std..Error) 
-    #up_S <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_S") %>% dplyr::select(up) %>% pull()
-    #lo_S <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_S") %>% dplyr::select(lo) %>% pull()
-    #up_O <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_O") %>% dplyr::select(up) %>% pull()
-    #lo_O <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_O") %>% dplyr::select(lo) %>% pull()
-    up_S <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_stream_CI") %>% dplyr::select(up) %>% pull()
-    lo_S <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_stream_CI") %>% dplyr::select(lo) %>% pull()
-    up_O <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_ocean_CI") %>% dplyr::select(up) %>% pull()
-    lo_O <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_ocean_CI") %>% dplyr::select(lo) %>% pull()
-    up <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_CI") %>% dplyr::select(up) %>% pull()
-    lo <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_CI") %>% dplyr::select(lo) %>% pull()
-    if(is.na(up_S[1])==FALSE) polygon(x=c(pred_lnWA, rev(pred_lnWA)), y=c(up_S, rev(lo_S)), col=rgb(0,0.4,0, alpha=0.2), border=NA)
-    if(is.na(up_O[1])==FALSE) polygon(x=c(pred_lnWA, rev(pred_lnWA)), y=c(up_O, rev(lo_O)), col=rgb(0,0.2,0.4, alpha=0.2), border=NA)
-    if(is.na(up[1])==FALSE) polygon(x=c(pred_lnWA, rev(pred_lnWA)), y=c(up, rev(lo)), col=rgb(0.6,0.2,0.4, alpha=0.2), border=NA)
+    pred_lnSMSY <- pred_lnSMSY %>% 
+      mutate (up = Estimate + 1.96 * Std..Error, lo=Estimate - 1.96*Std..Error) 
+    #up_S <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_S") %>% 
+    # dplyr::select(up) %>% pull()
+    #lo_S <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_S") %>% 
+    # dplyr::select(lo) %>% pull()
+    #up_O <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_O") %>% 
+    # dplyr::select(up) %>% pull()
+    #lo_O <- pred_lnSMSY %>% filter(Param== "pred_lnSMSY_O") %>% 
+    # dplyr::select(lo) %>% pull()
+    up_S <- pred_lnSMSY %>% 
+      filter(Param== "pred_lnSMSY_stream_CI") %>% 
+      dplyr::select(up) %>% 
+      pull()
+    lo_S <- pred_lnSMSY %>% 
+      filter(Param== "pred_lnSMSY_stream_CI") %>% 
+      dplyr::select(lo) %>% 
+      pull()
+    up_O <- pred_lnSMSY %>% 
+      filter(Param== "pred_lnSMSY_ocean_CI") %>% 
+      dplyr::select(up) %>% 
+      pull()
+    lo_O <- pred_lnSMSY %>% 
+      filter(Param== "pred_lnSMSY_ocean_CI") %>% 
+      dplyr::select(lo) %>% 
+      pull()
+    up <- pred_lnSMSY %>% 
+      filter(Param== "pred_lnSMSY_CI") %>% 
+      dplyr::select(up) %>% 
+      pull()
+    lo <- pred_lnSMSY %>% 
+      filter(Param== "pred_lnSMSY_CI") %>% 
+      dplyr::select(lo) %>% 
+      pull()
+    if(is.na(up_S[1])==FALSE) polygon(x=c(exp(pred_lnWA), exp(rev(pred_lnWA))), 
+                                      y=c(exp(up_S), exp(rev(lo_S))), 
+                                      col=rgb(0,0.4,0, alpha=0.2), border=NA) 
+    if(is.na(up_O[1])==FALSE) polygon(x=c(exp(pred_lnWA), exp(rev(pred_lnWA))), 
+                                      y=c(exp(up_O), exp(rev(lo_O))), 
+                                      col=rgb(0,0.2,0.4, alpha=0.2), border=NA) 
+    if(is.na(up[1])==FALSE) polygon(x=c(exp(pred_lnWA), exp(rev(pred_lnWA))), 
+                                    y=c(exp(up), exp(rev(lo))), 
+                                    col=rgb(0.6,0.2,0.4, alpha=0.2), border=NA)
   }
-
+  
   if(length(logD1)==2&length(logD2)==2){
-    text(x=6, y=10.5,labels= paste0("Ocean-type\nlog(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="dodgerblue3", cex=0.8)
-    text(x=9, y=6.5, labels= paste0("Stream-type\nlog(Delta1)=",round(logD1[3],2), ", \nDelta2=", round(exp(logD2[2]),2)), col="forestgreen", cex=0.8)
+    text(x=6, y=10.5,labels= paste0("Ocean-type\nlog(Delta1)=",
+                                    round(logD1[1],2), ", \nDelta2=", 
+                                    round(exp(logD2[1]),2)), col="dodgerblue3", cex=0.8)
+    text(x=9, y=6.5, labels= paste0("Stream-type\nlog(Delta1)=",
+                                    round(logD1[3],2), ", \nDelta2=", 
+                                    round(exp(logD2[2]),2)), col="forestgreen", cex=0.8)
   }
+  
   if(length(logD1)==1&length(logD2)==2){
-    text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="dodgerblue3", cex=0.8)
-    text(x=9, y=6.5, labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[2]),2)), col="forestgreen", cex=0.8)
+    text(x=6, y=10.5,labels= paste0("log(Delta1)=",
+                                    round(logD1[1],2), ", \nDelta2=", 
+                                    round(exp(logD2[1]),2)), col="dodgerblue3", cex=0.8)
+    text(x=9, y=6.5, labels= paste0("log(Delta1)=",
+                                    round(logD1[1],2), ", \nDelta2=", 
+                                    round(exp(logD2[2]),2)), col="forestgreen", cex=0.8)
   }
+  
   if(mod=="IWAM_FixedCombined"){
-    text(x=6, y=10.5,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="maroon", cex=0.8)
+    text(x=6, y=10.5,labels= paste0("log(Delta1)=",
+                                    round(logD1[1],2), ", \nDelta2=", 
+                                    round(exp(logD2[1]),2)), col="maroon", cex=0.8)
   
   }
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta"){
-    text(x=9, y=7,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
-    text(x=6, y=9.5,labels= paste0("log(Delta1)=",round(logD1o[1],2), ", \nDelta2=", round(D2o[1],2)), col="dodgerblue3", cex=0.8)
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="Liermann"|mod=="IWAM_Liermann"|
+     mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta"){
+    text(x= 50000, y= 500, labels= paste0("log(Delta1)=",
+                                 round(logD1[1],2), ", \nDelta2=",
+                                 round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
+    text(x= 500, y= 50000, labels= paste0("log(Delta1)=",
+                                   round(logD1o[1],2), ", \nDelta2=",
+                                   round(D2o[1],2)), col="dodgerblue3", cex=0.8)
   }
+  
   if(mod=="IWAM_FixedSep_Constm"){
-    text(x=9, y=7,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
-    text(x=6, y=9.5,labels= paste0("log(Delta1)=",round(logD1o[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="dodgerblue3", cex=0.8)
+    text(x=9, y=7,labels= paste0("log(Delta1)=",
+                                 round(logD1[1],2), ", \nDelta2=", 
+                                 round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
+    text(x=6, y=9.5,labels= paste0("log(Delta1)=",
+                                   round(logD1o[1],2), ", \nDelta2=", 
+                                   round(exp(logD2[1]),2)), col="dodgerblue3", cex=0.8)
   }
+  
   if(mod=="IWAM_FixedSep_Constyi"){
-    text(x=9, y=7,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
-    text(x=6, y=9.5,labels= paste0("log(Delta1)=",round(logD1[1],2), ", \nDelta2=", round(D2o[1],2)), col="dodgerblue3", cex=0.8)
+    text(x=9, y=7,labels= paste0("log(Delta1)=",
+                                 round(logD1[1],2), ", \nDelta2=", 
+                                 round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
+    text(x=6, y=9.5,labels= paste0("log(Delta1)=",
+                                   round(logD1[1],2), ", \nDelta2=", 
+                                   round(D2o[1],2)), col="dodgerblue3", cex=0.8)
   }
   
-  
-  title(title1, cex.main=0.9)
+  # Title if you want it
+  # title(title1, cex.main=0.9)
   
 }
 
-
-plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WAbase,  pred_lnSREP=NA, pred_lnWA, title1, mod) {
+# ------------------------------------------------------------------------------
+plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WAbase,  
+                                  pred_lnSREP=NA, pred_lnWA, title1, mod) {
   
-  SREP <- pars %>% filter(Param=="SREP") %>% mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
+  options(scipen = 5) # for ticks without sci. notation
+  
+  SREP <- pars %>% filter(Param=="SREP") %>% 
+    mutate(ModelOrder=0:(length(unique(pars$Stocknumber))-1))
   # what is scale of SREP?
-  Sc <- srdat %>% select(Stocknumber, scale) %>% distinct()
-  SREP <- SREP %>% left_join(Sc) %>% mutate(rawSREP=Estimate*scale)
+  Sc <- srdat %>% 
+    select(Stocknumber, scale) %>% 
+    distinct()
+  SREP <- SREP %>% 
+    left_join(Sc) %>% 
+    mutate(rawSREP=Estimate*scale)
   lnSREP <- log(SREP$rawSREP)
   lnWA <- log(WAbase$WA)
   
-  par(cex=1.5)
+  par(cex=1.5, mar = c(5, 4, 2, 2) + 0.1)
+    # If you want a title - restore to default margins or just take "mar" out
   col.use <- NA
-  for(i in 1:length(SREP$lh)) {if (SREP$lh[i]==0) col.use[i] <- "forestgreen" else col.use[i] <- "dodgerblue3"}
-  plot(y=lnSREP, x=lnWA, pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SREP)")
-  points(y=lnSREP, x=lnWA, pch=20, col=col.use, cex=1.5)
-  #points(y=lnSREP[18:length(SREP$lh)], x=lnWA[18:length(SREP$lh)], pch=3, col=col.use[18:length(SREP$lh)], cex=1.5)
-  logN1 <- all_Deltas %>% filter(Param=="logNu1") %>% dplyr::select(Estimate) %>% pull()
-  logN2 <- all_Deltas %>% filter(Param=="logNu2") %>% dplyr::select(Estimate) %>% pull()
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="IWAM_FixedSep_Constm"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") logN1o <- all_Deltas %>% filter(Param=="logNu1_ocean") %>% dplyr::select(Estimate) %>% pull() + logN1
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="IWAM_FixedSep_Constyi"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") {
-    N2o <- exp(all_Deltas %>% filter(Param=="logNu2_ocean") %>% dplyr::select(Estimate) %>% pull() ) + exp(logN2)
-    if(nrow(all_Deltas %>% filter(Param=="Nu2_ocean"))>=1)  N2o <- (all_Deltas %>% filter(Param=="Nu2_ocean") %>% dplyr::select(Estimate) %>% pull() ) + exp(logN2)
+  for(i in 1:length(SREP$lh)) {
+    if (SREP$lh[i]==0) col.use[i] <- "forestgreen" 
+    else col.use[i] <- "dodgerblue3"
+    }
+  
+  # plot(y=lnSREP, x=lnWA, pch=20, col=col.use, xlab="log(Watershed Area, km2)", ylab="log(SREP)") # ORIGINAL
+  # points(y=lnSREP, x=lnWA, pch=20, col=col.use, cex=1.5) # ORIGINAL
+  # points(y=lnSREP[18:length(SREP$lh)], x=lnWA[18:length(SREP$lh)], pch=3, col=col.use[18:length(SREP$lh)], cex=1.5)
+  
+  # LOG LOG
+  plot(y=exp(lnSREP), x=exp(lnWA), pch=20, col=col.use, 
+       xlab= expression("Accessible Watershed Area, km"^2), 
+       ylab=expression(S[REP]), log = 'xy',
+       # xlim =c(50,500000) , ylim=c(500,1000000))
+       xlim = c(50,200000) , ylim=c(200,2000000))
+  points(y=exp(lnSREP), x=exp(lnWA), pch=20, col=col.use, cex=1.5)
+    # Works for getting points on there - but lines are not showing properly
+    # Axes numbers are in sci-notif - can that be changed?
+
+  logN1 <- all_Deltas %>% 
+    filter(Param=="logNu1") %>% 
+    dplyr::select(Estimate) %>% 
+    pull()
+  logN2 <- all_Deltas %>% 
+    filter(Param=="logNu2") %>% 
+    dplyr::select(Estimate) %>% 
+    pull()
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="IWAM_FixedSep_Constm"|mod=="Liermann"|
+     mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|
+     mod=="Liermann_HalfNormRicVar_FixedDelta") logN1o <- all_Deltas %>% 
+    filter(Param=="logNu1_ocean") %>% 
+    dplyr::select(Estimate) %>% 
+    pull() + logN1
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="IWAM_FixedSep_Constyi"|mod=="Liermann"|
+     mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|
+     mod=="Liermann_HalfNormRicVar_FixedDelta") {
+    N2o <- exp(all_Deltas %>% 
+                 filter(Param=="logNu2_ocean") %>% 
+                 dplyr::select(Estimate) %>% 
+                 pull() ) + exp(logN2)
+    if(nrow(all_Deltas %>% 
+            filter(Param=="Nu2_ocean"))>=1)  N2o <- (all_Deltas %>% filter(Param=="Nu2_ocean") %>% 
+                                                       dplyr::select(Estimate) %>% 
+                                                       pull() ) + exp(logN2)
   }
+  
   #if (mod=="IWAM_FixedCombined") D2 <- all_Deltas %>% filter(Param=="Delta2_bounded") %>% dplyr::select(Estimate) %>% pull()
-  if(length(logN1)==1&length(logN2)==2){
+  if(length(logN1)==1&length(logN2)==2){ 
     abline(a=logN1[1], b=exp(logN2[1]), col="forestgreen", lwd=2)
     abline(a=logN1[1], b=exp(logN2[2]), col="dodgerblue3", lwd=2)
   }
@@ -387,11 +551,22 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WAbase,  pr
     abline(a=logN1[1], b=exp(logN2[1]), col="forestgreen", lwd=2)
     abline(a=logN1[2], b=exp(logN2[2]), col="dodgerblue3", lwd=2)
   }
-  if(mod=="IWAM_FixedCombined") abline(a=logN1, b=exp(logN2), col="maroon", lwd=2)#Actually pulls Delta2_bounded, so no need to log
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") {
-    abline(a=logN1, b=exp(logN2), col="forestgreen", lwd=2)
-    abline(a=logN1o, b=N2o, col="dodgerblue3", lwd=2)
+  
+  if(mod=="IWAM_FixedCombined") abline(a=logN1, b=exp(logN2), col="maroon", lwd=2) #Actually pulls Delta2_bounded, so no need to log
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="Liermann"|mod=="IWAM_Liermann"|
+     mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta") {
+    # abline(a=logN1, b=exp(logN2), col="forestgreen", lwd=2)
+    # abline(a=logN1o, b=N2o, col="dodgerblue3", lwd=2)
+    
+    simWA <-  seq(3, 13, 0.5)
+    Preds <-  logN1 + simWA*exp(logN2) 
+    Predso <- logN1o + simWA*N2o
+    lines(x=exp(simWA), y=exp(Preds), col="forestgreen", lwd=2)
+    lines(x=exp(simWA), y=exp(Predso), col="dodgerblue3", lwd=2)
   }
+  
   if(mod=="IWAM_FixedSep_Constm") {
     abline(a=logN1, b=exp(logN2), col="forestgreen", lwd=2)
     abline(a=logN1o, b=exp(logN2), col="dodgerblue3", lwd=2)
@@ -401,55 +576,230 @@ plotWAregressionSREP <- function (pars, all_Deltas, srdat, lifehist, WAbase,  pr
     abline(a=logN1, b=N2o, col="dodgerblue3", lwd=2)
   }
   
-  
   if(exists("pred_lnSREP")){
     pred_lnSREP <- pred_lnSREP %>% mutate (up = Estimate + 1.96 * Std..Error, lo=Estimate - 1.96*Std..Error) 
-    #up_S <- pred_lnSREP %>% filter(Param== "pred_lnSREP_S") %>% dplyr::select(up) %>% pull()
-    #lo_S <- pred_lnSREP %>% filter(Param== "pred_lnSREP_S") %>% dplyr::select(lo) %>% pull()
-    #up_O <- pred_lnSREP %>% filter(Param== "pred_lnSREP_O") %>% dplyr::select(up) %>% pull()
-    #lo_O <- pred_lnSREP %>% filter(Param== "pred_lnSREP_O") %>% dplyr::select(lo) %>% pull()
-    up_S <- pred_lnSREP %>% filter(Param== "pred_lnSREP_stream_CI") %>% dplyr::select(up) %>% pull()
-    lo_S <- pred_lnSREP %>% filter(Param== "pred_lnSREP_stream_CI") %>% dplyr::select(lo) %>% pull()
-    up_O <- pred_lnSREP %>% filter(Param== "pred_lnSREP_ocean_CI") %>% dplyr::select(up) %>% pull()
-    lo_O <- pred_lnSREP %>% filter(Param== "pred_lnSREP_ocean_CI") %>% dplyr::select(lo) %>% pull()
-    up <- pred_lnSREP %>% filter(Param== "pred_lnSREP_CI") %>% dplyr::select(up) %>% pull()
-    lo <- pred_lnSREP %>% filter(Param== "pred_lnSREP_CI") %>% dplyr::select(lo) %>% pull()
-    if(is.na(up_S[1])==FALSE) polygon(x=c(pred_lnWA, rev(pred_lnWA)), y=c(up_S, rev(lo_S)), col=rgb(0,0.4,0, alpha=0.2), border=NA)
-    if(is.na(up_O[1])==FALSE) polygon(x=c(pred_lnWA, rev(pred_lnWA)), y=c(up_O, rev(lo_O)), col=rgb(0,0.2,0.4, alpha=0.2), border=NA)
-    if(is.na(up[1])==FALSE) polygon(x=c(pred_lnWA, rev(pred_lnWA)), y=c(up, rev(lo)), col=rgb(0.6,0.2,0.4, alpha=0.2), border=NA)
+    #up_S <- pred_lnSREP %>% filter(Param== "pred_lnSREP_S") %>% 
+    # dplyr::select(up) %>% pull()
+    #lo_S <- pred_lnSREP %>% filter(Param== "pred_lnSREP_S") %>% 
+    # dplyr::select(lo) %>% pull()
+    #up_O <- pred_lnSREP %>% filter(Param== "pred_lnSREP_O") %>% 
+    # dplyr::select(up) %>% pull()
+    #lo_O <- pred_lnSREP %>% filter(Param== "pred_lnSREP_O") %>% 
+    # dplyr::select(lo) %>% pull()
+    up_S <- pred_lnSREP %>% 
+      filter(Param== "pred_lnSREP_stream_CI") %>% 
+      dplyr::select(up) %>% 
+      pull()
+    lo_S <- pred_lnSREP %>% 
+      filter(Param== "pred_lnSREP_stream_CI") %>% 
+      dplyr::select(lo) %>% 
+      pull()
+    up_O <- pred_lnSREP %>% 
+      filter(Param== "pred_lnSREP_ocean_CI") %>% 
+      dplyr::select(up) %>% 
+      pull()
+    lo_O <- pred_lnSREP %>% 
+      filter(Param== "pred_lnSREP_ocean_CI") %>% 
+      dplyr::select(lo) %>%  
+      pull()
+    up <- pred_lnSREP %>% 
+      filter(Param== "pred_lnSREP_CI") %>% 
+      dplyr::select(up) %>% 
+      pull()
+    lo <- pred_lnSREP %>% 
+      filter(Param== "pred_lnSREP_CI") %>% 
+      dplyr::select(lo) %>% 
+      pull()
+    
+    if(is.na(up_S[1])==FALSE) polygon(x=c(exp(pred_lnWA), exp(rev(pred_lnWA))), 
+                                      y=c(exp(up_S), exp(rev(lo_S))), 
+                                      col=rgb(0,0.4,0, alpha=0.2), border=NA)
+    if(is.na(up_O[1])==FALSE) polygon(x=c(exp(pred_lnWA), exp(rev(pred_lnWA))), 
+                                      y=c(exp(up_O), exp(rev(lo_O))), 
+                                      col=rgb(0,0.2,0.4, alpha=0.2), border=NA)
+    if(is.na(up[1])==FALSE) polygon(x=c(exp(pred_lnWA), exp(rev(pred_lnWA))), 
+                                    y=c(exp(up), exp(rev(lo))), 
+                                    col=rgb(0.6,0.2,0.4, alpha=0.2), border=NA)
   }
   
   if(length(logN1)==2&length(logN2)==2){
-    text(x=6, y=10.5,labels= paste0("Ocean-type\nlog(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="dodgerblue3", cex=0.8)
-    text(x=9, y=6.5, labels= paste0("Stream-type\nlog(Nu1)=",round(logN1[3],2), ", \nNu2=", round(exp(logN2[2]),2)), col="forestgreen", cex=0.8)
-  }
-  if(length(logN1)==1&length(logN2)==2){
-    text(x=6, y=10.5,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="dodgerblue3", cex=0.8)
-    text(x=9, y=6.5, labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[2]),2)), col="forestgreen", cex=0.8)
-  }
-  if(mod=="IWAM_FixedCombined"){
-    text(x=6, y=10.5,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="maroon", cex=0.8)
-  }
-  # Liermann (old was y=7)
-  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=="IWAM_Liermann"|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta"){
-    text(x=9, y=8,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
-    text(x=6, y=10.5,labels= paste0("log(Nu1)=",round(logN1o[1],2), ", \nNu2=", round(N2o[1],2)), col="dodgerblue3", cex=0.8)
-  }
-  if(mod=="IWAM_FixedSep_Constm"){
-    text(x=9, y=7,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
-    text(x=6, y=9.5,labels= paste0("log(Nu1)=",round(logN1o[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="dodgerblue3", cex=0.8)
-  }
-  if(mod=="IWAM_FixedSep_Constyi"){
-    text(x=9, y=7,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
-    text(x=6, y=9.5,labels= paste0("log(Nu1)=",round(logN1[1],2), ", \nNu2=", round(N2o[1],2)), col="dodgerblue3", cex=0.8)
+    text(x=6, y=10.5,labels= paste0("Ocean-type\nlog(Nu1)=",
+                                    round(logN1[1],2), ", \nNu2=", 
+                                    round(exp(logN2[1]),2)), col="dodgerblue3", cex=0.8)
+    text(x=9, y=6.5, labels= paste0("Stream-type\nlog(Nu1)=",
+                                    round(logN1[3],2), ", \nNu2=", 
+                                    round(exp(logN2[2]),2)), col="forestgreen", cex=0.8)
   }
   
+  if(length(logN1)==1&length(logN2)==2){
+    text(x=6, y=10.5,labels= paste0("log(Nu1)=",
+                                    round(logN1[1],2), ", \nNu2=", 
+                                    round(exp(logN2[1]),2)), col="dodgerblue3", cex=0.8)
+    text(x=9, y=6.5, labels= paste0("log(Nu1)=",
+                                    round(logN1[1],2), ", \nNu2=", 
+                                    round(exp(logN2[2]),2)), col="forestgreen", cex=0.8)
+  }
+  
+  if(mod=="IWAM_FixedCombined"){
+    text(x=6, y=10.5,labels= paste0("log(Nu1)=",
+                                    round(logN1[1],2), ", \nNu2=", 
+                                    round(exp(logN2[1]),2)), col="maroon", cex=0.8)
+  }
+  
+  if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedSep_RicStd"|
+     mod=="Liermann"|mod=="IWAM_Liermann"|
+     mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta"){
+    text(x = 50000, y = 500, labels = paste0("log(Nu1)=",
+                                 round(logN1[1],2), ", \nNu2=", 
+                                 round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
+    text(x = 500, y = 50000, labels = paste0("log(Nu1)=",
+                                    round(logN1o[1],2), ", \nNu2=", 
+                                    round(N2o[1],2)), col="dodgerblue3", cex=0.8)
+    # text(x= 50000, y= 500)
+    # text(x= 500, y= 50000)
+    # x = exp(9), y = exp(8)
+    # x = exp(6), y = exp(10.5)
+  }
+  
+  if(mod=="IWAM_FixedSep_Constm"){
+    text(x=9, y=7,labels= paste0("log(Nu1)=",
+                                 round(logN1[1],2), ", \nNu2=", 
+                                 round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
+    text(x=6, y=9.5,labels= paste0("log(Nu1)=",
+                                   round(logN1o[1],2), ", \nNu2=", 
+                                   round(exp(logN2[1]),2)), col="dodgerblue3", cex=0.8)
+  }
+  
+  if(mod=="IWAM_FixedSep_Constyi"){
+    text(x = 9, y = 7, labels = paste0("log(Nu1)=",
+                                 round(logN1[1],2), ", \nNu2=", 
+                                 round(exp(logN2[1]),2)), col="forestgreen", cex=0.8)
+    text(x = 6, y = 9.5, labels = paste0("log(Nu1)=",
+                                   round(logN1[1],2), ", \nNu2=", 
+                                   round(N2o[1],2)), col="dodgerblue3", cex=0.8)
+  }
+  
+  # If you want titles
+  # title(title1, cex.main=0.9)
+  
+}
+
+#-------------------------------------------------------------------------------
+# Plot WA regression for SREP with WCVI Chinook stock superimposed
+plotWAregressionSREP_withWCVI <- function (All_Est, All_Deltas, SRDat, Stream, 
+                                           WA,  PredlnSREP=NA, PredlnWA, 
+                                           WCVISREP, title1, mod,
+                                           WCVIlnWA_file = 
+                                             "DataIn/WCVIStocks.csv") {
+  
+  options(scipen=5) # This removes the tendancy for ticks with sci. notation.
+  SREP <- All_Est %>% filter(Param=="SREP") %>% 
+    mutate(ModelOrder=0:(length(unique(All_Est$Stocknumber))-1))
+  # Only ocean-type WAs
+  SREP.x <- SREP %>% select(Stocknumber, lh)
+  WA.x <- left_join(SREP.x,WA, by=c("Stocknumber"))
+  WA.x <- WA.x %>% filter(lh==1)
+  lnWA <- log(WA.x$WA)
+  
+  # Only ocean-type SREP:
+  
+  SREP <- SREP %>% filter(lh==1)
+  # what is scale of SMSY?
+  Sc <- SRDat %>% dplyr::select(Stocknumber, Scale) %>% distinct()
+  SREP <- SREP %>% left_join(Sc, by="Stocknumber") %>% 
+    mutate(rawSREP=Estimate*Scale)
+  lnSREP <- log(SREP$rawSREP)
+  
+  par(cex=1.5)
+  col.use <- NA
+  for(i in 1:length(SREP$lh)) {
+    if (SREP$lh[i]==0) col.use[i] <- "forestgreen" 
+        else col.use[i] <- "dodgerblue3"
+  }
+  plot(y = exp(lnSREP), x = exp(lnWA), log="xy", pch = 20, col = col.use, 
+       xlab = expression("Accessible watershed area, km"^2), 
+       ylab=expression(S[REP]), 
+       xlim =c(10,100000) , ylim=c(50,100000))
+  
+  logD1 <- All_Deltas %>% filter(Param=="logNu1") %>% 
+    dplyr::select(Estimate) %>% pull()
+  logD2 <- All_Deltas %>% filter(Param=="logNu2") %>% 
+    dplyr::select(Estimate) %>% pull()
+  if(mod=="Liermann_PriorRicSig_PriorDeltaSig") {
+    logD1o <- All_Deltas %>% 
+      filter(Param=="logNu1ocean") %>% 
+      dplyr::select(Estimate) %>% pull() + logD1
+  }
+  if(mod=="Liermann_PriorRicSig_PriorDeltaSig") {
+    D2o <- exp(All_Deltas %>% filter(Param=="logNu2ocean") %>% 
+                 dplyr::select(Estimate) %>% pull() ) + exp(logD2)
+    
+    if(nrow(All_Deltas %>% filter(Param=="Nu2ocean"))>=1)  {
+      D2o <- (All_Deltas %>% filter(Param=="Nu2ocean") %>% 
+                dplyr::select(Estimate) %>% pull() ) + exp(logD2) 
+    }
+  }
+  if(mod=="Liermann_PriorRicSig_PriorDeltaSig") {
+    simWA <-  seq(2,12,0.5)
+    Preds <-  logD1 + simWA*exp(logD2) 
+    Predso <- logD1o + simWA*D2o
+    # lines(x=exp(simWA), y=exp(Preds), col="forestgreen", lwd=2)
+    lines(x=exp(simWA), y=exp(Predso), col="dodgerblue3", lwd=2)
+  }
+  if(exists("PredlnSREP")){
+    PredlnSREP <- PredlnSREP %>% 
+      mutate (up = Estimate + 1.96 * Std..Error, lo=Estimate - 1.96*Std..Error) 
+    up_S <- PredlnSREP %>% filter(Param== "PredlnSREPs_CI") %>% 
+      dplyr::select(up) %>% pull()
+    lo_S <- PredlnSREP %>% filter(Param== "PredlnSREPs_CI") %>% 
+      dplyr::select(lo) %>% pull()
+    up_O <- PredlnSREP %>% filter(Param== "PredlnSREPo_CI") %>% 
+      dplyr::select(up) %>% pull()
+    lo_O <- PredlnSREP %>% filter(Param== "PredlnSREPo_CI") %>% 
+      dplyr::select(lo) %>% pull()
+    up <- PredlnSREP %>% filter(Param== "PredlnSREP_CI") %>% 
+      dplyr::select(up) %>% pull()
+    lo <- PredlnSREP %>% filter(Param== "PredlnSREP_CI") %>% 
+      dplyr::select(lo) %>% pull()
+    # if(is.na(up_S[1])==FALSE) polygon(x = c(exp(PredlnWA), exp(rev(PredlnWA))), 
+    #                                   y = c(exp(up_S), exp(rev(lo_S))), 
+    #                                   col = rgb(0,0.4,0, alpha=0.2), border=NA)
+    if(is.na(up_O[1])==FALSE) polygon(x = c(exp(PredlnWA), exp(rev(PredlnWA))), 
+                                      y = c(exp(up_O), exp(rev(lo_O))), 
+                                      col = rgb(0,0.2,0.4, alpha=0.2), 
+                                      border=NA)
+    if(is.na(up[1])==FALSE) polygon(x = c(PredlnWA, rev(PredlnWA)), 
+                                    y = c(up, rev(lo)), 
+                                    col = rgb(0.6,0.2,0.4, alpha=0.2), 
+                                    border=NA)
+  }
+  
+  if(mod=="Liermann_PriorRicSig_PriorDeltaSig"){
+    text(x=9, y=7,labels= 
+           paste0( "log(Delta1)=", round(logD1[1],2), ", \nDelta2=", 
+                   round(exp(logD2[1]),2)), col="forestgreen", cex=0.8)
+    text(x=6, y=9.5,labels= 
+           paste0("log(Delta1)=", round(logD1o[1],2), ", \nDelta2=", 
+                  round(D2o[1],2)), col="dodgerblue3", cex=0.8)
+  }
+  
+  WCVIlnWA <- read.csv("DataIn/WCVIStocks.csv") %>% mutate (lnWA=log(WA)) %>% 
+    filter(lh==1) %>% select(Stock, lnWA) %>% filter(Stock!="Cypre")
+  WCVISREP.x <- WCVISREP %>% filter(Param=="SREP") %>% 
+    select(Stock, Estimate, LL, UL) %>% filter(Stock!="Cypre")
+  WCVIplot.df <- left_join(WCVIlnWA, WCVISREP.x)
+  WCVIplot.df <- WCVIplot.df[complete.cases(WCVIplot.df),]
+  WCVIplot.df <- arrange(WCVIplot.df, lnWA)
+  points(x=exp(WCVIplot.df$lnWA), y=WCVIplot.df$Estimate, pch = 3, cex=0.5)
+  # polygon(x = c(exp(WCVIplot.df$lnWA), exp(rev(WCVIplot.df$lnWA))), 
+  #         y = c(WCVIplot.df$UL, rev(WCVIplot.df$LL)), 
+  #         col = grey(0.3, alpha=0.2), border=NA)
   
   title(title1, cex.main=0.9)
   
 }
 
-
+# -----------------------------------------------------------------------------
 # plotWAregression_Parken <- function(data, all_Deltas){
 #   par(cex=1.5)
 #   col.use <- NA
@@ -584,9 +934,13 @@ plotRicA_reduc <- function (){
   # All_Est_Liermann_SepRicA_invGamma0.001_invGammaA0.01 <- readRDS("DataOut/All_Est_Liermann_SepRicA_invGamma0.001_invGammaA0.01.RDS")
   
   # New read-ins
-  All_Est_Fixed <- readRDS("DataOut/pars_ricgamma_0.1_wagamma_1_IWAM_FixedEffects")
+    # TK: These are no broken due to the changes in naming conventions by IWAM_model.R
+  All_Est_Fixed <- readRDS("DataOut/pars_techreport_ricgamma_0.1_wagamma_1_IWAM_FixedEffects")
+  # pars_techreport_ricgamma_0.1_wagamma_1_IWAM_FixedEffects - new
+  # pars_ricgamma_0.1_wagamma_1_IWAM_FixedEffects - original
   RicFixed <- All_Est_Fixed %>% filter(Param=="logA")
   
+  # Re-name below
   All_Est_Default <- readRDS("DataOut/pars_ricgamma_0.1_wagamma_1_wagamma_IWAM_Liermann")
   RicDefault <-  All_Est_Default %>%  filter(Param=="logA")
   

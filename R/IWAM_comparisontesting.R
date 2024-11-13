@@ -61,10 +61,12 @@ iwam_d <- IWAM_func(WAinraw = c("DataIn/WCVIStocks.csv"),
                     bias.cor = FALSE) # [1] is Ric, [2] is WA
 
 iwam_default <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
-                          targetname = "techreport",
-                          run.predict = TRUE,
-                          run.bootstraps = TRUE,
-                            bs_nBS = 250000,
+                          targetname = "ptest",
+                          run.predict = F,
+                          run.bootstraps = F,
+                          random = TRUE, 
+                          bias.cor = TRUE,
+                            bs_nBS = 10, # 250,000 new FULL RUN
                             plot = TRUE,
                             SigRicPrior = c(F,T,F), # Ric
                             SigDeltaPrior = c(F,T,F), # WA default
@@ -147,7 +149,8 @@ iwam_wa_gamma0.01 <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
   # 9 RDS files to find
 iwam_fixedeff <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                            targetname = "techreport",
-                          predict = FALSE,
+                          run.predict = FALSE,
+                          random = FALSE, # Turn off random effect of logA
                           bs_nBS = 10,
                           plot = TRUE,
                           run.bootstraps = FALSE,
@@ -156,6 +159,15 @@ iwam_fixedeff <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
 
 # SR_curves and WA Linear Reg plots ####
 # Basic plots will be created provided plot = TRUE for desired penalty variants.
+# NEW WA Linear Reg Plot
+  # Change x-axis labels
+  # Change axes to both x and y being ong nat log
+  # TK: Can I do that externally - or is it worth doing it within the function?
+    # What data is used by the internal function? Can't I just call it externally?
+    # plotWAregressionSREP function from PlotFunctions.R
+        # plotWAregressionSREP (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSREP, 
+        # pred_lnWA = data$pred_lnWA, title1=title_plot, mod)
+
 
 # RicA Boxplot call ####
 png(paste("DataOut/RicADist_ComparePriors_wBC.png", sep=""), width=7, height=7, units="in", res=500)
@@ -163,6 +175,7 @@ plotRicA_reduc()
 dev.off()
   # Only 1 variant
   # x-axis label not working
+  # Re-run with new fixed effect model
 
 # PDF Prior Plotting ####
    # WA sigma priors - InvGamma
@@ -186,40 +199,72 @@ dev.off()
 # SREP Point Estimate comparison with CI's - IWAM vs. Parken ####
   # What file am I pulling from?
     # IWAM_modelcompare.Rmd and SEP_BackCalcRefPoints.RMD (maybe)
+iwam_evalstocks <- IWAM_func(WAinraw = c("DataIn/Parken_evalstocks.csv"),
+                          targetname = "eval",
+                          run.predict = TRUE,
+                          run.bootstraps = TRUE,
+                          random = TRUE,
+                          bs_nBS = 10, # 250,000 new FULL RUN
+                          plot = FALSE,
+                          SigRicPrior = c(F,T,F), # Ric
+                          SigDeltaPrior = c(F,T,F), # WA default
+                          TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
 
 # Prepare estimates
-SMSY_tmb <- iwam_default$dfout %>% # return: "dfout"
-  filter(RP=='SMSY')
-SREP_tmb <- iwam_default$dfout %>%
-  filter(RP=='SREP')
+# TK: Change the default run to run on Parken_evalstocks.csv - has WA and lh - should run out the gate
+SMSY_tmb <- iwam_evalstocks$dfout %>% # return: "dfout"
+  filter(RP=='SMSY') %>% 
+  rename("SMSY_i" = Value)
+SREP_tmb <- iwam_evalstocks$dfout %>%
+  filter(RP=='SREP') %>% 
+  rename("SREP_i" = Value)
 
-Parken_WCVI <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+# Parken_WCVI <- read.csv(here::here("DataIn/WCVI_Parken.csv"))
+Parken_WCVI <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
+# Parken_evalstocks.csv - Have the Parken paper evaluated stocks
+
+# eval_dat <- Parken_WCVI %>% left_join(SMSY_tmb, by=join_by(Stock)) %>% 
+#   rename("SMSY" = Value, "UL SMSY" = upr, "LL SMSY" = lwr) %>%
+#   select(-RP) %>% 
+#   left_join(SREP_tmb, by=join_by(Stock)) %>%
+#   rename("SREP" = Value, "UL SREP" = upr, "LL SREP" = lwr) %>%
+#   select(-RP) %>% 
+#   mutate(PA_UL_SMSY = PA_SMSY + (1.96 * PA_SE_SMSY)) %>% 
+#   mutate(PA_LL_SMSY = PA_SMSY - (1.96 * PA_SE_SMSY)) %>% 
+#   mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
+#   mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
 
 eval_dat <- Parken_WCVI %>% left_join(SMSY_tmb, by=join_by(Stock)) %>% 
-  rename("SMSY" = Value, "UL SMSY" = upr, "LL SMSY" = lwr) %>%
+  rename("UL SMSY" = upr, "LL SMSY" = lwr) %>%
   select(-RP) %>% 
   left_join(SREP_tmb, by=join_by(Stock)) %>%
-  rename("SREP" = Value, "UL SREP" = upr, "LL SREP" = lwr) %>%
-  select(-RP) %>% 
-  mutate(PA_UL_SMSY = PA_SMSY + (1.96 * PA_SE_SMSY)) %>% 
-  mutate(PA_LL_SMSY = PA_SMSY - (1.96 * PA_SE_SMSY)) %>% 
-  mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
-  mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
+  rename("UL SREP" = upr, "LL SREP" = lwr) %>%
+  select(-RP, -lh.y, -lh.x, -WA.x, -WA.y)
+
 benchmarks <- eval_dat
+# **** ORDER STOCK THEM BY ASCENDING WA
+# **** ORDER BY stock-specific variance for the Ricker model?
+# Plot them on the lines? 
+# Plot our line and then the parken line and where the dots are
+  # just take the slope and y intercept from the Parken paper
 
 # Plot
+options(scipen=5)
 png(paste("DataOut/PWC_WCVI_IWAM_PARKEN_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-ggplot(benchmarks, aes(x=Stock, y = SREP)) +
-  geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`, color='TMB',), width = 0.2, position = position_nudge(0.1)) +
-  geom_point(aes(color = 'TMB'), position = position_nudge(0.1)) +
-  geom_point(aes(x = Stock, y = PA_SREP, color='Parken'), position = position_nudge(-0.1)) +
-  geom_errorbar(aes(x = Stock, ymax = PA_UL_SREP, ymin = PA_LL_SREP, color='Parken'), width = 0.2, position = position_nudge(-0.1)) +
+ggplot(benchmarks, aes(x=Stock, y = SREP_i)) +
+  geom_errorbar(aes(ymax = `UL SREP`, ymin = `LL SREP`, color='IWAM',), width = 0.2, position = position_nudge(0.1)) +
+  geom_point(aes(color = 'IWAM'), position = position_nudge(0.1)) +
+  geom_point(aes(x = Stock, y = SREP, color='Parken'), position = position_nudge(-0.1)) +
+  geom_errorbar(aes(x = Stock, ymax = SREP_95, ymin = SREP_5, color='Parken'), width = 0.2, position = position_nudge(-0.1)) +
   theme_classic() +
+  scale_y_continuous(transform = "log", breaks = c(0, 10, 100, 1000, 10000, 100000)) +
+  # coord_trans(y ='log10') +
   ylab(TeX("$S_{REP}$ Estimate")) +
+  xlab("Stock Name") + 
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
   scale_color_manual(name='Model',
-                     breaks=c('Parken', 'TMB'),
-                     values=c('Parken'='black', 'TMB'='red'))
+                     breaks=c('Parken', 'IWAM'),
+                     values=c('Parken'='black', 'IWAM'='red'))
 dev.off()
 
 # Point-wise-comparison - IWAM vs. Parken - Synoptic stocks ####
