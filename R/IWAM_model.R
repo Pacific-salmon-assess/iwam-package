@@ -400,11 +400,11 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   
   # Parameters for stocks without AR1
   param$logA <- ( srdat %>% group_by (Stocknumber) %>% 
-                        summarise(yi = lm(log( Rec / Sp) ~ Sp )$coef[1] ) )$yi
+                        summarise(yi = lm(log( Rec / Sp) ~ Sp )$coefficients[1] ) )$yi
     # srdat_std: Rec and Sp are not scaled
   
   B <- srdat %>% group_by(Stocknumber) %>% 
-    summarise( m = - lm(log( Rec / Sp) ~ Sp )$coef[2] )
+    summarise( m = - lm(log( Rec / Sp) ~ Sp )$coefficients[2] )
     # *Tor* why the negative here?
   param$logB <- log ( 1/ ( (1/B$m)/data$scale ))
     # *Carrie* Need to apply the scale to the inverse of Beta, and then re-invert 
