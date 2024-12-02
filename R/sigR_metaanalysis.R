@@ -21,6 +21,15 @@ count.dig <- function(x) {floor(log10(x)) + 1}
 # Read in data
 SRDat <- read.csv("DataIn/PSE_ChinookData.csv")
 
+# Summary
+summary_df <- SRDat %>%
+     group_by(Name) %>%
+     summarize(
+           num_years = n(),
+           year_range = paste0(min(Yr), "-", max(Yr)),
+          .groups = "drop"
+    )
+
 # Calculate scale for each stock
 digits <- SRDat %>% group_by(Stocknumber) %>% summarize(maxDigits = count.dig(max(Sp)))
 SRDat <- left_join(SRDat, digits)
@@ -33,16 +42,16 @@ data$S <- SRDat$Sp/Scale
 data$logR <- log( (SRDat$Rec/Scale) )
 data$stk <- as.numeric(SRDat$Stocknumber)
 N_Stocks <- length(unique(SRDat$Name))
-#data$yr <- SRDat$yr_num
+# data$yr <- SRDat$yr_num
 
 param <- list()
-param$logA <- ( SRDat %>% group_by (Stocknumber) %>% summarise(yi = lm(log( Rec / Sp) ~ Sp )$coef[1] ) )$yi
-B <- SRDat %>% group_by(Stocknumber) %>% summarise( m = - lm(log( Rec / Sp) ~ Sp )$coef[2] )
+param$logA <- ( SRDat %>% group_by (Stocknumber) %>% summarise(yi = lm(log( Rec / Sp) ~ Sp )$coefficients[1] ) )$yi
+B <- SRDat %>% group_by(Stocknumber) %>% summarise( m = - lm(log( Rec / Sp) ~ Sp )$coefficients[2] )
 param$logB <- log ( 1/ ( (1/B$m)/Scale.stock ))
 param$logSigma <- rep(-2, N_Stocks)
 
-#dyn.unload(dynlib("TMB_Files/Ricker"))
-#compile("TMB_Files/Ricker.cpp")
+# dyn.unload(dynlib("TMB_Files/Ricker"))
+# compile("TMB_Files/Ricker.cpp")
 dyn.load(dynlib("TMB_Files/Ricker"))
 
 obj <- MakeADFun(data, param, DLL="Ricker", silent=TRUE)
@@ -67,7 +76,7 @@ LogSigma <- All_Ests %>% filter (Param %in% c("logSigma"))
 PSE_sigma<-exp(LogSigma$Estimate)
 write.table(LogSigma,"DataOut/PSE_sigma.csv")
 
-#read.table("DataOut/PSE_sigma.csv")
+# read.table("DataOut/PSE_sigma.csv")
 
 # Plot SR curves
 

@@ -1,6 +1,7 @@
 
 # Libs ####
 library(RTMB)
+library(TMB)
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
@@ -16,7 +17,7 @@ source(here::here("R/IWAM_model.R"))
   # Had to add TMB::sdreport to all_pars function
   # otherwise can't find sdreport through rtmb
 # source(here::here("R/IWAMsrep_RTMB_model.R"))
-source(here::here("R/IWAMsmax_RTMB_model.R"))
+# source(here::here("R/IWAMsmax_RTMB_model.R"))
 
 # Test Runs ####
   # RTMB SMAX Run test
@@ -56,13 +57,16 @@ source(here::here("R/IWAMsmax_RTMB_model.R"))
     # NEW BOOTSTRAP VALUE: 250,000 **********************************************
 # Ricker Log A prior tests
   # "DataOut/WAregSREP_target_ricgamma_0.1_wagamma_1_IWAM_Liermann"
-iwam_d <- IWAM_func(WAinraw = c("DataIn/WCVIStocks.csv"),
-                          targetname = "biascor_OFF",
-                    bias.cor = FALSE) # [1] is Ric, [2] is WA
+# iwam_d <- IWAM_func(WAinraw = c("DataIn/WCVIStocks.csv"),
+                    #       targetname = "biascor_OFF",
+                    # bias.cor = FALSE) # [1] is Ric, [2] is WA
+
+# targetname = "techreport" FOR THE OFFICIAL RUNS ONLY
 
 iwam_default <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
-                          targetname = "ptest",
-                          run.predict = T,
+                          targetname = "techreport",
+                          predict.syn = T, # T by default
+                          predict.tar = T, # T by default
                           run.bootstraps = T,
                           random = TRUE, 
                           bias.cor = TRUE,
@@ -149,20 +153,21 @@ iwam_wa_gamma0.01 <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
   # 9 RDS files to find
 iwam_fixedeff <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                            targetname = "techreport",
-                          run.predict = F,
+                          predict.tar = F, # turn target prediction off
                           bias.cor = T,
-                          random = FALSE, # Turn off random effect of logA
+                          random = FALSE, # Stops logA from being a random param
                           bs_nBS = 10,
                           plot = F,
                           run.bootstraps = FALSE,
                           mod = "IWAM_FixedEffects")
-  # PRODUCING ERROR: object datain not found
+  # Can also run mod = "IWAM_FixedEffects_WAreg vs. IWAM_FixedEffects
+  # Now producing SMSY estimates - but without Std. Errors
 
 # SR_curves and WA Linear Reg plots ####
 # Basic plots will be created provided plot = TRUE for desired penalty variants.
 
 # RicA Boxplot call ####
-png(paste("DataOut/RicADist_ComparePriors_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+png(paste("DataOut/RicADist_techreport_ComparePriors_wBC.png", sep=""), width=7, height=7, units="in", res=500)
 plotRicA_reduc()
 dev.off()
   # Only 1 variant
@@ -172,23 +177,23 @@ dev.off()
     # as expected
 
 # PDF Prior Plotting ####
+  # Ricker sigma priors
+    # See TWG ppt - slide 18 and 19
+    # plotPriors(plot_inv_gamma_only=TRUE, Delta=FALSE) or
+    # plotPriors(plot_inv_gamma_only=FALSE, Delta=FALSE)
+    # png statement
+png(paste("DataOut/PDF_techreport_sigRicker_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+plotPriors(plot_inv_gamma_only = TRUE, Delta = FALSE, modelobject = iwam_default$all_Deltas)
+dev.off()
+# plotPriors(plot_inv_gamma_only=FALSE, Delta=FALSE, modelobject = iwam_wa_gamma0.1$all_Deltas)
+
    # WA sigma priors - InvGamma
 # png(paste("DataOut/DeltaPriors_InvGamma.png", sep=""), width=7, height=7, units="in", res=500)
-png(paste("DataOut/PDF_sigWA_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-plotPriors(plot_inv_gamma_only=TRUE, Delta=TRUE, modelobject = iwam_default$all_Deltas)
+png(paste("DataOut/PDF_techreport_sigWA_wBC.png", sep=""), width=7, height=7, units="in", res=500)
+plotPriors(plot_inv_gamma_only = TRUE, Delta = TRUE, modelobject = iwam_default$all_Deltas)
   # FALSE, TRUE is also WA related
 # plotPriors(plot_inv_gamma_only=TRUE, Delta=TRUE, modelobject = iwam_wa_gamma0.1$all_Deltas) # prior comparison
 dev.off()
-
-  # Ricker sigma priors
-# See TWG ppt - slide 18 and 19
-  # plotPriors(plot_inv_gamma_only=TRUE, Delta=FALSE) or
-  # plotPriors(plot_inv_gamma_only=FALSE, Delta=FALSE)
-# png statement
-png(paste("DataOut/PDF_sigRicker_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-plotPriors(plot_inv_gamma_only=TRUE, Delta=FALSE, modelobject = iwam_default$all_Deltas)
-dev.off()
-# plotPriors(plot_inv_gamma_only=FALSE, Delta=FALSE, modelobject = iwam_wa_gamma0.1$all_Deltas)
 
 # SMSY Point Estimate comparison with CI's - IWAM vs. Parken ####
   # **TK: Changed from Srep to Smsy **
@@ -246,7 +251,7 @@ benchmarks <- eval_dat
 
 # Plot
 options(scipen=5)
-png(paste("DataOut/PWC_WCVI_IWAM_PARKEN_wBC.png", sep=""), 
+png(paste("DataOut/PWC_techreport_WCVI_IWAM_PARKEN_wBC.png", sep=""), 
     width=7, height=7, units="in", res=500)
 
 # SMSY
@@ -300,8 +305,6 @@ dev.off()
 # Point-wise-comparison - IWAM vs. Parken - Synoptic stocks ####
 # Parken_est <- read.csv(here::here("DataIn/Parkenest.csv"))
 
-# Plot
-
 # Table of SGEN, SMSY, and SREP for target WCVI ####
   # What file can I pull code from?
 # Prepare Data 
@@ -345,7 +348,7 @@ kable(complete, caption = "IWAM Smax Model: SGEN, SREP, and SMSY Estimates for A
       format.args = list(big.mark = ","))
 
 # export dataframe to csv - and then transfer excel table into word
-write.csv(complete, here::here("DataOut/TableofEstimates_kable_IWAM.csv"), 
+write.csv(complete, here::here("DataOut/TableofEstimates_kable_techreport_IWAM.csv"), 
           row.names = FALSE)
 
 # Bootstrap Convergence: ####
@@ -374,29 +377,29 @@ temp2 <- temp1 +
 
 temp2
 
-# example
-SMSY_parken <- SMSY_pl + 
-  geom_point(eval_data, mapping = aes(x = Stock, y = PA_SMSY), 
-             position = position_nudge(-0.3)) + 
-  geom_errorbar(aes(x = Stock, 
-                    ymax = PA_SMSY + (1.96 * PA_SE_SMSY) , 
-                    ymin = PA_SMSY - (1.96 * PA_SE_SMSY)), 
-                width = 0.2,                     
-                position = position_nudge(-0.3), 
-                inherit.aes = FALSE) 
+# Example ...
+# SMSY_parken <- SMSY_pl + 
+#   geom_point(eval_data, mapping = aes(x = Stock, y = PA_SMSY), 
+#              position = position_nudge(-0.3)) + 
+#   geom_errorbar(aes(x = Stock, 
+#                     ymax = PA_SMSY + (1.96 * PA_SE_SMSY) , 
+#                     ymin = PA_SMSY - (1.96 * PA_SE_SMSY)), 
+#                 width = 0.2,                     
+#                 position = position_nudge(-0.3), 
+#                 inherit.aes = FALSE) 
 
 
 
 # LambertW function Testing ####
-compile(here::here("TMB_Files/lambert.cpp"))
-dyn.load(dynlib(here::here("TMB_Files/lambert")))
-
-objlw <- MakeADFun(data=list(), parameters=list(x=1), DLL="lambert")
-objlw$fn(7 * exp(7))
-lambert_W0(7 * exp(7)) # eg
-
-#
-temp <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
-          bs_nBS = 10,
-          plot = FALSE,
-          mod = "IWAM_Liermann_srep")
+# compile(here::here("TMB_Files/lambert.cpp"))
+# dyn.load(dynlib(here::here("TMB_Files/lambert")))
+# 
+# objlw <- MakeADFun(data=list(), parameters=list(x=1), DLL="lambert")
+# objlw$fn(7 * exp(7))
+# lambert_W0(7 * exp(7)) # eg
+# 
+# #
+# temp <- IWAM_func(WAin = c("DataIn/WCVIStocks_NoAgg.csv"),
+#           bs_nBS = 10,
+#           plot = FALSE,
+#           mod = "IWAM_Liermann_srep")

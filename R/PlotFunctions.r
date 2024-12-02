@@ -21,29 +21,46 @@ t_col <- function(color, percent = 50, name = NULL) {
 }
 
 # Plot SR curves ####
-
-PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_surv=NULL, stks_surv, r2, removeSkagit, mod) {
+PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, 
+                        stksNum_surv=NULL, stks_surv, r2, removeSkagit, mod) {
   Stks <- unique(srdat$Stocknumber)
   NStks <- length(Stks)
-  par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1)
+  # par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1)
+  par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1))
+    # adjusted to fit GLOBAL axis labels
+  
+  Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) 
   
   for (i in Stks){
     names <- pars %>% dplyr::select ("Name", "Stocknumber") %>% distinct()
-    name <- pars %>% filter (Stocknumber==i) %>% dplyr::select ("Name") %>% distinct()
+    name <- pars %>% filter (Stocknumber==i) %>% 
+      dplyr::select ("Name") %>% distinct()
     
-    R <- srdat %>% filter (Stocknumber==i) %>% dplyr::select(Rec) 
-    S <- srdat %>% filter (Stocknumber==i) %>% dplyr::select(Sp) 
+    R <- srdat %>% filter (Stocknumber==i) %>% 
+      dplyr::select(Rec) 
+    S <- srdat %>% filter (Stocknumber==i) %>% 
+      dplyr::select(Sp) 
     # what is the scale of Ricker b estimate?
-    Sc <- srdat %>% filter (Stocknumber==i) %>% dplyr::select(scale) %>% distinct() %>% as.numeric()
-    if(name$Name != "Skagit" & name$Name != "KSR") plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)), ylim=c(0,max(R$Rec) ) )
-    if(name$Name == "Skagit") plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)*3), ylim=c(0,max(R$Rec) ) )
-    if(name$Name == "KSR") plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,500), ylim=c(0,max(R$Rec) ) )
+    Sc <- srdat %>% filter (Stocknumber==i) %>% 
+      dplyr::select(scale) %>% distinct() %>% 
+      as.numeric()
     
-    a <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logA") %>% 
-      summarise(A=exp(Estimate)) %>% as.numeric()
+    if(name$Name != "Skagit" & name$Name != "KSR") 
+      plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)), ylim=c(0,max(R$Rec) ) )
+    if(name$Name == "Skagit") 
+      plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)*3), ylim=c(0,max(R$Rec) ) )
+    if(name$Name == "KSR") 
+      plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,500), ylim=c(0,max(R$Rec) ) )
+    
+    a <- pars %>% filter (Stocknumber==i) %>% 
+      filter(Param=="logA") %>% 
+      summarise(A=exp(Estimate)) %>% 
+      as.numeric()
     # Divide b by scale
-    b <- pars %>% filter (Stocknumber==i) %>% filter(Param=="logB") %>% 
-      summarise(B=exp(Estimate)/Sc) %>% as.numeric()
+    b <- pars %>% filter (Stocknumber==i) %>% 
+      filter(Param=="logB") %>% 
+      summarise(B=exp(Estimate)/Sc) %>% 
+      as.numeric()
     
 # Test removal 
   #   if(mod!="IWAM_FixedSep_RicStd" & mod!="Liermann" & mod!= 'IWAM_Liermann' & mod!="Liermann_PriorRicSig_PriorDeltaSig" & mod!="Liermann_HalfNormRicVar_FixedDelta"){
@@ -60,31 +77,42 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
   # }
   #     
   #   }
-    #Parken values for skagit
+    # Parken values for skagit
+      # These are from Parken et al. 2006 Table 2 (Ocean life-histories)
+      # The complete table can now be found in DataIn/Parken_Table1n2.csv
     skagit_alpha <- 7.74
     skagit_beta <- 0.0000657
     RR_skagit <- NA
-    SS <- RR<- NA
+    SS <- RR <- RR_parken <- NA
     #RR_std <- NA
+    ap <- Parken_ab$Alpha
+    bp <- Parken_ab$Beta
     
-    if(removeSkagit==FALSE){
-      for (j in 1:100){
-        if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100)
-        if (i==22) SS[j] <- j*(max(S$Sp*3)/100)
-        if (i==7) SS[j] <- j*(500/100)
+    # Parken values
+    # Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv"))
+    
+    if(removeSkagit==FALSE){ # RUNNING FOR IWAM DEFAULT
+      for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
+        if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100) # IF NOT SKAGIT OR KSR
+        if (i==22) SS[j] <- j*(max(S$Sp*3)/100) # Skagit
+        if (i==7) SS[j] <- j*(500/100) # KSR
+        
         RR[j] <- a * SS[j] * exp(-b * SS[j])
-        if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])}
+        RR_parken[j] <- ap[i+1] * SS[j] * exp(-bp[i+1] * SS[j])
+        
+        if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
+          # alpha and beta from Table 1 and 2 from Parken et al. 2006
         #if (i %in% stks_ar) {RR_std[j] <- A_std$A[which(A_std$Stocknumber==i)] * SS[j] *  exp(-B_std$B[which(B_std$Stocknumber==i)] * SS[j])}
       }
     } 
+    
     if(removeSkagit==TRUE){
-      for (j in 1:100){
+      for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
         SS[j] <- j*(max(S$Sp)/100)
-        RR[j] <- a * SS[j] * exp(-b * SS[j])
+        RR[j] <- a * SS[j] * exp(-b * SS[j]) # Line based on alpha and beta from IWAM model
       }
     } 
     
-
     # if (i %not in% c(stksNum_ar, stksNum_surv)) col.use <- "black"
     # if (i %in% stksNum_ar) col.use <- "red"
     # if (i %in% stksNum_surv) col.use <- "blue"
@@ -93,21 +121,29 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
       # removed above give only one mod usage and no more _ar or _surv model order usage
     lines(x=SS, y=RR, col=col.use) 
     
-    #For Skagit, add Parken et al. 2006 model curve
-    if(removeSkagit==FALSE){if(i==22) lines(x=SS, y=RR_skagit, lty="dashed")}
+    # For Skagit, add Parken et al. 2006 model curve
+    if(removeSkagit==FALSE) {if(i==22) lines(x=SS, y=RR_skagit, lty="dashed")}
+    
+    # For all stocks, added in Parken et al. 2006 model curve
+    lines(x=SS, y=RR_parken, lty="dashed", col="red")
     
     mtext(name$Name, side=3, cex=0.8)
     
     # Plot SMSY_stream (black for std, red for AR(1), and dashed for Parken et al. 2006)
-    SMSY <- pars %>% filter (Stocknumber==i) %>% filter(Param=="SMSY") %>% 
-      summarise(SMSY = Estimate * Sc) %>% as.numeric()
-    SMSY_ul <- pars %>% filter (Stocknumber==i) %>% filter(Param=="SMSY") %>% 
-      summarise(SMSY_ul = Estimate * Sc + 1.96 * Std..Error * Sc ) %>% as.numeric()
-    SMSY_ll <- pars %>% filter (Stocknumber==i) %>% filter(Param=="SMSY") %>% 
-      summarise(SMSY_ul = Estimate * Sc - 1.96 * Std..Error * Sc ) %>% as.numeric()
+    SMSY <- pars %>% filter (Stocknumber==i) %>% 
+      filter(Param=="SMSY") %>% 
+      summarise(SMSY = Estimate * Sc) %>% 
+      as.numeric()
+    SMSY_ul <- pars %>% filter (Stocknumber==i) %>% 
+      filter(Param=="SMSY") %>% 
+      summarise(SMSY_ul = Estimate * Sc + 1.96 * Std..Error * Sc ) %>% 
+      as.numeric()
+    SMSY_ll <- pars %>% filter (Stocknumber==i) %>% 
+      filter(Param=="SMSY") %>% 
+      summarise(SMSY_ul = Estimate * Sc - 1.96 * Std..Error * Sc ) %>% 
+      as.numeric()
     
-    
-    abline(v = SMSY, col=col.use)
+    abline(v = SMSY, col=col.use, lty='dotted')
 
     # if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedCombined"|mod=="Ricker_AllMod"){
     #   if (i %in% stksNum_ar) polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), y=c(-10000,-10000,max(R$Rec),max(R$Rec)), col=rgb(1,0,0, alpha=0.1), border=NA ) 
@@ -115,7 +151,12 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
     #   if (i %not in% c(stksNum_ar, stksNum_surv))  polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), y=c(-10000,-10000,max(R$Rec),max(R$Rec)), col=grey(0.8, alpha=0.4), border=NA )
     # }
     
-    if(mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|mod=='IWAM_Liermann'|mod=="Liermann_PriorRicSig_PriorDeltaSig"|mod=="Liermann_HalfNormRicVar_FixedDelta")  polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), y=c(-10000,-10000,max(R$Rec),max(R$Rec)), col=grey(0.8, alpha=0.4), border=NA )
+    if(mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|
+       mod=='IWAM_Liermann'|mod=="Liermann_PriorRicSig_PriorDeltaSig"|
+       mod=="Liermann_HalfNormRicVar_FixedDelta")  
+      polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), 
+              y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)), 
+              col=grey(0.8, alpha=0.4), border=NA )
     #else polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), y=c(0,0,max(R$Rec),max(R$Rec)), col=grey(0.8, alpha=0.4), border=NA )
   
     if(!is.null(SMSY_std)) {
@@ -126,17 +167,34 @@ PlotSRCurve <- function(srdat, pars, SMSY_std=NULL, stksNum_ar=NULL, stksNum_sur
       }
     }
     
-    # PARKEN SMSY REMOVAL *******************************************************************************************************
+    # Parken Smsy Estimate (vert. line) from Table 1/2 Parken et al. 2006
+    # Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) 
+      # Stocks not ordered the same way as other files - alphabetical instead
+    Parken_smsy <- Parken_ab$Smsy[Parken_ab$Stocknumber == Parken_ab$Stocknumber[i+1]] 
+      # ordered by stocknumber - but starting at 1 instead of 0 (instead of 0:24 as per Stks - 1:25 --> i+1)
+    abline(v = Parken_smsy, col="red", lty='dotted')
+    
+    # PARKEN SMSY REMOVAL *******************************************************
     # ParkenSMSY <- read.csv(here::here("DataIn/ParkenSMSY.csv"))
     #if (removeSkagit==TRUE) ParkenSMSY <- ParkenSMSY %>% filter(Name != "Skagit")
     # ParkenSMSY <- ParkenSMSY %>% filter(Name==as.character(name$Name)) %>% dplyr::select (SMSY) %>% as.numeric()
     # abline(v=ParkenSMSY, lty="dashed")
     
     if(is.data.frame(r2)==TRUE) {
-      lab <-  r2 %>% filter(Stocknumber==i) %>% dplyr::select(r2) %>% as.numeric() %>% round(2)
+      lab <-  r2 %>% 
+        filter(Stocknumber==i) %>% 
+        dplyr::select(r2) %>% 
+        as.numeric() %>% 
+        round(2)
       legend("topright", legend = "", title= paste0("r2=",lab), bty="n")
     }
   }
+  
+  # Add an GLOBAL figure axis label across par()
+    # x = Spawners
+    # y = Recruitment
+  mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
+  mtext("Recruitment", side = 2, line  = 1, outer = TRUE, cex = 1.3, las = 0)
   
 }
 
@@ -918,33 +976,37 @@ plotRicA <- function (){#pars_Liermann, pars_Ricker_AllMod, pars_Liermann_SepRic
 # dev.off()
 
 plotRicA_reduc <- function (){
+  # Consider adding in a function parameter to input what version or "targetname = "target"
+    # to be used - or pasted into the name of the readRDS function
+  
   # New read-ins
     # TK: These are no broken due to the changes in naming conventions by IWAM_model.R
   All_Est_Fixed <- readRDS("DataOut/pars_techreport_ricgamma_0.1_wagamma_1_IWAM_FixedEffects")
   # pars_techreport_ricgamma_0.1_wagamma_1_IWAM_FixedEffects - new
+  # pars_techreport_ricgamma_0.1_wagamma_1_IWAM_FixedEffects_WAreg - WAreg alternative form
   # pars_ricgamma_0.1_wagamma_1_IWAM_FixedEffects - original
   RicFixed <- All_Est_Fixed %>% 
     filter(Param=="logA")
   
   # Inv Gamma 0.1
-  All_Est_Default <- readRDS("DataOut/pars_ricgamma_0.1_wagamma_1_wagamma_IWAM_Liermann")
+  All_Est_Default <- readRDS("DataOut/pars_techreport_ricgamma_0.1_wagamma_1_IWAM_Liermann")
   RicDefault <-  All_Est_Default %>%  
     filter(Param=="logA")
   
   # Halfcauchy
-  All_Est_riccauchy <- readRDS("DataOut/pars_riccauchy_0.1_wagamma_1_wagamma_IWAM_Liermann")
+  All_Est_riccauchy <- readRDS("DataOut/pars_techreport_riccauchy_wagamma_IWAM_Liermann")
   Riccauchy <-  All_Est_riccauchy %>%  
     filter(Param=="logA")
   # HalfNormal
-  All_Est_richalfnorm <- readRDS("DataOut/pars_richalfnorm_0.1_wagamma_1_wagamma_IWAM_Liermann")
+  All_Est_richalfnorm <- readRDS("DataOut/pars_techreport_richalfnorm_wagamma_IWAM_Liermann")
   Richalfnorm <-  All_Est_richalfnorm %>%  
     filter(Param=="logA")
   # Inv Gamma 0.001
-  All_Est_ricg0.001 <- readRDS("DataOut/pars_ricgamma_0.001_wagamma_1_wagamma_IWAM_Liermann")
+  All_Est_ricg0.001 <- readRDS("DataOut/pars_techreport_ricgamma_0.001_wagamma_1_IWAM_Liermann")
   Ric0.001 <-  All_Est_ricg0.001 %>%  
     filter(Param=="logA")
   # Inv Gamma 0.01
-  All_Est_ricg0.01 <- readRDS("DataOut/pars_ricgamma_0.01_wagamma_1_wagamma_IWAM_Liermann")
+  All_Est_ricg0.01 <- readRDS("DataOut/pars_techreport_ricgamma_0.01_wagamma_1_IWAM_Liermann")
   Ric0.01 <-  All_Est_ricg0.01 %>%  
     filter(Param=="logA")
   
@@ -994,11 +1056,27 @@ plotRicA_reduc <- function (){
   
   #Add reorder to as.factor(Model), I think, but need to specify order as above 1:8. Add column to dataframe to do this, of length 200.
   # see my old dplyr code on adding new columns with string of numbers aligned with a factor (IWAM.r)
-  cols<-viridis(4, alpha=0.9)
-  cols.order <- c(grey(0.2), grey(0.5), cols[3], cols[2], 
-                  t_col(color=cols[1], percent=70), 
-                  t_col(cols[1], percent=50), 
-                  t_col(cols[1], percent=30), "white", cols[4])
+  # cols <- viridis(4, alpha=0.9)
+  # cols.order <- c(grey(0.2),
+  #                 grey(0.5), 
+  #                 cols[3], 
+  #                 cols[2], 
+  #                 t_col(color=cols[1], percent=70),  
+  #                 t_col(cols[1], percent=50), 
+  #                 t_col(cols[1], percent=30), 
+  #                 "white", 
+  #                 cols[4])
+  
+  # cols.order <- c("#333333", # Explicit showing above color order
+  #                    "#808080",
+  #                    "#35B779E6",
+  #                    "#31688EE6",
+  #                    "#4401544C",
+  #                    "#4401547F",
+  #                    "#440154B2",
+  #                    "white",
+  #                    "#FDE725E6"
+  # )
   #print cols.order and then cut and past into line: scale_fill_manual below. These are the colours I used in the plot of priors. can add a legend to quickly see how ggplot reorders this befor plotting
   
   # fmodel <- function(x) { # used to quickly ifll model - could also do it internally
@@ -1007,8 +1085,8 @@ plotRicA_reduc <- function (){
   
   ggplot(box.data, aes(x=factor(Model, levels = unique(Model)), y=RicLogA, fill=factor(Model, levels = unique(Model)))) +  
     geom_boxplot(outlier.size=-1) + 
-    scale_fill_manual(values=c("#808080", "#35B779E6", "#31688EE6", 
-                               "#4401544C", "#4401547F", "#440154B2")) +
+    scale_fill_manual(values=c("#808080", "#440154B2", "#4401547F", "#4401544C", 
+                               "#35B779E6", "#31688EE6")) +
     geom_jitter(color="black", shape=as.factor(box.data$lh), size=2, alpha=0.9) + #,aes(shape=lh)?. I like shape 16,17
     scale_shape_manual(values=c(16,17)) +
     # ggtitle("Distribution of Ricker LogA") + # Remove title
@@ -1016,7 +1094,7 @@ plotRicA_reduc <- function (){
     theme(axis.text=element_text(size=10),
           axis.title=element_text(size=20,face="bold"),
           plot.title = element_text(size = 20)) + 
-    xlab("") + # blank 
+    xlab("") + # blank title
     ylab("Productivity") 
 }
 

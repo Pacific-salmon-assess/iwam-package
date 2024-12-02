@@ -134,17 +134,21 @@ Type objective_function<Type>:: operator() ()
     
      // add prior on sigma, 
     if (SigRicPriorGamma == 1) {
-       ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true);
+       ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true); 
+        // Change prior to 0.1, 0.1 - because rate should be 1/term (for gamma --> invgamma)
+          // which means scale is 1/(1/term) or in this case just term
+        // dgamma on precision
+        // invgamma on tau
     }
     if (SigRicPriorNorm == 1) {
       //ans += -abs( dnorm( sigma(i), HalfNormMean, HalfNormSig, true) );
       //3 June 2021. abs() function no longer works with TMB, so have removed
-      ans += -( dnorm( sigma(i), HalfNormMean, HalfNormSig, true) );
+      ans += -(dnorm(sigma(i), HalfNormMean, HalfNormSig, true) );
     }
     if (SigRicPriorCauchy == 1) {
       //ans += - abs( dt( sigma(i), Type(1), true ));
       //3 June 2021. abs() function no longer works with TMB, so have removed
-      ans += - ( dt( sigma(i), Type(1), true ));
+      ans += - (dt(sigma(i), Type(1), true ));
     }
   }
   

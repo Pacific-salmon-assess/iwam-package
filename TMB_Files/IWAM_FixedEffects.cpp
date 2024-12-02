@@ -112,6 +112,8 @@ Type objective_function<Type>:: operator() ()
   }
   SREP = logA / exp(logB);
   
+  
+  
   //Liermann's model with both stream and ocean type=================
   // vector <Type> pred_lnSMSY(N_stks);
   // vector <Type> pred_lnSREP(N_stks);
@@ -119,10 +121,10 @@ Type objective_function<Type>:: operator() ()
   // Type sigma_delta = exp(logDeltaSigma);
   // Type sigma_nu = exp(logNuSigma);
   // 
-  // // for (int i=0; i<N_stks; i++){
-  // //   PredlnSMSY(i) = logDelta1 + logDelta1ocean * Stream(i) + ( exp(logDelta2) + Delta2ocean * Stream(i) ) * log(WA(i)) ;
-  // //   ans += -dnorm( PredlnSMSY(i), log(SMSY(i) * Scale(i) ),  sigma_delta, true);
-  // // }
+  // for (int i=0; i<N_stks; i++){
+  //   pred_lnSMSY(i) = logDelta1 + logDelta1_ocean * lifehist(i) + ( exp(logDelta2) + Delta2_ocean * lifehist(i) ) * log(WAbase(i)) ;
+  //   ans += -dnorm(pred_lnSMSY(i), log(SMSY(i) * scale(i) ),  sigma_delta, true);
+  // }
   // for (int i=0; i<N_stks; i++){
   //   if(biasCor == 0) {
   //     pred_lnSMSY(i) = logDelta1 + logDelta1_ocean * lifehist(i) + ( exp(logDelta2) + Delta2_ocean * lifehist(i) ) * log(WAbase(i)) ;
@@ -144,38 +146,38 @@ Type objective_function<Type>:: operator() ()
 
     
 // Get predicted values for plotting  WA regression with CIs
-  // int N_pred = pred_lnWA.size();
-  // vector <Type> pred_lnSMSY_stream_CI(N_pred);
-  // vector <Type> pred_lnSMSY_ocean_CI(N_pred);
-  // vector <Type> pred_lnSREP_stream_CI(N_pred);
-  // vector <Type> pred_lnSREP_ocean_CI(N_pred);
-  // 
-  // for (int i=0; i<N_pred; i++){
-  //   pred_lnSMSY_stream_CI(i) = logDelta1 + exp(logDelta2) * pred_lnWA(i);
-  //   pred_lnSMSY_ocean_CI(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * pred_lnWA(i);
-  //   pred_lnSREP_stream_CI(i) = logNu1 + exp(logNu2) * pred_lnWA(i);
-  //   pred_lnSREP_ocean_CI(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * pred_lnWA(i);
-  // }
-  // 
-  // //// Get predicted values for stream-type target stocks with CIs
-  // int N_target_stream = target_lnWA_stream.size();
-  // vector <Type> target_lnSMSY_stream(N_target_stream);
-  // vector <Type> target_lnSREP_stream(N_target_stream);
-  // 
-  // for (int i=0; i<N_target_stream; i++){
-  //   target_lnSMSY_stream(i) = logDelta1 + exp(logDelta2) * target_lnWA_stream(i);
-  //   target_lnSREP_stream(i) = logNu1 + exp(logNu2) * target_lnWA_stream(i);
-  // } 
-  // 
-  // ///Get predicted values for ocean-type target stocks with CIs
-  // int N_target_ocean = target_lnWA_ocean.size();
-  // vector <Type> target_lnSMSY_ocean(N_target_ocean);
-  // vector <Type> target_lnSREP_ocean(N_target_ocean);
-  // 
-  // for (int i=0; i<N_target_ocean; i++){
-  //   target_lnSMSY_ocean(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * target_lnWA_ocean(i);
-  //   target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
-  // }
+// int N_pred = pred_lnWA.size();
+// vector <Type> pred_lnSMSY_stream_CI(N_pred);
+// vector <Type> pred_lnSMSY_ocean_CI(N_pred);
+// vector <Type> pred_lnSREP_stream_CI(N_pred);
+// vector <Type> pred_lnSREP_ocean_CI(N_pred);
+// 
+// for (int i=0; i<N_pred; i++){
+//   pred_lnSMSY_stream_CI(i) = logDelta1 + exp(logDelta2) * pred_lnWA(i);
+//   pred_lnSMSY_ocean_CI(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * pred_lnWA(i);
+// //   pred_lnSREP_stream_CI(i) = logNu1 + exp(logNu2) * pred_lnWA(i);
+// //   pred_lnSREP_ocean_CI(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * pred_lnWA(i);
+// }
+// 
+// //// Get predicted values for stream-type target stocks with CIs
+// int N_target_stream = target_lnWA_stream.size();
+// vector <Type> target_lnSMSY_stream(N_target_stream);
+// vector <Type> target_lnSREP_stream(N_target_stream);
+// 
+// for (int i=0; i<N_target_stream; i++){
+//   target_lnSMSY_stream(i) = logDelta1 + exp(logDelta2) * target_lnWA_stream(i);
+//   target_lnSREP_stream(i) = logNu1 + exp(logNu2) * target_lnWA_stream(i);
+// }
+// 
+// ///Get predicted values for ocean-type target stocks with CIs
+// int N_target_ocean = target_lnWA_ocean.size();
+// vector <Type> target_lnSMSY_ocean(N_target_ocean);
+// vector <Type> target_lnSREP_ocean(N_target_ocean);
+// 
+// for (int i=0; i<N_target_ocean; i++){
+//   target_lnSMSY_ocean(i) = logDelta1 + logDelta1_ocean + (exp(logDelta2) + Delta2_ocean) * target_lnWA_ocean(i);
+//   target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
+// }
 
   vector <Type> lnSMSY = log(SMSY*scale);
   vector <Type> lnSREP = log(SREP*scale);

@@ -29,16 +29,26 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   #Delta TRUE = plot priors for the SD of the Watershed-area model
   #Delta FALSE = plot priors for the SD of the Ricker model 
   
-  test <- seq(0.00001,9,len=10000)
+  par(mar=c(5, 4, 4, 12)) # Reset margins
+  
+  test <- seq(0.00001,9,len=10000) # Variances
+  
+  cols <- viridis(4, alpha=0.9) # Colours
   
   if(Delta){
-    plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Sigma for watershed-area regression" , ylim=c(0,0.8), xlim=c(0,2.5))
+    plot(x=test, y=abs(dcauchy(test,0,1)), type="n", 
+         ylab="Probability density", xlab="Sigma for watershed-area regression" , 
+         ylim=c(0,0.8), xlim=c(0,2.5)) 
+    # ylim=c(0,0.8), xlim=c(0,2.5)
   }
+  
   # plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Sigma for watershed-area regression" , ylim=c(0,0.8), xlim=c(0,2.5))
-  cols<-viridis(4, alpha=0.9)
   
   if(!Delta){ # DELTA IS FALSE FLAG ********************************************
-    plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Ricker Sigma (or LogA sigma)" , ylim=c(0,0.8), xlim=c(0,2.5))
+    plot(x=test, y=abs(dcauchy(test,0,1)), type="n", 
+         ylab="Probability density", xlab="Ricker Sigma (or LogA sigma)" , 
+         ylim=c(0,0.8), xlim=c(0,2.5)) 
+    #  ylim=c(0,0.8), xlim=c(0,2.5)
     
     # Add histogram of Ricker sigmas
     
@@ -65,10 +75,13 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   # E.g., NCEAS State of Alaska Salmon and People project:	
   # Brendan Connors: Chinook (n = 75) most from US West Coast and of questionable quality, remaining ~20 stocks are from AK and of higher quality
   
-  #Inverse gamma on sqrt(variance)=sigma
+  # Inverse gamma on sqrt(variance) = sigma - for Ricker penalties
   if(!Delta){
-    shape<-rate<-0.001
-    lines(sqrt(test), sqrt(dinvgamma(test,shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=90))
+    shape <- rate <- 0.001
+    lines(sqrt(test), sqrt(dinvgamma(test, shape = shape, rate = rate)), lwd = 4, col = t_col(color = cols[1], percent = 90))
+    # lines(sqrt(test, dinvgamma(test, shape = shape, rate = rate), lwd = 4, col = "red"))
+    lines(sqrt(test), dgamma(1/test, shape = shape, scale = 1/rate), lwd = 4, col = "deepskyblue")
+    
   }
   
   # shape<-rate<-0.01
@@ -78,12 +91,11 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   # shape<-rate<-1
   # lines(sqrt(test), sqrt(dinvgamma(test,shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=30))
   
-  if (!plot_inv_gamma_only){
+  if (!plot_inv_gamma_only){ # Not used.
     
     if(!Delta){
       #Half-Normal on sigma
       lines(x=test, y=abs(dnorm(test,0,1)), col=cols[2], lwd=4)
-    
     
       # Half-cauchy on sigma, as implemented in TMB
       # student T, reduced to cauchy with scale=1. Adapted from Kasper Kristensen
@@ -98,8 +110,8 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
     
       lines(x=test, y=dt(test), col=cols[3], lwd=4)
     
-      #Altrenative, equivalent half cauchy using R function
-      #lines(x=test, y=abs(dcauchy(test,0,1)), lwd=2, col="red")
+      # Alternative, equivalent half cauchy using R function
+      # lines(x=test, y=abs(dcauchy(test,0,1)), lwd=2, col="red")
     
       #Uniform 0-1
       lines(x=c(0,2,2,3), y=c(0.5,0.5,0,0), col=cols[4], lwd=2)
@@ -116,7 +128,6 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
       lines(x=testb, y=abs(dnorm(testb,0.8,0.28))/norm_scalar, col=cols[2], lwd=4)#See KRrun.R for N(0.8,0.28)
       lines(x=c(0,lower, lower), y=c(0, 0, dnorm(lower,0.8,0.28))/norm_scalar, col=cols[2], lwd=4)
       lines(x=c(upper,upper, 3), y=c(dnorm(upper,0.8,0.28)/norm_scalar, 0, 0), col=cols[2], lwd=4)
-      
     }
     
     if(Delta){
@@ -126,20 +137,30 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
       abline(v= 0.21, col=grey(0.5), lty="dotted") #See KFrun.R
     }
     
-    if(!Delta){
-      legend(x=1.1, y=0.78, legend=c("Inverse gamma(1,1)", "Inverse gamma(0.1,0.1)", "Inverse gamma(0.01,0.01)", 
-                                     "Inverse gamma(0.001,0.001)", "Half Normal (0,1)", "Half Cauchy (0,1)", "Uniform (0,2)"),
+    if(!Delta){ # Not used.
+      legend(x=1.1, y=0.78, legend=c("Inverse gamma(1,1)", 
+                                     "Inverse gamma(0.1,0.1)", 
+                                     "Inverse gamma(0.01,0.01)", 
+                                     "Inverse gamma(0.001,0.001)", 
+                                     "Half Normal (0,1)", 
+                                     "Half Cauchy (0,1)", 
+                                     "Uniform (0,2)"),
              col=c(t_col(cols[1], 30), t_col(cols[1], 50), t_col(cols[1], 70), t_col(cols[1], 90), cols[2:4]), bty="n", lwd=2) 
     }
-    if(Delta){
+    if(Delta){ # Not used.
       # legend(x=1.4, y=0.78, legend=c("Inverse gamma(1,1)", "Inverse gamma(0.1,0.1)", "Inverse gamma(0.01,0.01)",
       #                               "Half Normal (0,1)", "Half Cauchy (0,1)", "SD of ln(SMSY) Parken et al.",
       #                               "sigma WA regression Parken et al.", "Med. SD of time-varying SMSYs"),
       #        col=c(t_col(cols[1], 30), t_col(cols[1], 50), t_col(cols[1], 70), cols[2:3], rep(grey(0.5),3)),
       #        lty=c(rep("solid", 6), "dashed", "dotted"), bty="n", lwd=2, cex=0.8)
-      legend(x=1.4, y=0.78, legend=c("Inverse gamma(1,1)", "Inverse gamma(0.1,0.1)", "Inverse gamma(0.01,0.01)",
-                                     "Normal bounded", "Uniform bounded", "SD of ln(SMSY) Parken et al.",
-                                     "sigma WA regression Parken et al.", "Med. SD of time-varying SMSYs"),
+      legend(x=1.4, y=0.78, legend=c("Inverse gamma(1,1)", 
+                                     "Inverse gamma(0.1,0.1)", 
+                                     "Inverse gamma(0.01,0.01)",
+                                     "Normal bounded", 
+                                     "Uniform bounded", 
+                                     "SD of ln(SMSY) Parken et al.",
+                                     "sigma WA regression Parken et al.", 
+                                     "Med. SD of time-varying SMSYs"),
              col=c(t_col(cols[1], 30), t_col(cols[1], 50), t_col(cols[1], 70), cols[2], cols[4], rep(grey(0.5),3)),
              lty=c(rep("solid", 6), "dashed", "dotted"), bty="n", lwd=2, cex=0.8)
       
@@ -147,37 +168,14 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   }
   
   if (plot_inv_gamma_only){
-    if(!Delta){
-      legend(x=1.05, y=0.8, legend=c("Inverse gamma(1,1)", # 1
-                                   "Inverse gamma(0.1,0.1)", # 2 
-                                   "Inverse gamma(0.01,0.01)", # 3
-                                   "Inverse gamma(0.001,0.001)", # 4
-                                   "Thorson et al. 2014 marginal sigma", # 5
-                                   "Distribution of Ricker Sigma Parken", # 6
-                                   "Distribution of Ricker Sigma PSE"), # 7
-             col=c(t_col(cols[1], 30), 
-                   t_col(cols[1], 50), 
-                   t_col(cols[1], 70), 
-                   t_col(cols[1], 90), 
-                   grey(0.7, alpha = 0.5),
-                   grey(0.7, alpha = 0.5), 
-                   "light blue"), 
-             bty="n", 
-             pch=c(NA,NA,NA,NA,NA, 22,22), 
-             pt.bg= c(NA, NA, NA, NA, NA,
-                      grey(0.7, alpha=0.5), 
-                     "light blue"), 
-             lty = c("solid", "solid", "solid", "solid", "dashed", NA, NA),
-             lwd = c(rep(2,5),NA,NA) )
-    }
-    if(Delta){
+    if(Delta){ # ADITIONAL LINES
       # NEW LINES
       mleest_smsy <- exp(modelobject[5,1])
       # mleest_srep <- modelobject[10,1]
       smsy95 <- mleest_smsy + 1.96 * modelobject[5,2]
       smsy5 <- mleest_smsy - 1.96 * modelobject[5,2]
-        # MLE line for estimate of WA regression sigma
-        # Boundaries for 95% confidence intervals of sigma
+      # MLE line for estimate of WA regression sigma
+      # Boundaries for 95% confidence intervals of sigma
       # abline(v = mleest_smsy, col = grey(0.5)) # solid
       # abline(v = smsy5, col = grey(0.5), lty = "dotted")
       # abline(v = smsy95, col = grey(0.5), lty = "dotted")
@@ -193,11 +191,86 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
       abline(v= sd(log(read.csv("DataIn/ParkenSMSY.csv")$SMSY)), col=t_col(cols[2], 50), lwd = 2)
       abline(v= sqrt((0.293+0.146)/2), col=t_col(cols[2], 50), lty="dashed", lwd = 2) #See Parken et al. (2006)
       abline(v= 0.21, col=t_col(cols[2], 50), lty="dotted", lwd = 2) #See KFrun.R
-      
+    }
+  }
+
+  # LAST LINES
+  # IF In frequentist setting::
+  # sigma not a random variable - no transformation required on PDF - its just a penalty
+  # its not a distribution.
+  
+  # IF Bayesian (a random variable)::
+  # Can take the sqrt() of the posterior sample - and then calculate density function
+  # Randomly sample from prior - then square root - and then plot in dinvgamma (??)
+  # OR
+  # use the jacobian to transform
+  
+  shape <- rate <- 0.01
+  lines(sqrt(test), sqrt(dinvgamma(test, shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=70))
+  # lines(sqrt(test), dinvgamma(test, shape = shape, rate = rate), lwd = 4, col = "red")
+  lines(sqrt(test), dgamma(1/test, shape = shape, scale = 1/rate), lwd = 4, col = "blue")
+  # lines(sqrt(test), dgamma(1/test, shape = shape,)
+  
+  shape <- rate <- 0.1
+  lines(sqrt(test), sqrt(dinvgamma(test, shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=50))
+  # lines(sqrt(test), dinvgamma(test, shape = shape, rate = rate), lwd = 4, col = "red")
+  lines(sqrt(test), dgamma(1/test, shape = shape, scale = 1/rate), lwd = 4, col = "blue", lty = 'dashed')
+  
+  # This one only shows up for WA - NOT for Ricker
+  if (Delta) {
+    shape <- rate <- 1
+    lines(sqrt(test), sqrt(dinvgamma(test, shape = shape, rate = rate)), lwd = 4, col = t_col(color = cols[1], percent = 30))
+    # lines(sqrt(test), dinvgamma(test, shape = shape, rate = rate), lwd = 4, col = "red")
+    lines(sqrt(test), dgamma(1/test, shape = shape, scale = 1/rate), lwd = 4, col = "cyan2")
+  }
+  
+    
+  if (plot_inv_gamma_only){ # LEGENDS
+    if(!Delta){
+      # remove Inverse gamma(1,1) - there will then only be 6 
+        # Position: x = 1.05, y = 0.8,
+      legend("topright", legend = c(# "Inverse gamma(1,1)", # 1
+                                   "Inverse gamma(0.1,0.1)", # 2 
+                                   "Inverse gamma(0.01,0.01)", # 3
+                                   "Inverse gamma(0.001,0.001)", # 4
+                                   "Gamma(1, 1/1)", # Added blue line
+                                   "Gamma(0.1, 1/0.1)", # Added blue line
+                                   "Gamma(0.001, 1/0.001)", # Added blue line
+                                   "Thorson et al. 2014 marginal sigma", # 5
+                                   "Distribution of Ricker Sigma Parken", # 6
+                                   "Distribution of Ricker Sigma PSE"), # 7
+             col=c(t_col(cols[1], 30), 
+                   t_col(cols[1], 50), 
+                   t_col(cols[1], 70), 
+                   "blue",
+                   "blue",
+                   "deepskyblue",
+                   # t_col(cols[1], 90), 
+                   grey(0.7, alpha = 0.5),
+                   grey(0.7, alpha = 0.5), 
+                   "light blue"), 
+             bty="n", 
+             pch=c(NA,NA,NA,NA,NA,NA,NA,22,22), # Removed first NA
+             pt.bg= c(NA, NA, NA, NA, NA, NA, NA, # Removed first NA
+                      grey(0.7, alpha=0.5), 
+                     "light blue"), 
+             lty = c("solid", "solid", "solid", 
+                     "solid", "dashed", "solid", 
+                     "dashed", NA, NA), # Removed first "solid"
+             lwd = c(rep(2,7),NA,NA), # Changed to rep(2, 4) 
+             cex = 0.6,
+             xpd = TRUE,
+             inset = c(-0.5, 0))
+    }
+    if(Delta){
       # Adjust legend for new lines - make sure they are short enough titles
-      legend(x=1.4, y=0.78, legend=TeX(c("Inverse gamma(1,1)", 
+        # Position: x = 1.4, y = 0.78
+      legend("topright", legend = TeX(c("Inverse gamma(1,1)",
                                      "Inverse gamma(0.1,0.1)", 
                                      "Inverse gamma(0.01,0.01)", 
+                                     "Gamma(1, 1/1)", # Added blue line
+                                     "Gamma(0.1, 1/0.1)", # Added blue line
+                                     "Gamma(0.001, 1/0.001)", # Added blue line
                                      r"($\sigma$ WA-SMSY reg. MLE)", 
                                      "95% CI",
                                      "SD of ln(SMSY) Parken et al.",
@@ -205,25 +278,21 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
                                      "Med. SD of time-varying SMSYs")),
              # col=c(t_col(cols[1], 30), t_col(cols[1], 50), t_col(cols[1], 70), rep(grey(0.5),3)), 
              col = c(t_col(cols[1], 30), t_col(cols[1], 50), t_col(cols[1], 70), 
+                     "cyan2", "blue", "blue",
                      rep(grey(0.5),2),
                      rep(t_col(cols[2], 50), 3)), 
              # lty=c(rep("solid", 4), "dashed", "dotted"),
-             lty = c(rep("solid", 4), NA, "solid", "dashed", "dotted"),
-             pch = c(rep(NA, 4), 15, rep(NA, 3)),
-             pt.bg = c(rep(NA,4), grey(0.5), rep(NA,3)),
+             lty = c(rep("solid", 4), "solid", "dashed", "solid", NA, "solid", "dashed", "dotted"),
+             pch = c(rep(NA, 4), rep(NA, 3), 15, rep(NA, 3)),
+             pt.bg = c(rep(NA,4), rep(NA, 3), grey(0.5), rep(NA,3)),
              pt.cex = 2,
              bty = "n", 
              lwd=2, 
-             cex=0.8)
+             cex=0.6,
+             xpd = TRUE,
+             inset = c(-0.5, 0))
     }
   }
-  
-  shape<-rate<-0.01
-  lines(sqrt(test), sqrt(dinvgamma(test,shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=70))
-  shape<-rate<-0.1
-  lines(sqrt(test), sqrt(dinvgamma(test,shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=50))
-  shape<-rate<-1
-  lines(sqrt(test), sqrt(dinvgamma(test,shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=30))
   
 }
 
@@ -250,8 +319,6 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
     #   # Ricker Priors - InvGamma
     # png(paste("DataOut/RicPriors_InvGamma.png", sep=""), width=7, height=7, units="in", res=500)
     # plotPriors(plot_inv_gamma_only=TRUE, Delta=FALSE)
-        # Dashed line?
-        # X-title is wrong
     # dev.off()
     # 
     #   # WA sigma priors - InvGamma

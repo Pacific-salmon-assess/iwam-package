@@ -87,7 +87,10 @@ source(here::here("R/Get_LRP_bs.R")) # Now no longer includes TMB
 IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
                       targetname = "target", # target name for naming different target groupings
                       remove.EnhStocks = FALSE, # was originally TRUE as default
-                      run.predict = TRUE,
+                      predict.syn = TRUE, # Run creation of intervals for synoptic set
+                      predict.tar = TRUE, # Run prediction of estimates/intervals for target set
+                      # Both TRUE by default. If you are for example just running the FixedEffects model
+                        # and do not want targets - turn predict.tar = FALSE.
                       run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
                       bias.cor = TRUE,
                       random = TRUE, # Turn random = "logA" on by default - Turn off for the fixed effect model
@@ -438,10 +441,16 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   
   # Compile model if changed:
     # Run a detect - if file is exist statement - then unload
-  if (file.exists(here::here(paste("TMB_Files/", mod, sep="")))){
-    # print("Files exist.")
+  
+  if (is.loaded(here::here(paste("TMB_Files/", mod, sep="")))){
+    print("Files exist and is loaded. Unloading before re-compliation")
     dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
-  }
+  } else {print("File not loaded. Onwards.")}
+  
+  # if (file.exists(here::here(paste("TMB_Files/", mod, ".dll", sep="")))){
+  #   print("Files exist. Unloading before re-compliation")
+  #   dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+  # }
   # dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   compile(here::here(paste("TMB_Files/", mod, ".cpp", sep="")))
     # Needs to be run to re-create the .dll and .o files from a new .cpp file
@@ -499,7 +508,6 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   all_pars$Param <- row.names(all_pars)
   # Rename parameter names
   all_pars$Param <- sapply(all_pars$Param, function(x) (unlist(strsplit(x, "[.]"))[[1]]))
-  
   
   pars <- data.frame()
   pars <- all_pars %>% filter (Param %in% c("logA", 
@@ -736,9 +744,11 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   }
   
   #### Predictions
+  # old verison was entire section under run.predict
+    # But there are cases - where you just want to run the synoptic set for PI's 
+    # and not the targets themselves
   
-  if (run.predict == TRUE) {
-    
+  if (predict.syn == TRUE) {
     #### 6. Calculate prediction intervals for SMSY and SREP for additional stocks ----
     
     # Get predicted values to estimate prediction intervals
@@ -789,13 +799,14 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
       filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
     
-    
+  }
+    # **************************************************************************
     # Get watershed areas for synoptic data set to calculate PIs for stream and ocean
     wa_stream <- WAbase %>% left_join(lifehist) %>% filter(lh == 0) %>% pull(WA)
     wa_ocean <- WAbase %>% left_join(lifehist) %>% filter(lh == 1) %>% pull(WA)
     
     # Get names of *supplied* stocks
-      # * Requires Inlet aggregation information **************************************************************************
+      # * Requires Inlet aggregation information *******************************
     # Create another triple if, elif, else statment
     # if (all(sapply(c("Inlet","CU"), function(col) exists(col, where = WAin)))) { # Complete aggregation
     #   stocknames <- c(as.vector(WAin$Stock), as.vector(InletlnWA$Inlet), as.vector(CUlnWA$CU))
@@ -836,8 +847,8 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       stocknames_ocean <- c(as.vector(WAin$Stock[WAin$lh == 1]))
     }
      
-      # *******************************************************************************************************************
-    
+    # **************************************************************************
+    if (predict.tar == TRUE) {
     # Get Predicted SMSY and SREP values for the target stocks and their Prediction Intervals
     # For single life-history events (stream OR ocean targets)
     # targetSMSY <- data.frame() 
@@ -1077,7 +1088,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       # stream only
       # combined
     
-    
+  } 
     
     #### End of IWAM Model ####
     
@@ -1091,7 +1102,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # run.bootstraps = TRUE
     # bs_seed <- 1
     # bs_nBS <- 10
-    tic()
+  tic()
     
     # library(doFuture)
     # plan(multisession, workers = 4)
@@ -1184,7 +1195,6 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   
     }
 
-  }
   toc()
   #### Table outputs ####
   if (est.table == TRUE){
@@ -1237,11 +1247,16 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
                       SRes = SRes,
                       r2 = r2)
   
-  if (run.predict == TRUE) {
+  # now predict.tar and predict.syn
+  if (predict.syn == TRUE) {
     return.list <- c(return.list,
-                     list(dataname = datain),
                      list(pred_lnSREP_pi = pred_lnSREP_pi),
                      list(pred_lnSMSY_pi = pred_lnSMSY_pi))
+  }
+  
+  if (predict.tar == TRUE) {
+    return.list <- c(return.list,
+                     list(dataname = datain))
   }
   
   if (run.bootstraps == TRUE) {
