@@ -25,16 +25,20 @@ t_col <- function(color, percent = 50, name = NULL) {
 
 
 plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
-  #plot_inv_gamma_only TRUE = then only plot inverse gamma distributions and not cauchy, normal or uniform
+  #plot_inv_gamma_only TRUE = then only plot inverse gamma distributions 
+    # and not cauchy, normal or uniform
   #Delta TRUE = plot priors for the SD of the Watershed-area model
   #Delta FALSE = plot priors for the SD of the Ricker model 
+  
   
   par(mar=c(5, 4, 4, 12)) # Reset margins
   
   test <- seq(0.00001,9,len=10000) # Variances
   
   cols <- viridis(4, alpha=0.9) # Colours
+  # cols <- c("#440154E6", "#31688EE6", "#35B779E6", "#FDE725E6")
   
+  # WA REG PENALTY PLOT --------------------------------------------------------
   if(Delta){
     plot(x=test, y=abs(dcauchy(test,0,1)), type="n", 
          ylab="Probability density", xlab="Sigma for watershed-area regression" , 
@@ -44,7 +48,8 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   
   # plot(x=test, y=abs(dcauchy(test,0,1)), type="n", ylab="Probability density", xlab="Sigma for watershed-area regression" , ylim=c(0,0.8), xlim=c(0,2.5))
   
-  if(!Delta){ # DELTA IS FALSE FLAG ********************************************
+  # RICKER PENALTY PLOT --------------------------------------------------------
+  if(!Delta){
     plot(x=test, y=abs(dcauchy(test,0,1)), type="n", 
          ylab="Probability density", xlab="Ricker Sigma (or LogA sigma)" , 
          ylim=c(0,0.8), xlim=c(0,2.5)) 
@@ -75,7 +80,8 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   # E.g., NCEAS State of Alaska Salmon and People project:	
   # Brendan Connors: Chinook (n = 75) most from US West Coast and of questionable quality, remaining ~20 stocks are from AK and of higher quality
   
-  # Inverse gamma on sqrt(variance) = sigma - for Ricker penalties
+  # RICKER PENALTY LINES -------------------------------------------------------
+    # Inverse gamma on sqrt(variance) = sigma
   if(!Delta){
     shape <- rate <- 0.001
     lines(sqrt(test), sqrt(dinvgamma(test, shape = shape, rate = rate)), lwd = 4, col = t_col(color = cols[1], percent = 90))
@@ -91,6 +97,7 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   # shape<-rate<-1
   # lines(sqrt(test), sqrt(dinvgamma(test,shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=30))
   
+  # IN-ACTIVE
   if (!plot_inv_gamma_only){ # Not used.
     
     if(!Delta){
@@ -165,10 +172,12 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
              lty=c(rep("solid", 6), "dashed", "dotted"), bty="n", lwd=2, cex=0.8)
       
     }
-  }
+  } 
   
+  # ACTIVE
   if (plot_inv_gamma_only){
-    if(Delta){ # ADITIONAL LINES
+    # WA REG PENALTY LINES -----------------------------------------------------
+    if(Delta){
       # NEW LINES
       mleest_smsy <- exp(modelobject[5,1])
       # mleest_srep <- modelobject[10,1]
@@ -194,7 +203,7 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
     }
   }
 
-  # LAST LINES
+  # LAST LINES -----------------------------------------------------------------
   # IF In frequentist setting::
   # sigma not a random variable - no transformation required on PDF - its just a penalty
   # its not a distribution.
@@ -203,7 +212,7 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   # Can take the sqrt() of the posterior sample - and then calculate density function
   # Randomly sample from prior - then square root - and then plot in dinvgamma (??)
   # OR
-  # use the jacobian to transform
+  # use the Jacobian to transform
   
   shape <- rate <- 0.01
   lines(sqrt(test), sqrt(dinvgamma(test, shape=shape, rate=rate)), lwd=4, col=t_col(color=cols[1], percent=70))
@@ -224,8 +233,9 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
     lines(sqrt(test), dgamma(1/test, shape = shape, scale = 1/rate), lwd = 4, col = "cyan2")
   }
   
-    
-  if (plot_inv_gamma_only){ # LEGENDS
+  # LEGENDS --------------------------------------------------------------------
+  if (plot_inv_gamma_only){
+    # RICKER PENALTY LEGEND
     if(!Delta){
       # remove Inverse gamma(1,1) - there will then only be 6 
         # Position: x = 1.05, y = 0.8,
@@ -262,6 +272,7 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
              xpd = TRUE,
              inset = c(-0.5, 0))
     }
+    # WA REG PENALTY LEGEND
     if(Delta){
       # Adjust legend for new lines - make sure they are short enough titles
         # Position: x = 1.4, y = 0.78
@@ -296,6 +307,9 @@ plotPriors <- function (plot_inv_gamma_only, Delta, modelobject){
   
 }
 
+
+
+# ------------------------------------------------------------------------------
 # cols <- c("#440154E6" "#31688EE6" "#35B779E6" "#FDE725E6")
 # Cauchy = normal/sqrt(chi^2), Gelman et al. 2006. Doesnt work
 # prior.scale <- 1

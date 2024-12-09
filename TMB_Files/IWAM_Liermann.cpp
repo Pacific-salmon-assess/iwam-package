@@ -39,17 +39,14 @@ px[0] = DW * py[0];                 // Reverse mode chain rule
     return LambertW(tx)[0];
   }
   
-  
-  
-// REAL CODE STARTS  
+// Opening calls ---------------------------------------------------------------
 template<class Type>
 Type objective_function<Type>:: operator() ()
 {
-  // REMOVE ALL _std objects
-  DATA_VECTOR(S); // Org _std 
-  DATA_VECTOR(logRS); // Org _std
+  DATA_VECTOR(S); 
+  DATA_VECTOR(logRS); 
   
-  DATA_IVECTOR(stk); // stock number // Org _std
+  DATA_IVECTOR(stk); // stock number 
   DATA_IVECTOR(yr); // only occurs once
   
   DATA_SCALAR(logMuA_stream_mean);
@@ -60,20 +57,40 @@ Type objective_function<Type>:: operator() ()
   DATA_SCALAR(HalfNormSig);
   DATA_SCALAR(HalfNormMeanA);
   DATA_SCALAR(HalfNormSigA);
+  
   DATA_VECTOR(WAbase); 
   DATA_VECTOR(scale);
   DATA_IVECTOR(lifehist);
+
+  DATA_INTEGER(biasCor);
+    
   DATA_INTEGER(SigRicPriorNorm); // on/off
   DATA_INTEGER(SigRicPriorGamma); // on/off
   DATA_INTEGER(SigRicPriorCauchy); // on/off
-  DATA_INTEGER(biasCor);
+  
   DATA_INTEGER(SigDeltaPriorNorm); // on/off
   DATA_INTEGER(SigDeltaPriorGamma); // on/off
   DATA_INTEGER(SigDeltaPriorCauchy); // on/off
-  DATA_SCALAR(Tau_dist);
-  DATA_SCALAR(Tau_D_dist);
+  
+  // Alternative's
+  DATA_INTEGER(SigRicPenal); // Gamma Ricker penalty on sigma
+  DATA_INTEGER(SigDeltaPenal); // Gamma WA penalty on precision
+  DATA_INTEGER(SigDeltaPenal_Jac); // Invgamma WA penalty on variance
+  
+  // Depreciated controls for shape and rate
+  DATA_SCALAR(Tau_dist); // Turn off to manually change penalties
+  DATA_SCALAR(Tau_D_dist); // Turn off to manually change penalties
+  
+  // New penalty term controls for shape and rate (scale = 1/rate)
+  // DATA_SCALAR(Ric_sigshape);
+  // DATA_SCALAR(Ric_sigrate);
+  // DATA_SCALAR(WA_sigshape);
+  // DATA_SCALAR(WA_sigscale);
+  // DATA_SCALAR(WA_sigshapeJac); // Specific shape for Jacobian alt.
+  
   //DATA_SCALAR(logDeltaSigma);
   //DATA_SCALAR(logNuSigma);
+  
   DATA_SCALAR(SigDelta_mean);
   DATA_SCALAR(SigDelta_sig);
   DATA_SCALAR(SigNu_mean);
@@ -83,11 +100,9 @@ Type objective_function<Type>:: operator() ()
   DATA_VECTOR(target_lnWA_ocean);
   DATA_VECTOR(target_lnWA_stream);
   
-  
-  // Remove all _std
-  PARAMETER_VECTOR(logA); // Org _std
-  PARAMETER_VECTOR(logB); // Org _std
-  PARAMETER_VECTOR(logSigma); // Org _std
+  PARAMETER_VECTOR(logA); 
+  PARAMETER_VECTOR(logB); 
+  PARAMETER_VECTOR(logSigma); 
   
   PARAMETER(logMuA_stream);
   PARAMETER(logSigmaA);
@@ -115,7 +130,7 @@ Type objective_function<Type>:: operator() ()
   Type sigmaA = exp(logSigmaA);
   vector <Type> nLL(N_Obs); // negative log-likelihood to calculate AIC - not need for est.
 
-  // Standard Ricker model: 
+  // Standard Ricker model: ----------------------------------------------------
   for (int i = 0; i<N_Obs; i++){
     if(biasCor == 0) {
       logRS_pred(i) = logA(stk(i)) - exp(logB(stk(i))) * S(i); // S is: Sp/scale
@@ -127,53 +142,78 @@ Type objective_function<Type>:: operator() ()
     nLL(i) = -dnorm(logRS_pred(i), logRS(i),  sigma(stk(i)), true);
   }
   
-  // Add hierarchical structure to A:
+  
+  
+  // Add hierarchical structure to A: ------------------------------------------
   for(int i=0; i<N_stks; i++){
     // add prior on logA, 
     ans += -dnorm(logA(i), logMuA_stream + logMuA_ocean * lifehist(i), sigmaA, true );
     
      // add prior on sigma, 
-    if (SigRicPriorGamma == 1) {
-       ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true); 
-        // Change prior to 0.1, 0.1 - because rate should be 1/term (for gamma --> invgamma)
-          // which means scale is 1/(1/term) or in this case just term
-        // dgamma on precision
-        // invgamma on tau
-    }
-    if (SigRicPriorNorm == 1) {
-      //ans += -abs( dnorm( sigma(i), HalfNormMean, HalfNormSig, true) );
-      //3 June 2021. abs() function no longer works with TMB, so have removed
-      ans += -(dnorm(sigma(i), HalfNormMean, HalfNormSig, true) );
-    }
-    if (SigRicPriorCauchy == 1) {
-      //ans += - abs( dt( sigma(i), Type(1), true ));
-      //3 June 2021. abs() function no longer works with TMB, so have removed
-      ans += - (dt(sigma(i), Type(1), true ));
-    }
+    // if (SigRicPriorGamma == 1) {
+    //   ans += -dgamma(pow(sigma(i),-2), Tau_dist, 1/Tau_dist, true); 
+    //     // Change prior to 0.1, 0.1 - because rate should be 1/term 
+    //     // (for gamma --> invgamma)
+    //     // which means scale is 1/(1/term) or in this case just term
+    //     // dgamma on precision
+    //     // invgamma on tau
+    // }
+    
+    // Alternative penalty directly on sigma        
+    // if (SigRicPenal == 1) {
+      ans += -dgamma(sigma(i), Type(7.5), Type(0.1), true);
+      // Type(7.5), Type(0.1)
+    // }
+    
+    // Half normal
+    // if (SigRicPriorNorm == 1) {
+    //   //ans += -abs( dnorm( sigma(i), HalfNormMean, HalfNormSig, true) );
+    //   //3 June 2021. abs() function no longer works with TMB, so have removed
+    //   ans += -(dnorm(sigma(i), HalfNormMean, HalfNormSig, true) );
+    // }
+    
+    // // Half cauchy
+    // if (SigRicPriorCauchy == 1) {
+    //   //ans += - abs( dt( sigma(i), Type(1), true ));
+    //   //3 June 2021. abs() function no longer works with TMB, so have removed
+    //   ans += - (dt(sigma(i), Type(1), true ));
+    // }
   }
   
-  // Add priors for hyperpars:
+  
+  
+  // Add priors for hyperpars: -------------------------------------------------
   // MuA prior for stream type
   ans += -dnorm(logMuA_stream, logMuA_stream_mean, logMuA_stream_sig, true);
   // MuA prior for ocean type
   ans += -dnorm(logMuA_ocean, logMuA_ocean_mean, logMuA_ocean_sig, true);
+  
   // sigmaA prior
-  if (SigRicPriorGamma == 1) {
-    ans += -dgamma(pow(sigmaA,-2), Tau_dist, 1/Tau_dist, true);
-  }
-  if (SigRicPriorNorm == 1) {
-    //3June 2021. abs() functin no longer works in TMB
-    //ans += -abs( dnorm( sigmaA, HalfNormMeanA, HalfNormSigA, true) );
-    ans += -( dnorm( sigmaA, HalfNormMeanA, HalfNormSigA, true) );
-  }
-  if (SigRicPriorCauchy == 1) {
-    //ans += - abs(dt( sigmaA, Type(1), true));
-    ans += - (dt( sigmaA, Type(1), true));
-  }
+  // if (SigRicPriorGamma == 1) {
+  //   ans += -dgamma(pow(sigmaA,-2), Tau_dist, 1/Tau_dist, true);
+  // }
+  
+  // Alternative penalty directly on sigma
+  // if (SigRicPenal == 1) {
+    ans += -dgamma(sigmaA, Type(7.5), Type(0.1), true);
+  // }
+  
+  // // Half Normal
+  // if (SigRicPriorNorm == 1) {
+  //   //3June 2021. abs() functin no longer works in TMB
+  //   //ans += -abs( dnorm( sigmaA, HalfNormMeanA, HalfNormSigA, true) );
+  //   ans += -(dnorm(sigmaA, HalfNormMeanA, HalfNormSigA, true) );
+  // }
+  
+  // Half cauchy
+  // if (SigRicPriorCauchy == 1) {
+  //   //ans += - abs(dt( sigmaA, Type(1), true));
+  //   ans += -(dt(sigmaA, Type(1), true));
+  // }
   
   
   
-  //Calculate SMSY and SREP
+  //Calculate SMSY and SREP ----------------------------------------------------
   vector <Type> SMSY(N_stks); // Removed _std 
   vector <Type> SREP(N_stks); // Removed _std
   
@@ -182,11 +222,12 @@ Type objective_function<Type>:: operator() ()
     SMSY(i) =  (1 - LambertW( exp (1- logA(i)) ) ) / exp(logB(i)) ; // scaled SMSY
   }
   SREP = logA / exp(logB); // scaled SREP
- // SMSY(i) =  (1 - LambertW( exp (1- logA(i) - sigma^2/2) ) ) / exp(logB(i)) ; // non-bias correction version
+  // SMSY(i) =  (1 - LambertW( exp (1- logA(i) - sigma^2/2) ) ) / exp(logB(i)) ; 
+    // non-bias correction version
+   
   
   
-  
-  // Liermann's model with both stream and ocean type =================
+  // Liermann's model with both stream and ocean type --------------------------
   vector <Type> pred_lnSMSY(N_stks);
   vector <Type> pred_lnSREP(N_stks);
   Type sigma_delta = exp(logDeltaSigma);
@@ -218,33 +259,51 @@ Type objective_function<Type>:: operator() ()
     if(biasCor == 1) {
       pred_lnSREP(i) = logNu1 + logNu1_ocean * lifehist(i) + ( exp(logNu2) + Nu2_ocean * lifehist(i) ) * log(WAbase(i))  - pow(sigma_nu,2) / Type(2);
     }
-    
     ans += -dnorm( pred_lnSREP(i), log(SREP(i) * scale(i) ),  sigma_nu, true);
   }
   
+  
+  
   // Normal prior on sigma_delta and sigma_nu
-  if (SigDeltaPriorNorm == 1) {
-    ans += -dnorm(sigma_delta, SigDelta_mean, SigDelta_sig, true);
-    ans += -dnorm(sigma_nu, SigNu_mean, SigNu_sig, true);
-  }
+  // if (SigDeltaPriorNorm == 1) {
+  //   ans += -dnorm(sigma_delta, SigDelta_mean, SigDelta_sig, true);
+  //   ans += -dnorm(sigma_nu, SigNu_mean, SigNu_sig, true);
+  // }
   
   // Inverse gamma prior on sigma_delta and sigma_nu
-  if (SigDeltaPriorGamma == 1) {
-    ans += -dgamma(pow(sigma_delta,-2), Tau_D_dist, 1/Tau_D_dist, true);
-    ans += -dgamma(pow(sigma_nu,-2), Tau_D_dist, 1/Tau_D_dist, true);
-  }
+  // if (SigDeltaPriorGamma == 1) {
+  //   ans += -dgamma(pow(sigma_delta,-2), Tau_D_dist, 1/Tau_D_dist, true);
+  //   ans += -dgamma(pow(sigma_nu,-2), Tau_D_dist, 1/Tau_D_dist, true);
+  // }
+  
+  // Alternative: Gamma penalty on precision
+    // Shape = 3, scale = rate = 1
+  // if (SigDeltaPenal == 1) {
+    ans += -dgamma(pow(sigma_delta, -2), Type(3), Type(1), true);
+    ans += -dgamma(pow(sigma_nu, -2), Type(3), Type(1), true);
+  // }
+  
+  // Alternative: Invgamma on variance w/ Jacobian: 
+    // Shape 0.75, scale = rate = 1
+  // if (SigDeltaPenal_Jac == 1) {
+  //   ans += -dgamma(pow(sigma_delta,-2), Type(0.75), Type(1), true);
+  //   ans += Type(2)*log(pow(sigma_delta,2)); //Jacobian adjustment
+  //   ans += -dgamma(pow(sigma_nu,-2), Type(0.75), Type(1), true);
+  //   ans += Type(2)*log(pow(sigma_nu,2)); //Jacobian adjustment
+  // }
   
   // Half cauchy prior on sigma_delta and sigma_nu
-  if (SigDeltaPriorCauchy == 1) {
-    //3 June 2021. abs() no longer works in TMB
-    //ans += -abs( dt( sigma_delta, Type(1), true));
-    //ans += - abs( dt( sigma_nu, Type(1), true ));
-    ans += -( dt( sigma_delta, Type(1), true));
-    ans += -( dt( sigma_nu, Type(1), true ));
-  }
+  // if (SigDeltaPriorCauchy == 1) {
+  //   //3 June 2021. abs() no longer works in TMB
+  //   //ans += -abs( dt( sigma_delta, Type(1), true));
+  //   //ans += - abs( dt( sigma_nu, Type(1), true ));
+  //   ans += -( dt( sigma_delta, Type(1), true));
+  //   ans += -( dt( sigma_nu, Type(1), true ));
+  // }
   
   
-  // Get predicted values for plotting WA regresssion with CIs
+  
+  // Get predicted values for plotting WA regresssion with CIs -----------------
   int N_pred = pred_lnWA.size();
   vector <Type> pred_lnSMSY_stream_CI(N_pred);
   vector <Type> pred_lnSMSY_ocean_CI(N_pred);
@@ -258,7 +317,7 @@ Type objective_function<Type>:: operator() ()
     pred_lnSREP_ocean_CI(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * pred_lnWA(i);
   }
   
-  //// Get predicted values for stream-type target stocks with CIs
+  //// Get predicted values for stream-type target stocks with CIs -------------
   int N_target_stream = target_lnWA_stream.size();
   vector <Type> target_lnSMSY_stream(N_target_stream);
   vector <Type> target_lnSREP_stream(N_target_stream);
@@ -268,7 +327,7 @@ Type objective_function<Type>:: operator() ()
     target_lnSREP_stream(i) = logNu1 + exp(logNu2) * target_lnWA_stream(i);
   } 
   
-  ///Get predicted values for ocean-type target stocks with CIs
+  ///Get predicted values for ocean-type target stocks with CIs ----------------
   int N_target_ocean = target_lnWA_ocean.size();
   vector <Type> target_lnSMSY_ocean(N_target_ocean);
   vector <Type> target_lnSREP_ocean(N_target_ocean);
@@ -278,7 +337,7 @@ Type objective_function<Type>:: operator() ()
     target_lnSREP_ocean(i) = logNu1 + logNu1_ocean + (exp(logNu2) + Nu2_ocean) * target_lnWA_ocean(i);
   }
   
-  // ///Get predicted lines values
+  // ///Get predicted lines values ------------------------------------------------
   // int N_target_ocean = target_lnWA_ocean.size();
   // vector <Type> target_lnSMSY_ocean(N_target_ocean);
   // vector <Type> target_lnSREP_ocean(N_target_ocean);
@@ -289,6 +348,8 @@ Type objective_function<Type>:: operator() ()
   // }
   
   
+  
+  // REPORTING -----------------------------------------------------------------
   vector <Type> lnSMSY = log(SMSY*scale); //This is taking a value on the real
   // scale * a constant scalar (ignore) and putting it on the log-scale
   // This shouldn't matter because it was calculated on the real-scale

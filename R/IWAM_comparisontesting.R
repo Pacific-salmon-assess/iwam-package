@@ -10,8 +10,8 @@ library(diffr)
 library(knitr)
 
 # source
-source(here::here("R/helperFunctions.R"))
-source(here::here("R/PlotFunctions.R"))
+# source(here::here("R/helperFunctions.R")) # Within IWAM_model
+# source(here::here("R/PlotFunctions.R")) # Within IWAM_model
 source(here::here("R/PDF_plot.r"))
 source(here::here("R/IWAM_model.R"))
   # Had to add TMB::sdreport to all_pars function
@@ -61,29 +61,35 @@ source(here::here("R/IWAM_model.R"))
                     #       targetname = "biascor_OFF",
                     # bias.cor = FALSE) # [1] is Ric, [2] is WA
 
-# targetname = "techreport" FOR THE OFFICIAL RUNS ONLY
-
 iwam_default <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
-                          targetname = "techreport",
+                          targetname = "newpenalty_original",
                           predict.syn = T, # T by default
                           predict.tar = T, # T by default
                           run.bootstraps = T,
                           random = TRUE, 
                           bias.cor = TRUE,
-                            bs_nBS = 10, # 250,000 new FULL RUN
-                            plot = TRUE,
-                            SigRicPrior = c(F,T,F), # Ric
-                            SigDeltaPrior = c(F,T,F), # WA default
-                            TauPrior = c(0.1, 1)) # [1] is Ric, [2] is WA
+                          bs_nBS = 10, # 250,000 new FULL RUN
+                          plot = TRUE,
+                          SigRicPrior = c(F, F, F, T),
+                          SigDeltaPrior = c(F, F, F, T, F),
+                          # TauPrior = c(7.5, 0.1, 3, 1, 0.75), # Currently set in hard
+                            # Would need to change in IWAM_Liermann.cpp back to OBJECTS
+                          TauDist = c(0.1, 1) # [1] is Ricker, [2] is WA
+                          )
   # "DataOut/WAregSREP_target_richalfnorm_0.1_wagamma_1_IWAM_Liermann"
   # 11 minutes run time - 675.76 seconds (for bootstrapping)
+
+
+
 iwam_r_halfnorm <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                              targetname = "techreport",
                           bs_nBS = 10,
                           plot = TRUE,
                           SigRicPrior = c(T,F,F), # Ric half normal
                           SigDeltaPrior = c(F,T,F),
-                          TauPrior = c(0.1, 1)) 
+                          TauPrior = c(7.5, 0.1, 3, 1), 
+                          TauPrior = c(0.1, 1)
+                          ) 
   # "DataOut/WAregSREP_target_riccauchy_0.1_wagamma_1_IWAM_Liermann"
 iwam_r_halfcauchy <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                                targetname = "techreport",
@@ -91,7 +97,8 @@ iwam_r_halfcauchy <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NoAgg.csv"),
                              plot = TRUE,
                              SigRicPrior = c(F,F,T), # Ric half cauchy
                              SigDeltaPrior = c(F,T,F), # WA Default
-                             TauPrior = c(0.1, 1))  # default
+                             TauPrior = c(0.1, 1) # default
+                             )
 
 # RIC Gamma Priors x 3
   # iwam_default to compare against
@@ -175,8 +182,8 @@ dev.off()
   # Running WITHOUT bias correction brings down the mean of the fixed
     # effect model under 2 - and creates a skew in the distribution
     # as expected
-
-# PDF Prior Plotting ####
+ 
+# PDF Penalty Plotting ####
   # Ricker sigma priors
     # See TWG ppt - slide 18 and 19
     # plotPriors(plot_inv_gamma_only=TRUE, Delta=FALSE) or
@@ -194,6 +201,10 @@ plotPriors(plot_inv_gamma_only = TRUE, Delta = TRUE, modelobject = iwam_default$
   # FALSE, TRUE is also WA related
 # plotPriors(plot_inv_gamma_only=TRUE, Delta=TRUE, modelobject = iwam_wa_gamma0.1$all_Deltas) # prior comparison
 dev.off()
+
+# PDF Penalty Plotting ####
+
+
 
 # SMSY Point Estimate comparison with CI's - IWAM vs. Parken ####
   # **TK: Changed from Srep to Smsy **

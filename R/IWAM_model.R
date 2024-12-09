@@ -98,11 +98,18 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
                       bs_nBS = 10, # trials for bootstrapping
                       plot = TRUE, # whether or not to create plots stored in DataOut/
                       est.table = FALSE, # store kable tables as per wcvi_workedexample.RMD
-                      # Norm, Gamma, Cauchy
-                      SigRicPrior = c(F, T, F), # Default invgamma
-                      SigDeltaPrior = c(F, T, F), # Default invgamma
+                      # Norm, InvGamma, Cauchy, Gamma alt
+                      SigRicPrior = c(F, T, F, F), # Default invgamma
+                      SigDeltaPrior = c(F, T, F, F, F), # Default invgamma
                       # Tau_dist, Tau_D_dist
-                      TauPrior = c(0.1, 1), # Defaults
+                      TauDist = c(0.1, 1), # DEPRECIATED Defaults for penalty terms for gamma
+                      TauPrior = c(7.5, 0.1, 3, 1, 0.75), # New Default for added penalty controls for
+                        # dgamma shape and scale
+                        # Order: Ric_sigshape, Ric_sigscale, WA_sigshape, WA_sigscale
+                        # Remembering that scale is 1/X
+                        # Defaults: Ricker: shape = 7.5, scale = 1/10 = 0.1, penalty on sigma
+                        # Defaults: WA: shape = 3, scale = 1, where the penalty sits on precision
+                        # Alts: WA: shape = 0.75, where the penalty sits on variance [5]
                       mod = "IWAM_Liermann", # TMB Model used
                       prod = "LifeStageModel" # Productivity assumption used for bootstrapping
 )
@@ -263,14 +270,29 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # data$SigDeltaPriorCauchy <- as.numeric(F) # SigDeltaPrior[3]
   # data$Tau_dist <- 0.1 # Consider changing to 0.01 # TauPrior[1]
   # data$Tau_D_dist <- 1 # TauPrior[2]
-  data$SigRicPriorNorm <- as.numeric(SigRicPrior[1])
-  data$SigRicPriorGamma <- as.numeric(SigRicPrior[2])
-  data$SigRicPriorCauchy <- as.numeric(SigRicPrior[3])
-  data$SigDeltaPriorNorm <- as.numeric(SigDeltaPrior[1])
-  data$SigDeltaPriorGamma <- as.numeric(SigDeltaPrior[2])
-  data$SigDeltaPriorCauchy <- as.numeric(SigDeltaPrior[3])
-  data$Tau_dist <- TauPrior[1]
-  data$Tau_D_dist <- TauPrior[2]
+  
+  # Penalty term scenario switches
+  data$SigRicPriorNorm <- as.numeric(SigRicPrior[1]) # Half normal
+  data$SigRicPriorGamma <- as.numeric(SigRicPrior[2]) # Invgamma
+  data$SigRicPriorCauchy <- as.numeric(SigRicPrior[3]) # Half cauchy
+  data$SigRicPenal <- as.numeric(SigRicPrior[4]) # 4th term - alternative gamma
+  
+  data$SigDeltaPriorNorm <- as.numeric(SigDeltaPrior[1]) # Half normal
+  data$SigDeltaPriorGamma <- as.numeric(SigDeltaPrior[2]) # Invgamma
+  data$SigDeltaPriorCauchy <- as.numeric(SigDeltaPrior[3]) # Half cauchy
+  data$SigDeltaPenal <- as.numeric(SigDeltaPrior[4]) # 4th term - alternative gamma on precision
+  data$SigDeltaPenal_Jac <- as.numeric(SigDeltaPrior[5]) # 5th term - alternative w/ jacobian on variance
+  
+  # Older version of penalty controls for dgamma's
+  data$Tau_dist <- TauDist[1] # DEPRECIATED
+  data$Tau_D_dist <- TauDist[2] # DEPRECIATED
+  
+  data$Ric_sigshape <- TauPrior[1] # shape
+  data$Ric_sigrate <- TauPrior[2] # rate
+  data$WA_sigshape <- TauPrior[3] # shape
+  data$WA_sigscale <- TauPrior[4] # rate = 1, therefore rate = scale
+  data$WA_sigshapeJac <- TauPrior[5] # shape for Jacobian alt.
+  
   # *******************************************************
   # logDeltaSigma # currently listed as param in R, but data_scalar in TMB
   # logNuSigma # currently listed as param in R, but data_scalar in TMB
@@ -622,12 +644,24 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # scaled e.g., "SRes"
   # PlotSRCurve(srdat=srdat, pars=pars, r2=r2, removeSkagit = FALSE, mod=mod)
   
-  isigricprior <- which(SigRicPrior) # value
-  isigdeltaprior <- which(SigDeltaPrior) # value
-  pngtitleobj_ric <- c("richalfnorm_", "ricgamma_", "riccauchy_") # list
-  pngtitleobj_wa <- c("wahalfnorm_", "wagamma_", "wacauchy_") # list
-  pngtitle_gammaricprior <- TauPrior[1] # value
-  pngtitle_gammawaprior <- TauPrior[2] # value
+  isigricprior <- which(SigRicPrior) # value of scenario (1-3)
+  isigdeltaprior <- which(SigDeltaPrior) # value of scenario (1-3)
+    # Now ric (1-4)
+    # Now wa (1-5)
+  pngtitleobj_ric <- c("richalfnorm_", "ricinvgamma_", "riccauchy_",
+                       "ricaltgamma_") # list
+  pngtitleobj_wa <- c("wahalfnorm_", "wagamma_", "wacauchy_",
+                      "wagammaprec_", "wagammajac_") # list
+  
+  # Original TauDist
+  pngtitle_gammaricprior <- TauDist[1] # Value of Ricker penalty shape term
+  pngtitle_gammawaprior <- TauDist[2] # Value of WA penalty shape term
+  
+  # New Alternative TauPrior's  where scale and rate terms for TMB
+  # pngtitle_tauprior1 <- TauPrior[1] # shape for ricker gamma
+  # pngtitle_tauprior3 <- TauPrior[3] # shape for wa gamma
+  # pngtitle_tauprior5 <- TauPrior[5] # shape for wa gamma w/ jacobian
+  
   pngtitle_ricprior <- ifelse(length(isigricprior) > 0, pngtitleobj_ric[isigricprior], "") # string e.g. ricgamma_
   pngtitle_waprior <- ifelse(length(isigdeltaprior) > 0, pngtitleobj_wa[isigdeltaprior], "") # string e.g. ^
   
@@ -681,11 +715,16 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     # change title depending on prior
     if (SigRicPrior[1] == TRUE) {SigRicPriorTitle <- "Half normal Prior Ricker sigma"}
-    if (SigRicPrior[2] == TRUE) {SigRicPriorTitle <- "Gamma Prior Ricker sigma"}
+    if (SigRicPrior[2] == TRUE) {SigRicPriorTitle <- "InvGamma Prior Ricker sigma"}
     if (SigRicPrior[3] == TRUE) {SigRicPriorTitle <- "Half cauchy Prior Ricker sigma"}
+    if (SigRicPrior[4] == TRUE) {SigRicPriorTitle <- "Alt. Gamma on Sigma Ricker Penalty"}
+    
     if (SigDeltaPrior[1] == TRUE) {SigDeltaPriorTitle <- "Half normal prior WA regression sigma"}
     if (SigDeltaPrior[2] == TRUE) {SigDeltaPriorTitle <- "Gamma prior WA regression sigma"}
     if (SigDeltaPrior[3] == TRUE) {SigDeltaPriorTitle <- "Half cauchy prior WA regression sigma"}
+    if (SigDeltaPrior[4] == TRUE) {SigDeltaPriorTitle <- "Alt. Gamma on Var WA Penalty"}
+    if (SigDeltaPrior[5] == TRUE) {SigDeltaPriorTitle <- "Alt. Gamma w/ Jacobian WA Penalty"}
+    
     title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, sep="\n")
     #title_plot <- "Separate life-histories: n=17\nFixed-effect yi (logDelta1), \nFixed-effect slope (Delta2)"
     plotWAregressionSMSY (pars, all_Deltas, srdat, lifehist, WAbase, pred_lnSMSY, 
@@ -709,13 +748,15 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     
     par(mfrow=c(1,1), mar=c(4, 4, 4, 2) + 0.1)
     # change title depending on prior
-    if (SigRicPrior[1] == TRUE) {SigRicPriorTitle <- "Half normal Prior Ricker sigma"}
-    if (SigRicPrior[2] == TRUE) {SigRicPriorTitle <- "Gamma Prior Ricker sigma"}
-    if (SigRicPrior[3] == TRUE) {SigRicPriorTitle <- "Half cauchy Prior Ricker sigma"}
-    if (SigDeltaPrior[1] == TRUE) {SigDeltaPriorTitle <- "Half normal prior WA regression sigma"}
-    if (SigDeltaPrior[2] == TRUE) {SigDeltaPriorTitle <- "Gamma prior WA regression sigma"}
-    if (SigDeltaPrior[3] == TRUE) {SigDeltaPriorTitle <- "Half cauchy prior WA regression sigma"}
+    # if (SigRicPrior[1] == TRUE) {SigRicPriorTitle <- "Half normal Prior Ricker sigma"}
+    # if (SigRicPrior[2] == TRUE) {SigRicPriorTitle <- "Gamma Prior Ricker sigma"}
+    # if (SigRicPrior[3] == TRUE) {SigRicPriorTitle <- "Half cauchy Prior Ricker sigma"}
+    # 
+    # if (SigDeltaPrior[1] == TRUE) {SigDeltaPriorTitle <- "Half normal prior WA regression sigma"}
+    # if (SigDeltaPrior[2] == TRUE) {SigDeltaPriorTitle <- "Gamma prior WA regression sigma"}
+    # if (SigDeltaPrior[3] == TRUE) {SigDeltaPriorTitle <- "Half cauchy prior WA regression sigma"}
     # else {title_plot <- "Prior Ricker sigma and prior WA regression sigma"}
+    
     title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, sep="\n")
     # title_plot <- paste(SigRicPriorTitle, "and", SigDeltaPriorTitle, collapse = "\n")
     # title_plot <- "Prior Ricker sigmas and prior on WA regression sigma"
