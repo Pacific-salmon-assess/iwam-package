@@ -202,10 +202,6 @@ plotPriors(plot_inv_gamma_only = TRUE, Delta = TRUE, modelobject = iwam_default$
 # plotPriors(plot_inv_gamma_only=TRUE, Delta=TRUE, modelobject = iwam_wa_gamma0.1$all_Deltas) # prior comparison
 dev.off()
 
-# PDF Penalty Plotting ####
-
-
-
 # SMSY Point Estimate comparison with CI's - IWAM vs. Parken ####
   # **TK: Changed from Srep to Smsy **
 

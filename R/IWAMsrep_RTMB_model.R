@@ -29,7 +29,8 @@ compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 
 # Internal running
 # WAin <- c("DataIn/WCVIStocks.csv")
-WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv")
 nsim <- 10
 
 IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
@@ -102,17 +103,17 @@ dat <- list(srdat = srdat,
             logRS = log(srdat$Rec) - log(srdat$Sp))
 
 # External vectors
-N_Stk <- max(srdat$Stocknumber + 1)
+N_Stk <- max(srdat$Stocknumber + 1) # 25
 
 # Parameters
   # TK: Add in comments to say what the pars are - similar to ModelBook comparisons so it is easier to read first time
 par <- list(b0 = c(10, 10), # Initial values for WA regression intercepts
               # b0 = c(9, 9)
              bWA = c(0, 0), # Inital values for WA regression slopes
-              # bWA = c(0.83, 1)
+             # bWA = c(0.83, 1),
              # logAlpha = numeric(N_Stk), # comment on or off depending if using "nll" or not
              logAlpha_re = numeric(nrow(dat$WAbase)), 
-             logAlpha_re_pred = numeric(nrow(dat$WAin)), 
+             logAlpha_re_pred = numeric(nrow(dat$WAin)),
              logE0 = numeric(N_Stk),
              logE0_ = numeric(nrow(dat$WAin)),
              tauobs = 0.01 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
@@ -120,24 +121,25 @@ par <- list(b0 = c(10, 10), # Initial values for WA regression intercepts
              logESD = 1,
              logAlphaSD = 10
 )
+# TK/CH: Add a version with a log-normal back-transformation adjustment. 
+  # Unless there is a citable reference to explain why.
 
-# TK/CH: Add a version with a log-normal back-transformation adjustment. Unless there is a citable reference
-  # to explain why.
+
 
 f_srep <- function(par){
   getAll(dat, par)
-  
+   
   N_Stk = max(srdat$Stocknumber + 1)
   stk = srdat$Stocknumber + 1
   N_Obs = nrow(srdat)
   N_Pred = nrow(WAin) # number of predicted watershed areas
   S = srdat$Sp
-  # type = lifehist$lh + 1
-  type = lifehist + 1
-  type_ = WAin$lh + 1
+  type = lifehist$lh + 1
+  # type = lifehist + 1 # ?
+  # type_ = WAin$lh + 1
   
   E <- numeric(N_Stk)
-  # log_E <- numeric(N_Stk) 
+  log_E <- numeric(N_Stk)
   E_tar <- numeric(N_Pred)
   log_E_tar <- numeric(N_Pred)
   
@@ -179,21 +181,24 @@ f_srep <- function(par){
       # How does this work if tauobs is removed as a prior?
     nll <- nll - sum(dnorm(logRS[i], logRS_pred, sd = sqrt(1/tauobs[stk[i]]), log = TRUE))
   }
+    # Is this SD right? Shouldn't it be N(0,tau) per Liermann?
+    # And couldn't "w" be modelled here explicitly as logE0 is in the watershed model?
+  
   
   # PREDICTIONS
   BETA = numeric(nrow(WAin))
   SMSY = numeric(nrow(WAin))
   SGEN = numeric(nrow(WAin))
-  
+
   for (i in 1:N_Pred){
     nll <- nll - sum(dnorm(logAlpha_re_pred[i], 0, sd=logAlphaSD, log  = TRUE))
     logAlpha_tar[i] <- logAlpha0 + logAlpha_re_pred[i]
-    
+
     # Predict E for target watershed areas
     nll <- nll - sum(dnorm(logE0_[i], 0, sd = logESD, log = TRUE)) # random effect again
-    log_E_tar[i] <- b0[type_[i]] + bWA[type_[i]]*WAin$logWAshifted_t[i] + logE0_[i] ## Stock level regression
+    log_E_tar[i] <- b0[type[i]] + bWA[type[i]]*WAin$logWAshifted_t[i] + logE0_[i] ## Stock level regression
     E_tar[i] <- exp(log_E_tar[i])
-    
+
     # Predict BETA
     BETA[i] <- logAlpha_tar[i]/E_tar[i]
     # Predict SMSY
@@ -201,26 +206,28 @@ f_srep <- function(par){
     # Predict SGEN
     SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logAlpha_tar[i])))
   }
-  
+    # Double check which of the current LambertW's is best to use here - as long
+    # as it is an explicit form
   # Predict along a preset line for plotting (see NIMBLE)
+  
   
   # ADREPORT - internals
   # ADREPORT(logRS) # logRS for all 501 data points
     # I think it might be worth it not to report for model speed?
     # Question: Does ADREPORT slow down RTMB? It is more to calculate.
-  ADREPORT(E) # E (Srep) for all synotopic data set rivers (25)
+  ADREPORT(E) # E (Srep) for all synoptic data set rivers (25)
   ADREPORT(logAlpha) # model logAlpha (25)
   
   # ADREPORT - predicted
     # Mean estimate of the median (without bias correction)
   ADREPORT(E_tar) # target E (Srep) (21)
-  ADREPORT(log_E_tar) # exponentiate these for the correct confidence intervals
+  ADREPORT(log_E_tar) # exp these for the correct confidence intervals
   ADREPORT(logAlpha_tar)
   
   # ADREPORT(BETA)
   # ADREPORT(SMSY)
   # ADREPORT(SGEN)
-    # Symetrical - would need to get the confidence interval on the log-scale and then exp()
+    # Symmetrical - would need to get the confidence interval on the log-scale and then exp()
   REPORT(BETA)
   REPORT(SMSY)
   REPORT(SGEN)
@@ -229,9 +236,21 @@ f_srep <- function(par){
 }
 
 ## MakeADFun ####
-obj <- RTMB::MakeADFun(f_srep, par, random = c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_"), silent=TRUE)
-opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0)) 
+obj <- RTMB::MakeADFun(f_srep,
+                       par,
+                       random = c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_"),
+                       silent=TRUE)
+# obj <- MakeADFun(f_srep, 
+#                        par, 
+#                        random = c("logAlpha_re", "logE0"), 
+#                        silent=TRUE)
+opt <- nlminb(obj$par, 
+              obj$fn, 
+              obj$gr, 
+              control = list(trace = 0)) 
   # trace = 0 controls printing
+
+osdr <- sdreport(obj)
 
 # Simulate ####
 sgen = smsy = beta = NULL
@@ -239,7 +258,7 @@ sgen = smsy = beta = NULL
 nsim <- nsim # number of sims
 
 for (i in 1:nsim){
-  pb$tick()
+  # pb$tick()
   temp <- obj$simulate()
   # Simulate one or more responses from the distribution corresponding to a fitted model object.
   sgen <- rbind(sgen, temp$SGEN)
@@ -247,6 +266,7 @@ for (i in 1:nsim){
   smsy <- rbind(smsy, temp$SMSY)
 }
 # quantiles by row - apply
+  # dim(x) must have a positive length
 SGEN_boot <- apply(sgen, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
 SMSY_boot <- apply(smsy, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
 BETA_boot <- apply(beta, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
@@ -317,6 +337,94 @@ return(list(opt = opt,
 }
 
 # Testing ####
+test_srep <- IWAMsrep_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
+                      # Parken_evalstocks.csv
+                      # WCVIStocks.csv
+                      nsim = 1000) # default test run for outputs
 
-# test <- IWAMsrep_rtmb(nsim = 1000) # default test run for outputs
+
+## MCMC run through tmbstan ####
+library(tmbstan)
+library(tidybayes) # Plotting usage
+
+# Create a initial value function 
+  # EXAMPLE from TMB_rtmb.R using the SMAX model version
+# initf1_EXAMPLE <- function(){
+#   list(logA = (srdat %>% group_by (Stocknumber) %>%
+#                  summarise(yi = lm(log(Rec / Sp) ~ Sp)$coef[1]))$yi, # random effect
+#        logB = log ( 1/ ( (1/B$m)/dat$scale )), # fixed effect
+#        logSigma = rep(-2, length(unique(srdat$Name))),
+#        logSigmaA = -2,
+#        logMuA_stream = 1.5,
+#        logMuA_ocean = 0,
+#        logDelta1 = 3,
+#        logDelta1_ocean = 0,
+#        logDelta2 = log(0.72),
+#        Delta2_ocean = 0,
+#        logNu1 = 3,
+#        logNu1_ocean = 0,
+#        logNu2 = log(0.72),
+#        Nu2_ocean = 0,
+#        logNuSigma = -0.412,
+#        logDeltaSigma = -0.412
+#   )
+# }
+
+initf1 <- function(){
+  list( # list out pars
+    b0 = c(10, 10),
+    bWA = c(0, 0),
+    logAlpha_re = numeric(nrow(dat$WAbase)), 
+    logAlpha_re_pred = numeric(nrow(dat$WAin)),
+    logE0 = numeric(N_Stk),
+    logE0_ = numeric(nrow(dat$WAin)),
+    tauobs = 0.01 + numeric(N_Stk),
+    logAlpha0 = 1.5,
+    logESD = 1,
+    logAlphaSD = 10
+  )
+}
+
+# Run the cores using:
+  # obj <- RTMB object
+  # init <- initial value function defined above
+  # rest of usual chain and iter parameters
+fitstan <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
+                    chains=4, open_progress=FALSE, silent=TRUE)
+# https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
+# Examine the pairs() plot to diagnose sampling problems
+
+# Getting things out 
+  # Probably use tidybayes or something
+traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
+pairs(fitstan, pars=names(obj$par))
+
+
+## Can extract marginal posteriors easily
+post <- as.matrix(fitstan)
+hist(post[,'b0[1]'])
+hist(post[,'logAlpha0'])
+## What if you want a posterior for derived quantities in the report? Just
+## loop through each posterior sample (row) and call the report function
+## which returns a list. The last column is the log-posterior density (lp__)
+## and needs to be dropped
+  # This only works for single values
+obj$report(post[1,-ncol(post)])         # sd0 is only element
+SMSY_mc <- rep(NA, length.out=nrow(post))
+for(i in 1:nrow(post)){
+  r <- obj$report(post[i,-ncol(post)])
+  SMSY_mc[i] <- r$SMSY_mc
+}
+hist(sd0)
+
+# shinystan example:
+library(shinystan)
+launch_shinystan(fitstan)
+
+
+
+
+
+
+
 

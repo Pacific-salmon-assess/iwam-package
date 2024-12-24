@@ -73,9 +73,9 @@ Type objective_function<Type>:: operator() ()
   DATA_INTEGER(SigDeltaPriorCauchy); // on/off
   
   // Alternative's
-  DATA_INTEGER(SigRicPenal); // Gamma Ricker penalty on sigma
-  DATA_INTEGER(SigDeltaPenal); // Gamma WA penalty on precision
-  DATA_INTEGER(SigDeltaPenal_Jac); // Invgamma WA penalty on variance
+  // DATA_INTEGER(SigRicPenal); // Gamma Ricker penalty on sigma
+  // DATA_INTEGER(SigDeltaPenal); // Gamma WA penalty on precision
+  // DATA_INTEGER(SigDeltaPenal_Jac); // Invgamma WA penalty on variance
   
   // Depreciated controls for shape and rate
   DATA_SCALAR(Tau_dist); // Turn off to manually change penalties
@@ -292,6 +292,14 @@ Type objective_function<Type>:: operator() ()
   //   ans += Type(2)*log(pow(sigma_nu,2)); //Jacobian adjustment
   // }
   
+  // Alternative: Another Normal
+    // ans += -dnorm(sigma_delta, Type(1), Type(0.1), true);
+    // ans += -dnorm(sigma_nu, Type(1), Type(0.1), true);
+    
+  // Alternative: STATIC VALUE
+    // Comment out all of the above and set logNuSigma and logDeltaSigma 
+    // within IWAM_model.R
+  
   // Half cauchy prior on sigma_delta and sigma_nu
   // if (SigDeltaPriorCauchy == 1) {
   //   //3 June 2021. abs() no longer works in TMB
@@ -377,4 +385,7 @@ Type objective_function<Type>:: operator() ()
   REPORT(nLL); // Removed _std
   return ans;
 }
+
+
+
 

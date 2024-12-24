@@ -346,8 +346,8 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   ## MakeADFun ####
     # NOTE: If you run f_tmb - before you run obj - there will be math errors
     # TK: I have no idea why
-  # obj <- RTMB::MakeADFun(f_smax, par, random = c("logA"), silent = TRUE) # create the rtmb object
-  obj <- RTMB::MakeADFun(f_smax, par, silent = TRUE) # Non-logA testing
+  obj <- RTMB::MakeADFun(f_smax, par, random = c("logA"), silent = TRUE) # create the rtmb object
+  # obj <- RTMB::MakeADFun(f_smax, par, silent = TRUE) # Non-logA testing
   # 
   # opt <- nlminb(obj$par, obj$fn, obj$gr, control = list(trace = 0)) # optimization
   
@@ -826,7 +826,7 @@ IWAMsmax_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 } # End IWAM_rtmb function
 
 # Test run IWAM_rtmb func
-# test <- IWAMsmax_rtmb(bs_nBS = 1000, plot = FALSE) # default run
+test <- IWAMsmax_rtmb(bs_nBS = 1000, plot = FALSE) # default run
   # confirmed same objective value - code matches - we are good
 
 # Test run

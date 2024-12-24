@@ -117,6 +117,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96)
   SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96)
+  # print(SREP_logSE$SE)
   # The UpperLimit-MLE gives same answer
   #SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREPUL) - log(RPs$SREP)) / 1.96)
   SREP_logSE <- SREP_logSE %>% dplyr::select(Stock, SE)

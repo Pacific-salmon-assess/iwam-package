@@ -212,13 +212,13 @@ IWAM_r <- function(WAin = c("DataIn/WCVIStocks.csv"),
               logRS = log(srdat$Rec) - log(srdat$Sp), 
               
               # Aim is to eliminate scale usage
-              logRS_scaled = log((srdat$Rec/srdat$scale)/(srdat$Sp/srdat$scale)),
+              # logRS_scaled = log((srdat$Rec/srdat$scale)/(srdat$Sp/srdat$scale)),
               lifehist = lifehist$lh, # On/off switch in regression
               
               # Scales - may be able to remove all
-              scale = srdat_scale, # DNE
-              scale_TMB = srdat$scale,
-              S_scaled = srdat$Sp/scale_TMB,
+              # scale = srdat_scale, # DNE
+              # scale_TMB = srdat$scale,
+              # S_scaled = srdat$Sp/scale_TMB,
               # S = srdat$Sp,
               
               # Constants
@@ -465,14 +465,14 @@ IWAM_r <- function(WAin = c("DataIn/WCVIStocks.csv"),
       nll
     }
     
-    return(nll)
+    nll
   }
   
   # RTMB OBJ and OPT ####
   
   if (mod == "srep") {# determine what the random variables are depending on the model being run
-    # random_vars <- c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_")
-    random_vars <- c("logAlpha_re", "logE0")
+    random_vars <- c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_")
+    # random_vars <- c("logAlpha_re", "logE0")
   } else {
       random_vars <- c("logA")
     }

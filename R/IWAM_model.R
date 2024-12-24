@@ -99,6 +99,8 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
                       plot = TRUE, # whether or not to create plots stored in DataOut/
                       est.table = FALSE, # store kable tables as per wcvi_workedexample.RMD
                       # Norm, InvGamma, Cauchy, Gamma alt
+                      static_nusigma = c(-0.412), # Static nu sigma value
+                        # Default -0.412
                       SigRicPrior = c(F, T, F, F), # Default invgamma
                       SigDeltaPrior = c(F, T, F, F, F), # Default invgamma
                       # Tau_dist, Tau_D_dist
@@ -293,6 +295,9 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   data$WA_sigscale <- TauPrior[4] # rate = 1, therefore rate = scale
   data$WA_sigshapeJac <- TauPrior[5] # shape for Jacobian alt.
   
+  data$logNuSigma <- static_nusigma
+  data$logDeltaSigma <- static_nusigma
+  
   # *******************************************************
   # logDeltaSigma # currently listed as param in R, but data_scalar in TMB
   # logNuSigma # currently listed as param in R, but data_scalar in TMB
@@ -448,37 +453,52 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   param$logDelta1_ocean <- 0
   param$logDelta2 <- log(0.72) 
   param$Delta2_ocean <- 0 
-  param$logDeltaSigma <- -0.412 # from Parken et al. 2006 where sig=0.662
+  # param$logDeltaSigma <- -0.412 # from Parken et al. 2006 where sig=0.662
+  
+  param$logDeltaSigma <- static_nusigma
   
   param$logNu1 <- 3
   param$logNu1_ocean <- 0
   param$logNu2 <- log(0.72)
   param$Nu2_ocean <- 0
   param$logNuSigma <- -0.412 #from Parken et al. 2006 where sig=0.66
+  
+  param$logNuSigma <- static_nusigma
 
   
-  # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs ----------
+  # 3. Estimate SR parameters from synoptic data set and SMSY and SREPs --------
   # mod <- "IWAM_Liermann" 
   # mod <- "IWAM_Liermann_srep"
   
   # Compile model if changed:
     # Run a detect - if file is exist statement - then unload
+  # FIX IT TOR *****************************************************************
+  # if (is.loaded(here::here(paste("TMB_Files/", mod, ".dll", sep="")))){
+  #   print("Files exist and is loaded. Unloading before re-compliation")
+  #   dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+  # } else {print("File not loaded.")}
   
-  if (is.loaded(here::here(paste("TMB_Files/", mod, sep="")))){
-    print("Files exist and is loaded. Unloading before re-compliation")
-    dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
-  } else {print("File not loaded. Onwards.")}
+  try({dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+    print("The .dll was loaded and has been successfully unloaded.")
+    }, silent = TRUE)
+    # tries to unload the .dll
+    # if .dll is loaded - will run and print statement
+    # if .dll is not loaded - will silence error and run to compile and load
+    # THEREFORE whenever the .dll is loaded - it will also unload and re-complile
   
   # if (file.exists(here::here(paste("TMB_Files/", mod, ".dll", sep="")))){
   #   print("Files exist. Unloading before re-compliation")
   #   dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   # }
+  
   # dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+  
   compile(here::here(paste("TMB_Files/", mod, ".cpp", sep="")))
     # Needs to be run to re-create the .dll and .o files from a new .cpp file
     # Creates an error: "make: Nothing to be done for 'all'/
       # Current assumed to mean that there were NO changes detected in the .cpp
       # and thus the run continues WITHOUT compiling.
+  
   dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   
   if (!random) { # if random = FALSE
@@ -534,11 +554,15 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   pars <- data.frame()
   pars <- all_pars %>% filter (Param %in% c("logA", 
                                             "logB", 
-                                            "logSigma",  
+                                            "logSigma",
+                                            # "logSigmaA", # new add
                                             "SMSY", 
                                             "SREP",
                                             "lnSMSY",
                                             "lnSREP"))
+  
+  .GlobalEnv$logSigmaA_SAVED <- all_pars %>% filter (Param %in% c("logSigmaA"))
+  logSigmaA <- all_pars %>% filter (Param %in% c("logSigmaA"))
   
   stnum <- unique(srdat[, c("Stocknumber")])
   pars$Stocknumber <- rep(stnum)
@@ -605,8 +629,11 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # mutate the predicted values with scale 
     # RE-SCALED VALUES
     # These Preds_stds are not used for plotting
-  all_pred <- all_pred %>% mutate(ObslogRS = log ( (Rec / scale) / (Sp/scale) ) )
-  r2 <- all_pred %>% group_by(Stocknumber) %>% summarize(r2=cor(ObslogRS,Pred)^2)
+  all_pred <- all_pred %>% 
+    mutate(ObslogRS = log ( (Rec / scale) / (Sp/scale) ) )
+  r2 <- all_pred %>% 
+    group_by(Stocknumber) %>% 
+    summarize(r2=cor(ObslogRS,Pred)^2)
   
   
   # Get predicted values and their SEs to plot CIs
@@ -614,14 +641,16 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # They are used in the plotting functions and scaled within
     # pred_lnSMSY_S and pred_lnSMSY_O don't occur anywhere ************************************************************
   pred_lnSMSY <- data.frame() 
-  pred_lnSMSY <- all_pars %>% filter (Param %in% c("pred_lnSMSY_stream", # not included
+  pred_lnSMSY <- all_pars %>% 
+    filter (Param %in% c("pred_lnSMSY_stream", # not included
                                                   "pred_lnSMSY_ocean", # not included
                                                   "pred_lnSMSY_CI", # not included
                                                   "pred_lnSMSY_stream_CI", 
                                                   "pred_lnSMSY_ocean_CI"))
     # pred_lnSREP_S and pred_lnSREP_O don't occur elsewhere ***********************************************************
   pred_lnSREP <- data.frame() 
-  pred_lnSREP <- all_pars %>% filter (Param %in% c("pred_lnSREP_stream", # not included
+  pred_lnSREP <- all_pars %>% 
+    filter (Param %in% c("pred_lnSREP_stream", # not included
                                                   "pred_lnSREP_ocean", # not included
                                                   "pred_lnSREP_CI", # not included
                                                   "pred_lnSREP_stream_CI", 
@@ -734,12 +763,18 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # if statements to follow titles for png pasting titles - so they don't get overwritten
     if (isigricprior == 2 && isigdeltaprior == 2) { # if both are default
       # combine the titles
-      png(paste("DataOut/WAregSREP_", targetname, "_", pngcombotitle, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-      print(paste("DataOut/WAregSREP_", targetname, "_", pngcombotitle, mod, "_wBC.png", sep=""))
+      png(paste("DataOut/WAregSREP_", targetname, "_", 
+                pngcombotitle, mod, "_wBC.png", sep=""), 
+          width=7, height=7, units="in", res=500)
+      print(paste("DataOut/WAregSREP_", targetname, "_", 
+                  pngcombotitle, mod, "_wBC.png", sep=""))
       # removed "pngtitle_waprior" as pngcombotitle already identifes the wagamma_ prior specifics
     } else {
-      png(paste("DataOut/WAregSREP_", targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
-      print(paste("DataOut/WAregSREP_", targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))  
+      png(paste("DataOut/WAregSREP_", targetname, "_", 
+                pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), 
+          width=7, height=7, units="in", res=500)
+      print(paste("DataOut/WAregSREP_", targetname, "_", 
+                  pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""))  
     }
 
     # png(paste("DataOut/WAregSREP_", pngtitle_ricprior, pngtitle_waprior, mod, "_wBC.png", sep=""), width=7, height=7, units="in", res=500)
@@ -776,12 +811,15 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # saveRDS(pars, paste( "DataOut/pars_", title_plot, sep="") )
   # if statements to follow titles for png pasting titles - so they don't get overwritten
   if (isigricprior == 2 && isigdeltaprior == 2) {
-    saveRDS(pars, paste(here::here(), "/DataOut/pars_", targetname, "_", pngcombotitle, mod, sep="") )
+    saveRDS(pars, paste(here::here(), "/DataOut/pars_", 
+                        targetname, "_", pngcombotitle, mod, sep="") )
     print(paste("DataOut/pars_", targetname, "_", pngcombotitle, mod, sep=""))
     # removed pngtitle_waprior - see above notes
   } else {
-    saveRDS(pars, paste(here::here(), "/DataOut/pars_", targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, sep="") )
-    print(paste("DataOut/pars_", targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, sep=""))  
+    saveRDS(pars, paste(here::here(), "/DataOut/pars_", 
+                        targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, sep="") )
+    print(paste("DataOut/pars_", targetname, "_", 
+                pngtitle_ricprior, pngtitle_waprior, mod, sep=""))  
   }
   
   #### Predictions
@@ -795,9 +833,11 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # Get predicted values to estimate prediction intervals
       # These values are RE-SCALED to raw estimates during outputting in the TMB code
     pred_lnSMSY_pi <- data.frame()
-    pred_lnSMSY_pi <- all_pars %>% filter (Param %in% c("pred_lnSMSY", "lnSMSY"))
+    pred_lnSMSY_pi <- all_pars %>% 
+      filter (Param %in% c("pred_lnSMSY", "lnSMSY"))
     pred_lnSREP_pi <- data.frame()
-    pred_lnSREP_pi <- all_pars %>% filter (Param %in% c("pred_lnSREP", "lnSREP"))
+    pred_lnSREP_pi <- all_pars %>% 
+      filter (Param %in% c("pred_lnSREP", "lnSREP"))
     
     pred_lnSMSY_pi$Stocknumber <- rep(stnum)
     pred_lnSREP_pi$Stocknumber <- rep(stnum)
@@ -807,10 +847,14 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     #   (actually only need observed logSMSY and logSREP values)
     
     #  First need to get the scale for each stock
-    scale_pi <- srdat %>% dplyr::select(Stocknumber, scale) %>% distinct()
-    pred_lnSMSY_pi <- pred_lnSMSY_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
+    scale_pi <- srdat %>% 
+      dplyr::select(Stocknumber, scale) %>% 
+      distinct()
+    pred_lnSMSY_pi <- pred_lnSMSY_pi %>% 
+      left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
       left_join(scale_pi)
-    pred_lnSREP_pi <- pred_lnSREP_pi %>% left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
+    pred_lnSREP_pi <- pred_lnSREP_pi %>% 
+      left_join(unique(srdat[, c("Stocknumber", "Name")])) %>% 
       left_join(scale_pi)
     
     # Then need to separate observed stream vs ocean type
@@ -822,29 +866,55 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # and same for SREP
     
     # consider removing "_" between to match the names
-    pred_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
-      filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs
-    pred_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="pred_lnSMSY") %>% left_join(lifehist) %>% 
-      filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-    obs_lSMSY_stream <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
-      filter( lh== 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-    obs_lSMSY_ocean <- pred_lnSMSY_pi %>% filter(Param=="lnSMSY") %>% left_join(lifehist) %>% 
-      filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
+    pred_lSMSY_stream <- pred_lnSMSY_pi %>% 
+      filter(Param=="pred_lnSMSY") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 0) %>% 
+      pull(Estimate) #Predicted lnSMSY from WA regression- stream - PlSMSYs
+    pred_lSMSY_ocean <- pred_lnSMSY_pi %>% 
+      filter(Param=="pred_lnSMSY") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 1) %>% 
+      pull(Estimate) #Predicted lnSMSY from WA regression- ocean
+    obs_lSMSY_stream <- pred_lnSMSY_pi %>% 
+      filter(Param=="lnSMSY") %>% 
+      left_join(lifehist) %>% 
+      filter( lh== 0) %>% 
+      pull(Estimate) # "observed" lnSMSY data output from SR models- stream
+    obs_lSMSY_ocean <- pred_lnSMSY_pi %>% 
+      filter(Param=="lnSMSY") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 1) %>% 
+      pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
     
-    pred_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
-      filter(lh == 0) %>% pull(Estimate) #Predicted lnSMSY from WA regression- stream
-    pred_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="pred_lnSREP") %>% left_join(lifehist) %>% 
-      filter(lh == 1) %>% pull(Estimate) #Predicted lnSMSY from WA regression- ocean
-    obs_SREP_stream <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
-      filter(lh == 0) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- stream
-    obs_SREP_ocean <- pred_lnSREP_pi %>% filter(Param=="lnSREP") %>% left_join(lifehist) %>% 
-      filter(lh == 1) %>% pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
+    pred_SREP_stream <- pred_lnSREP_pi %>% 
+      filter(Param=="pred_lnSREP") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 0) %>% 
+      pull(Estimate) #Predicted lnSMSY from WA regression- stream
+    pred_SREP_ocean <- pred_lnSREP_pi %>% 
+      filter(Param=="pred_lnSREP") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 1) %>% 
+      pull(Estimate) #Predicted lnSMSY from WA regression- ocean
+    obs_SREP_stream <- pred_lnSREP_pi %>% 
+      filter(Param=="lnSREP") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 0) %>% 
+      pull(Estimate) # "observed" lnSMSY data output from SR models- stream
+    obs_SREP_ocean <- pred_lnSREP_pi %>% 
+      filter(Param=="lnSREP") %>% 
+      left_join(lifehist) %>% 
+      filter(lh == 1) %>% 
+      pull(Estimate) # "observed" lnSMSY data output from SR models- ocean
     
   }
     # **************************************************************************
     # Get watershed areas for synoptic data set to calculate PIs for stream and ocean
-    wa_stream <- WAbase %>% left_join(lifehist) %>% filter(lh == 0) %>% pull(WA)
-    wa_ocean <- WAbase %>% left_join(lifehist) %>% filter(lh == 1) %>% pull(WA)
+    wa_stream <- WAbase %>% left_join(lifehist) %>% 
+      filter(lh == 0) %>% pull(WA)
+    wa_ocean <- WAbase %>% left_join(lifehist) %>% 
+      filter(lh == 1) %>% pull(WA)
     
     # Get names of *supplied* stocks
       # * Requires Inlet aggregation information *******************************
@@ -916,37 +986,67 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     
     if (any(WAin$lh == 1)) {
       # Step 1
-      target_SMSY_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames_ocean)
+      target_SMSY_ocean <- all_pars %>% 
+        filter (Param %in% c("target_lnSMSY_ocean")) %>% 
+        add_column(Stock = stocknames_ocean)
         # with latest dataset -> backcalced:
         # stocknames has 116 values - of these 116 values, 85 are ocean, and 32 are stream
         # need to make sure that this difference is understood
         # consider making a stocknames_ocean and _stream?
-      target_SREP_ocean <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames_ocean)
-      target_SMSY_pull_ocean <- target_SMSY_ocean %>% pull(Estimate)
-      target_SREP_pull_ocean <- target_SREP_ocean %>% pull(Estimate)
+      target_SREP_ocean <- all_pars %>% 
+        filter (Param %in% c("target_lnSREP_ocean")) %>% 
+        add_column(Stock = stocknames_ocean)
+      target_SMSY_pull_ocean <- target_SMSY_ocean %>% 
+        pull(Estimate)
+      target_SREP_pull_ocean <- target_SREP_ocean %>% 
+        pull(Estimate)
       # Step 2
-      target_SMSY_pi_ocean <- PredInt(x = log(wa_ocean), y = obs_lSMSY_ocean, Predy = target_SMSY_pull_ocean, Newx = data$target_lnWA_ocean)
-      target_SREP_pi_ocean <- PredInt(x = log(wa_ocean), y = obs_SREP_ocean, Predy = target_SREP_pull_ocean, Newx = data$target_lnWA_ocean)
+      target_SMSY_pi_ocean <- PredInt(x = log(wa_ocean), 
+                                      y = obs_lSMSY_ocean, 
+                                      Predy = target_SMSY_pull_ocean, 
+                                      Newx = data$target_lnWA_ocean)
+      target_SREP_pi_ocean <- PredInt(x = log(wa_ocean), 
+                                      y = obs_SREP_ocean, 
+                                      Predy = target_SREP_pull_ocean, 
+                                      Newx = data$target_lnWA_ocean)
       # Step 3
-      target_SMSY_ocean <- target_SMSY_ocean %>% add_column(LL = exp(target_SMSY_pi_ocean$lwr), UL = exp(target_SMSY_pi_ocean$upr))
-      target_SREP_ocean <- target_SREP_ocean %>% add_column(LL = exp(target_SREP_pi_ocean$lwr), UL = exp(target_SREP_pi_ocean$upr))
+      target_SMSY_ocean <- target_SMSY_ocean %>% 
+        add_column(LL = exp(target_SMSY_pi_ocean$lwr), 
+                   UL = exp(target_SMSY_pi_ocean$upr))
+      target_SREP_ocean <- target_SREP_ocean %>% 
+        add_column(LL = exp(target_SREP_pi_ocean$lwr), 
+                   UL = exp(target_SREP_pi_ocean$upr))
       # Step 4
-      target_SMSY_ocean <- target_SMSY_ocean %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+      target_SMSY_ocean <- target_SMSY_ocean %>% 
+        mutate (Estimate = exp(Estimate)) %>% 
+        dplyr::select(-Std..Error, - Param) %>% 
         add_column(Param = "SMSY")
-      target_SREP_ocean <- target_SREP_ocean %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+      target_SREP_ocean <- target_SREP_ocean %>% 
+        mutate (Estimate = exp(Estimate)) %>% 
+        dplyr::select(-Std..Error, - Param) %>% 
         add_column(Param = "SREP")
       # Step 5
-      target_estimates_SMSY_ocean <- target_SMSY_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-      target_estimates_SREP_ocean <- target_SREP_ocean %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+      target_estimates_SMSY_ocean <- target_SMSY_ocean %>% 
+        mutate(Estimate = round(Estimate, 0), 
+               LL = round(LL,0), 
+               UL = round(UL,0))
+      target_estimates_SREP_ocean <- target_SREP_ocean %>% 
+        mutate(Estimate = round(Estimate, 0), 
+               LL = round(LL,0), 
+               UL = round(UL,0))
     
-      data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
+      data_out_ocean <- target_estimates_SMSY_ocean %>% 
+        bind_rows(target_estimates_SREP_ocean)
       # bind watershed area back to these dataout files
-      data_out_ocean <- merge(data_out_ocean, wasample, by="Stock", all.x=TRUE, sort=FALSE) # makes them alphabetical
+      data_out_ocean <- merge(data_out_ocean, wasample, 
+                              by="Stock", 
+                              all.x=TRUE, sort=FALSE) # makes them alphabetical
       
       }
     
     # WARNING
-    length_check_params_ocean <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean"))
+    length_check_params_ocean <- all_pars %>% 
+      filter (Param %in% c("target_lnSMSY_ocean"))
     if (length(stocknames_ocean) == length(length_check_params_ocean$Estimate)) { # originally this checked the full stocknames list
       print("Lengths checked passed - Ocean life histories.")
     } else {
@@ -956,33 +1056,62 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # Does not currently work * no data for stream
     if (any(WAin$lh == 0)){
       # Step 1
-      target_SMSY_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream")) %>% add_column(Stock = stocknames_stream)
-      target_SREP_stream <- all_pars %>% filter (Param %in% c("target_lnSREP_stream")) %>% add_column(Stock = stocknames_stream)
-      target_SMSY_pull_stream <- target_SMSY_stream %>% pull(Estimate)
-      target_SREP_pull_stream <- target_SREP_stream %>% pull(Estimate)
+      target_SMSY_stream <- all_pars %>% 
+        filter (Param %in% c("target_lnSMSY_stream")) %>%
+        add_column(Stock = stocknames_stream)
+      target_SREP_stream <- all_pars %>% 
+        filter (Param %in% c("target_lnSREP_stream")) %>% 
+        add_column(Stock = stocknames_stream)
+      target_SMSY_pull_stream <- target_SMSY_stream %>% 
+        pull(Estimate)
+      target_SREP_pull_stream <- target_SREP_stream %>% 
+        pull(Estimate)
       # Step 2
-      target_SMSY_pi_stream <- PredInt(x = log(wa_stream), y = obs_lSMSY_stream, Predy = target_SMSY_pull_stream, Newx = data$target_lnWA_stream)
-      target_SREP_pi_stream <- PredInt(x = log(wa_stream), y = obs_SREP_stream, Predy = target_SREP_pull_stream, Newx = data$target_lnWA_stream)
+      target_SMSY_pi_stream <- PredInt(x = log(wa_stream), 
+                                       y = obs_lSMSY_stream, 
+                                       Predy = target_SMSY_pull_stream, 
+                                       Newx = data$target_lnWA_stream)
+      target_SREP_pi_stream <- PredInt(x = log(wa_stream), 
+                                       y = obs_SREP_stream, 
+                                       Predy = target_SREP_pull_stream, 
+                                       Newx = data$target_lnWA_stream)
       # Step 3
-      target_SMSY_stream <- target_SMSY_stream %>% add_column(LL = exp(target_SMSY_pi_stream$lwr), UL = exp(target_SMSY_pi_stream$upr))
-      target_SREP_stream <- target_SREP_stream %>% add_column(LL = exp(target_SREP_pi_stream$lwr), UL = exp(target_SREP_pi_stream$upr))
+      target_SMSY_stream <- target_SMSY_stream %>% 
+        add_column(LL = exp(target_SMSY_pi_stream$lwr), 
+                   UL = exp(target_SMSY_pi_stream$upr))
+      target_SREP_stream <- target_SREP_stream %>% 
+        add_column(LL = exp(target_SREP_pi_stream$lwr), 
+                   UL = exp(target_SREP_pi_stream$upr))
       # Step 4
-      target_SMSY_stream <- target_SMSY_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>%
+      target_SMSY_stream <- target_SMSY_stream %>% 
+        mutate (Estimate = exp(Estimate)) %>% 
+        dplyr::select(-Std..Error, - Param) %>%
         add_column(Param = "SMSY")
-      target_SREP_stream <- target_SREP_stream %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>%
+      target_SREP_stream <- target_SREP_stream %>% 
+        mutate (Estimate = exp(Estimate)) %>% 
+        dplyr::select(-Std..Error, - Param) %>%
         add_column(Param = "SREP")
       # Step 5
-      target_estimates_SMSY_stream <- target_SMSY_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
-      target_estimates_SREP_stream <- target_SREP_stream %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0))
+      target_estimates_SMSY_stream <- target_SMSY_stream %>% 
+        mutate(Estimate = round(Estimate, 0), 
+               LL = round(LL,0), 
+               UL = round(UL,0))
+      target_estimates_SREP_stream <- target_SREP_stream %>% 
+        mutate(Estimate = round(Estimate, 0), 
+               LL = round(LL,0), 
+               UL = round(UL,0))
     
-      data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
+      data_out_stream <- target_estimates_SMSY_stream %>% 
+        bind_rows(target_estimates_SREP_stream)
       # bind watershed area back to these dataout files
-      data_out_stream <- merge(data_out_stream, wasample, by="Stock", all.x=TRUE, sort=FALSE)
+      data_out_stream <- merge(data_out_stream, wasample, 
+                               by="Stock", all.x=TRUE, sort=FALSE)
       
       }
     
     # WARNING
-    length_check_params_stream <- all_pars %>% filter (Param %in% c("target_lnSMSY_stream"))
+    length_check_params_stream <- all_pars %>% 
+      filter (Param %in% c("target_lnSMSY_stream"))
     if (length(stocknames_stream) == length(length_check_params_stream$Estimate)) { # originally this checked the full stocknames list
       print("Lengths checked passed - Stream life histories.")
     } else {
@@ -1278,7 +1407,8 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # Create a list and then return it
   return.list <- list(opt = opt, 
                       modelpars = pars, 
-                      all_Deltas = all_Deltas, 
+                      all_Deltas = all_Deltas,
+                      logSigmaA = logSigmaA,
                       srdat = srdat, 
                       lh = lifehist, 
                       WAbase = WAbase, 

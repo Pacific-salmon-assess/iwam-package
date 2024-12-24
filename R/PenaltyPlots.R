@@ -31,15 +31,15 @@ t_col <- function(color, percent = 50, name = NULL) {
 # Sigma in watershed-area regression -------------------------------------------
 
 # Option 1: Gamma penalty on precision -----------------------------------------
-sigma <- seq(0.00001,9, length.out=10000)
-vari <- seq(0.00001,9, length.out=10000) # Variances (from PDF_plot.R)
+sigma <- seq(0.00001, 9, length.out=10000)
+# vari <- seq(0.00001, 9, length.out=10000) # Variances (from PDF_plot.R)
 cols <- viridis(4, alpha=0.9)
 
 
 plot(x=sigma, y=sigma, type="n", ylab="Density", 
      xlab="Sigma for watershed-area regression" ,
      main="Gamma penalty on precision",
-     ylim=c(0,0.6), xlim=c(0,2.5))
+     ylim=c(0,1), xlim=c(0,2.5))
 abline(v= sd(log(read.csv("DataIn/ParkenSMSY.csv")$SMSY)), col=grey(0.5), 
        lty="dashed")
 abline(v= sd(log(read.csv("DataIn/ParkenSREP.csv")$SREP)), col=grey(0.5), 
@@ -55,24 +55,28 @@ for (i in 1:length(rate)){
   lines(sigma, dgamma(1/(sigma^2),shape=rate[i]*mean, scale=1/rate[i]), lwd=4, 
         col=t_col(color=cols[1], percent= per[i]))
 }
+lines(sigma, dgamma(1/(sigma^2), shape=3, scale=1), 
+      lwd = 4, col="red")
 
 # Add in old dgamma lines to compare against previous penalties
-lines(sqrt(vari), dgamma(1/vari, shape = 0.1, scale = 1/0.1), 
-      lwd = 2, col = 'lightblue', lty = 'dotted') # dgamma(1, 10)
-lines(sqrt(vari), dgamma(1/vari, shape = 1, scale = 1/1),
-      lwd = 2, col = 'blue', lty = 'dotted') # dgamma(1,1)
-lines(sqrt(vari), dgamma(1/vari, shape = 0.01, scale = 1/0.01),
-      lwd = 2, col = 'cyan', lty = 'dotted') # dgamma(0.01, 100)
-lines(sqrt(vari), sqrt(dinvgamma(vari, shape = 1, rate = 1)),
+# lines(sqrt(vari), dgamma(1/vari, shape = 0.1, scale = 1/0.1), 
+#       lwd = 2, col = 'lightblue', lty = 'dotted') # dgamma(1, 10)
+# lines(sqrt(vari), dgamma(1/vari, shape = 1, scale = 1/1),
+#       lwd = 2, col = 'blue', lty = 'dotted') # dgamma(1,1)
+# lines(sqrt(vari), dgamma(1/vari, shape = 0.01, scale = 1/0.01),
+#       lwd = 2, col = 'cyan', lty = 'dotted') # dgamma(0.01, 100)
+lines(sigma, sqrt(dinvgamma(sigma^2, shape = 1, rate = 1)),
       lwd = 2, col = 'yellow', lty = 'dashed') # IWAM Penalty before changes
+  # double check
+
+# lines(sigma, dnorm(sigma, 0.69, 0.27), col = "forestgreen", lty = "dotted")
+# lines(vari, 0.5*dnorm(vari, 0.69, 0.27), col = "green") # Normal based on Thorson
+lines(sigma, dnorm(sigma, 1, 0.25), col = "forestgreen", lwd = 2)
 
 legend(x=0, y=0.6, legend=c("sigma ln(SMSY) Parken et al. (upper bound)", 
                              "sigma ln(SREP) Parken et al. (upper bound)"),
        col=grey(0.5),
        lty=c("dashed", "dotted"), bty="n", lwd=2, cex=0.5)
-
-lines(sigma, dgamma(1/(sigma^2), shape=3, scale=1), 
-      lwd = 4, col="red")
 # Rate = 1, Scale=1, Shape= 3 seems would work
 # It has low densities above the upper bound, and has very lowdensity at zero
 

@@ -39,21 +39,25 @@ count.dig <- function(x) {floor(log10(x)) + 1}
 # y = dependenet variable
 # Newx = x variables for which you'd like the prediction intervals
 # Predy = Predicted y variable at those Newx's
-PredInt <- function(x,y,Newx=x, Predy){
-  sumXErr <- sum( (x-mean(x))^2 )
-  sumYErr <- sum( (y-mean(y))^2 )
-  sumXYErr <- sum( (y - mean(y)) * (x - mean(x)) ) ^2
-  STEYX <- sqrt( (1/(length(x)-2)) * (sumYErr - sumXYErr/sumXErr) )
+PredInt <- function(x, y, Newx=x, Predy){
+  # n <- length(x) 
+  # sumXErr <- sum( (x-mean(x))^2 )
+  # sumYErr <- sum( (y-mean(y))^2 )
+  # sumXYErr <- sum( (y - mean(y)) * (x - mean(x)) ) ^2
+  # STEYX <- sqrt( (1/(length(x)-2)) * (sumYErr - sumXYErr/sumXErr) )
+  # 
+  # # SE of the prediction from http://www.real-statistics.com/regression/confidence-and-prediction-intervals/
+  # SE.pred <- STEYX * sqrt( (1 + 1/length(x) + ((Newx - mean(x))^2)/sumXErr) ) 
+  # t.crit <- qt(0.975,df=length(x)-2) #95% intervals
+  # 
+  # upr <- Predy + SE.pred*t.crit
+  # lwr <- Predy - SE.pred*t.crit
   
-  # SE of the prediction from http://www.real-statistics.com/regression/confidence-and-prediction-intervals/
-  SE.pred <- STEYX * sqrt( (1 + 1/length(x) + ((Newx - mean(x))^2)/sumXErr) ) 
-  t.crit <- qt(0.975,df=length(x)-2) #95% intervals
-  
-  upr <- Predy + SE.pred*t.crit
-  lwr <- Predy - SE.pred*t.crit
+  fit <- lm(y~x)
+  out <- predict(fit, newdata = data.frame(x = Newx), interval = "prediction", level = 0.95, type = "response")
   PI <- list()
-  PI$upr <- upr
-  PI$lwr <- lwr
+  PI$upr <- out[,"upr"]
+  PI$lwr <- out[,"lwr"]
   return(PI)
 }
 
