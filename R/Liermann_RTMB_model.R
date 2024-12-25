@@ -33,10 +33,11 @@ compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 WAin <- c("DataIn/Parken_evalstocks.csv")
 nsim <- 10
 
-IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
+lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                           nsim = 10 # default nsim for bootstrapping
                           # remove.EnhStocks = FALSE,
-                          # run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+                          # run.bootstraps = TRUE, # to turn on or off the bootstrap 
+                              # function added at the end
                           # bs_seed = 1, # seed for bootstrapping
                           # bs_nBS = 10, # trials for bootstrapping
                           # plot = FALSE # whether or not to create plots stored in DataOut/
@@ -111,9 +112,9 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
               
               logE0 = numeric(N_Stk),
               logE0_pred = numeric(nrow(dat$WAin)), # Targets
-              hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
               rm = 1,
-              hj_pred = numeric(nrow(dat$WAbase)),
+              hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
+              hj_pred = numeric(nrow(dat$WAin)),
 
               tauobs = 0.01 + numeric(N_Stk),
 
@@ -140,7 +141,6 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     log_E_tar <- numeric(N_Pred)
     logAlpha_tar <- numeric(N_Pred)
     
-    
     nll <- 0
     
     nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE))
@@ -155,9 +155,10 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
       log_E <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i]
       E[i] <- exp(log_E)
       
-      logAlpha[i] <- rm + hj[i]
+        # incompatible types in sub-assignment type fix
       nll <- nll - sum(dnorm(rm, 0.6, sd = 0.45, log = TRUE)) # Liermann prior table
       nll <- nll - sum(dnorm(hj[i], 0, sd  = logAlphaSD, log = TRUE)) # Liermann prior table
+      logAlpha[i] <- rm + hj[i]
       
       nll <- nll - sum(dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE))
     }
@@ -174,11 +175,11 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     SMSY = numeric(nrow(WAin))
     SGEN = numeric(nrow(WAin))
     
-    # MAKE SURE THIS MIRRORS ABOVE - with terms - match terms to param list too *****************************************
+    # MAKE SURE THIS MIRRORS ABOVE - with terms - match terms to param list too
     for (i in 1:N_Pred){
-      nll <- nll - sum(dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE)) # **********************************************
+      nll <- nll - sum(dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE)) # ***
       # nll <- nll - sum(dnorm(rm, 0.6, sd = 0.45, log = TRUE)) # IS THIS NECESSARY HERE?
-      logAlpha_tar[i] <- rm + hj_pred[i] # ******************************************************************************
+      logAlpha_tar[i] <- rm + hj_pred[i] # *************************************
 
       # Predict E for target watershed areas
       nll <- nll - sum(dnorm(logE0_pred[i], 0, sd = logESD, log = TRUE))
@@ -200,6 +201,8 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     # Question: Does ADREPORT slow down RTMB? It is more to calculate.
     REPORT(E) # E (Srep) for all synoptic data set rivers (25)
     REPORT(logAlpha) # model logAlpha (25)
+    # ADREPORT(E)
+    # ADREPORT(logAlpha)
     
     # ADREPORT - predicted
     # Mean estimate of the median (without bias correction)
@@ -225,66 +228,80 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   #                        par,
   #                        random = c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_"),
   #                        silent=TRUE)
-  obj <- MakeADFun(f_srep,
+  obj <- RTMB::MakeADFun(f_srep,
                          par,
                          random = c("hj", "hj_pred", "logE0", "logE0_pred"),
                          silent=TRUE)
+  
+  # upper <- numeric(length(obj$par)) + Inf
+  # lower <- numeric(length(obj$par)) + -Inf
+  # lower[names(obj$par) == "tauobs"] <- 0
+  # upper[names(obj$par) == "logESD"] <- 100
+  # lower[names(obj$par) == "logESD"] <- 0
+  # upper[names(obj$par) == "logAlphaSD"] <- 100
+  # lower[names(obj$par) == "logAlphaSD"] <- 0
+  
   opt <- nlminb(obj$par, 
                 obj$fn, 
                 obj$gr, 
-                control = list(trace = 0)) 
-  
+                control = list(trace = 0) # ,
+                # lower = lower,
+                # upper = upper) 
+  )
+                
   # osdr <- sdreport(obj)
   
-  # Simulate ####
-  sgen = smsy = beta = NULL
-  # obj$simulate() # 1000 times in a for loop and then track it - as a bootstrap
-  nsim <- nsim # number of sims
-  
-  for (i in 1:nsim){
-    # pb$tick()
-    temp <- obj$simulate()
-    # Simulate one or more responses from the distribution corresponding to a fitted model object.
-    sgen <- rbind(sgen, temp$SGEN)
-    beta <- rbind(beta, temp$BETA)
-    smsy <- rbind(smsy, temp$SMSY)
-  }
-  # quantiles by row - apply
-  # dim(x) must have a positive length
-  SGEN_boot <- apply(sgen, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
-  SMSY_boot <- apply(smsy, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
-  BETA_boot <- apply(beta, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
-  
-  # bind together bootstrapped values
-  # transpose so that it is 115 rows instead of columns 
-  # and then add in an identifier
-  # and the rbind them together - since the columns will all be the same
-  SGEN_boot_ <- t(as.data.frame(SGEN_boot)) # transpose SGEN_boot (once as a df)
-  SMSY_boot_ <- t(as.data.frame(SMSY_boot))
-  BETA_boot_ <- t(as.data.frame(BETA_boot))
-  # rename columns
-  colnames(SGEN_boot_) <- c("Median","LQ","Mean","UQ")
-  colnames(SMSY_boot_) <- c("Median","LQ","Mean","UQ")
-  colnames(BETA_boot_) <- c("Median","LQ","Mean","UQ")
-  # now rows are just numbered - can just cbind into main df since they should be in same order
-  # and are of length (nrow(t(test))) for e.g.
-  # nrow(SGEN_boot_)
-  
-  sdr <- sdreport(obj)
-  sdr_full <- summary(RTMB::sdreport(obj))
-  
-  sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
-  sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
-  
-  # Create the correct quantiles for E
-  # log_E_tar for sdr_est and sdr_se
-  # Must first calculate their quantile in log-space AND THEN exponentiate
-  E_quant <- cbind(WAin,
-                   E_tar = exp(sdr_est$log_E_tar), # Mean
-                   E_LQ = exp(sdr_est$log_E_tar - (sdr_se$log_E_tar*1.96)), # E LQ
-                   E_UQ = exp(sdr_est$log_E_tar + (sdr_se$log_E_tar*1.96)) # E UQ
-  )
-  
+  # Simulate #### THIS SECTION IS COMMENTED OUT ####
+  # sgen = smsy = beta = NULL
+  #     # obj$simulate() # 1000 times in a for loop and then track it - as a bootstrap
+  # nsim <- nsim # number of sims
+  # 
+  # for (i in 1:nsim){
+  #       # pb$tick()
+  #   temp <- obj$simulate() 
+  #       # error in logAlpha[i] <- rm + hj[i]
+  #       # Simulate one or more responses from the distribution corresponding to a fitted model object.
+  #   sgen <- rbind(sgen, temp$SGEN)
+  #   beta <- rbind(beta, temp$BETA)
+  #   smsy <- rbind(smsy, temp$SMSY)
+  # }
+  # # quantiles by row - apply
+  # # dim(x) must have a positive length
+  # SGEN_boot <- apply(sgen, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
+  # SMSY_boot <- apply(smsy, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
+  # BETA_boot <- apply(beta, 2, FUN = function(x){c(mean(x), quantile(x, c(0.0275,0.5,0.975)))})
+  # 
+  # # bind together bootstrapped values
+  # # transpose so that it is 115 rows instead of columns
+  # # and then add in an identifier
+  # # and the rbind them together - since the columns will all be the same
+  # SGEN_boot_ <- t(as.data.frame(SGEN_boot)) # transpose SGEN_boot (once as a df)
+  # SMSY_boot_ <- t(as.data.frame(SMSY_boot))
+  # BETA_boot_ <- t(as.data.frame(BETA_boot))
+  # # rename columns
+  # colnames(SGEN_boot_) <- c("Median","LQ","Mean","UQ")
+  # colnames(SMSY_boot_) <- c("Median","LQ","Mean","UQ")
+  # colnames(BETA_boot_) <- c("Median","LQ","Mean","UQ")
+  # # now rows are just numbered - can just cbind into main df since they should be in same order
+  # # and are of length (nrow(t(test))) for e.g.
+  # # nrow(SGEN_boot_)
+  # 
+  # # CURRENTLY NaN Std. Error ***************************************************
+  # sdr <- RTMB::sdreport(obj)
+  # sdr_full <- summary(RTMB::sdreport(obj))
+  # 
+  # sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
+  # sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
+  # 
+  # # Create the correct quantiles for E
+  # # log_E_tar for sdr_est and sdr_se
+  # # Must first calculate their quantile in log-space AND THEN exponentiate
+  # E_quant <- cbind(WAin,
+  #                  E_tar = exp(sdr_est$log_E_tar), # Mean
+  #                  E_LQ = exp(sdr_est$log_E_tar - (sdr_se$log_E_tar*1.96)), # E LQ
+  #                  E_UQ = exp(sdr_est$log_E_tar + (sdr_se$log_E_tar*1.96)) # E UQ
+  # )
+
   ## Outputs and Plotting Preparations (interior)
   # IWAMsmax produces the following:
   # - SR curve
@@ -298,33 +315,33 @@ IWAMsrep_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # * SMAX = 1/beta
   # * SMSY = (1-LambertW0(exp(1-logalpha)))/beta # EXPLICIT
   # * SGEN = -1/beta*LambertW0(-beta*Smsy[i,j]/(exp(logalpha))) # EXPLICIT
-  
-  WArefpoints <- cbind(E_quant, # Now contains WAin's information
-                       # E = sdr_est$E_tar,
-                       # E_se = sdr_se$E_tar,
-                       logalpha = sdr_est$logAlpha_tar,
-                       logalpha_se = sdr_se$logAlpha_tar,
-                       SGEN = SGEN_boot_,
-                       SMSY = SMSY_boot_,
-                       BETA = BETA_boot_
-  )
-  
+
+  # WArefpoints <- cbind(E_quant, # Now contains WAin's information
+  #                      # E = sdr_est$E_tar,
+  #                      # E_se = sdr_se$E_tar,
+  #                      logalpha = sdr_est$logAlpha_tar,
+  #                      logalpha_se = sdr_se$logAlpha_tar,
+  #                      SGEN = SGEN_boot_,
+  #                      SMSY = SMSY_boot_,
+  #                      BETA = BETA_boot_
+  # )
+
   return(list(opt = opt,
-              obj = obj,
-              sdr = sdr,
-              sdr_full = sdr_full,
-              sdr_est = sdr_est,
-              sdr_se = sdr_se,
-              refpoints = WArefpoints
+              obj = obj #,
+              # sdr = sdr,
+              # sdr_full = sdr_full,
+              # sdr_est = sdr_est,
+              # sdr_se = sdr_se,
+              # refpoints = WArefpoints
   ))
-  
+
 }
 
 # Testing ####
-test_srep <- IWAMsrep_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
+test_srep <- lier_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
                            # Parken_evalstocks.csv
                            # WCVIStocks.csv
-                           nsim = 1000) # default test run for outputs
+                           nsim = 10) # default test run for outputs
 
 
 ## MCMC run through tmbstan ####
@@ -374,7 +391,8 @@ initf2 <- function(){
        logE0 = numeric(N_Stk),
        logE0_pred = numeric(nrow(dat$WAin)),
        hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
-       hj_pred = numeric(nrow(dat$WAbase)),
+       hj_pred = numeric(nrow(dat$WAin)),
+          # WAin or WAbase
        rm = 1,
        
        tauobs = 0.01 + numeric(N_Stk),
@@ -385,9 +403,11 @@ initf2 <- function(){
 }
 
 # Run the cores using:
-# obj <- RTMB object
-# init <- initial value function defined above
-# rest of usual chain and iter parameters
+  # obj <- RTMB object
+  # init <- initial value function defined above
+  # rest of usual chain and iter parameters
+
+# Create bounds - moved upwards to creation of rtmb obj
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 
@@ -397,9 +417,10 @@ lower[names(obj$par) == "logESD"] <- 0
 upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
-fitstan <- tmbstan(obj, iter=2000, warmup=200, init=initf2,
+fitstan <- tmbstan(test_srep$obj, iter = 5000, warmup = 500, init = initf2,
                    lower = lower, upper = upper,
-                   chains=4, open_progress=FALSE, silent=TRUE)
+                   chains = 4, open_progress = FALSE, silent = TRUE)
+  # Can I add in a beepr?
 # https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
 # Examine the pairs() plot to diagnose sampling problems
 
@@ -411,46 +432,78 @@ pairs(fitstan, pars=names(obj$par))
 
 ## Can extract marginal posteriors easily
 post <- as.matrix(fitstan)
-# hist(post[,'b0[1]'])
-# hist(post[,'logAlpha0'])
+hist(post[,'b0[1]'])
+hist(post[,'bWA[1]'])
+
 ## What if you want a posterior for derived quantities in the report? Just
-## loop through each posterior sample (row) and call the report function
-## which returns a list. The last column is the log-posterior density (lp__)
-## and needs to be dropped
-# This only works for single values
-obj$report(post[1,-ncol(post)])         # sd0 is only element
-SMSY_mc <- rep(NA, length.out=nrow(post))
+  ## loop through each posterior sample (row) and call the report function
+  ## which returns a list. The last column is the log-posterior density (lp__)
+  ## and needs to be dropped
+# This only works for single values e.g. sd0 is only element
+obj$report(post[1,-ncol(post)])   
+outs <- rep(NA, length.out=nrow(post))
+
 for(i in 1:nrow(post)){
   r <- obj$report(post[i,-ncol(post)])
-  SMSY_mc[i] <- r$SMSY_mc
+  # loop through all the obj$report names
+  for (i in 1:length(names(obj$report()))) {
+    # sd0[i] <- r$
+    outs
+  }
 }
-hist(sd0)
 
+outsmatrix <- matrix(0, nrow = nrow(post), ncol = length(report))
+for(i in 1:nrow(post)){
+  r <- obj$report(post[i,-ncol(post)])
+  outsmatrix[i] <- r$E
+}
 
+# Below doesn't work because 
+obj$report(post[1,-ncol(post)]) # sd0 is only element
+E <- rep(NA, length.out=nrow(post))
+for(i in 1:nrow(post)){
+  r <- obj$report(post) # -ncol(post) is doing nothing
+  E[i] <- r$E
+}
 
-## Let's get posterior samples for all our REPORTS.post <- as.matrix(fit.stan)
-post <- as.matrix(fitstan)
-report <- obj$report() # REPORTS ONLY IF REPORT IS IN TMB FUNCTION
-post.report <- matrix(0,  nrow = nrow(post), ncol = length(report))
-colnames(post.report) <- names(report)
-for( i in 1:nrow(post) )
-  post.report[i,] <- do.call('c', 
-                             obj$report(post[i,seq_along(obj$par)]))
 
 
 ## Let's get posterior samples for all our REPORTS.
-post <- as.matrix(fitstan)
-post.report <- NULL
-for( i in 1:nrow(post) )
-  post.report <- rbind(post.report, 
-                       unlist(obj$report(post[i,seq_along(obj$par)])))
+# https://github.com/pbs-assess/renewassess/blob/main/material/RTMB%20Recap%20and%20Nimble%20Demo/Jacobians.Rmd
+
+post <- as.matrix(fit.stan)
+report <- obj$report()
+post.report <- matrix(0,  nrow = nrow(post), ncol = length(report))
+colnames(post.report) <- names(report)
+
+for (i in 1:nrow(post)) { # 18000 iterations 
+  # i is length of post
+  # need a second one that is k for length of report
+  for (k in 1:length(report)) {
+    post.report[i, k] <- obj$report(post[i,k])
+  }
+}
+  post.report[i,] <- do.call('c', 
+                             obj$report(post[i,seq_along(obj$par)]))
+
+summary(coda::mcmc(post.report))
 
 
-# shinystan example:
-# library(shinystan)
-# launch_shinystan(fitstan)
+
+# ## Let's get posterior samples for all our REPORTS.
+# post <- as.matrix(fitstan)
+# post.report <- NULL
+# for( i in 1:nrow(post) )
+#   post.report <- rbind(post.report, 
+#                        unlist(obj$report(post[i,seq_along(obj$par)])))
+# 
+# sum.out <- summary(coda::mcmc(post.report))
+# summary <- data.frame(do.call('cbind', sum.out))
+# summary$params <- rownames(summary)
 
 
 
+# Rstan and tidybayes
+library(rstan)
 
-
+str(rstan::extract(fitstan)) # this is a list format of post
