@@ -201,20 +201,20 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     # Question: Does ADREPORT slow down RTMB? It is more to calculate.
     REPORT(E) # E (Srep) for all synoptic data set rivers (25)
     REPORT(logAlpha) # model logAlpha (25)
-    # ADREPORT(E)
-    # ADREPORT(logAlpha)
+    ADREPORT(E)
+    ADREPORT(logAlpha)
     
     # ADREPORT - predicted
     # Mean estimate of the median (without bias correction)
-    # ADREPORT(E_tar) # target E (Srep) (21)
-    # ADREPORT(log_E_tar) # exp these for the correct confidence intervals
+    ADREPORT(E_tar) # target E (Srep) (21)
+    ADREPORT(log_E_tar) # exp these for the correct confidence intervals
     # ADREPORT(logAlpha_tar)
     REPORT(E_tar)
     REPORT(logAlpha_tar)
     
-    # ADREPORT(BETA)
-    # ADREPORT(SMSY)
-    # ADREPORT(SGEN)
+    ADREPORT(BETA)
+    ADREPORT(SMSY)
+    ADREPORT(SGEN)
     # Symmetrical - would need to get the confidence interval on the log-scale and then exp()
     REPORT(BETA)
     REPORT(SMSY)
@@ -233,6 +233,7 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                          random = c("hj", "hj_pred", "logE0", "logE0_pred"),
                          silent=TRUE)
   
+  # New limits
   # upper <- numeric(length(obj$par)) + Inf
   # lower <- numeric(length(obj$par)) + -Inf
   # lower[names(obj$par) == "tauobs"] <- 0
@@ -241,12 +242,22 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # upper[names(obj$par) == "logAlphaSD"] <- 100
   # lower[names(obj$par) == "logAlphaSD"] <- 0
   
+  # old limits:
+  # upper <- unlist(obj$par)
+  # upper[1:length(upper)]<- Inf
+  # lower <- unlist(obj$par)
+  # lower[1:length(lower)]<- -Inf
+  
+  # Tor: Limits (upper/lower) for nlminb do not seem to effect the convergence
+    # or objective function
+  
   opt <- nlminb(obj$par, 
                 obj$fn, 
                 obj$gr, 
-                control = list(trace = 0) # ,
+                # control = list(trace = 0) # ,
+                control = list(eval.max = 1e5, iter.max = 1e5, trace = 0)
                 # lower = lower,
-                # upper = upper) 
+                # upper = upper
   )
                 
   # osdr <- sdreport(obj)
@@ -258,7 +269,7 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # 
   # for (i in 1:nsim){
   #       # pb$tick()
-  #   temp <- obj$simulate() 
+  #   temp <- obj$simulate()
   #       # error in logAlpha[i] <- rm + hj[i]
   #       # Simulate one or more responses from the distribution corresponding to a fitted model object.
   #   sgen <- rbind(sgen, temp$SGEN)
@@ -417,7 +428,7 @@ lower[names(obj$par) == "logESD"] <- 0
 upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
-fitstan <- tmbstan(test_srep$obj, iter = 5000, warmup = 500, init = initf2,
+fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = initf2,
                    lower = lower, upper = upper,
                    chains = 4, open_progress = FALSE, silent = TRUE)
   # Can I add in a beepr?
@@ -432,6 +443,9 @@ pairs(fitstan, pars=names(obj$par))
 
 ## Can extract marginal posteriors easily
 post <- as.matrix(fitstan)
+  # post is 133 by 18000
+  # which is 133: the number of parameters (for each iteration)
+  # 18000 is 4500 x 4
 hist(post[,'b0[1]'])
 hist(post[,'bWA[1]'])
 
@@ -440,8 +454,13 @@ hist(post[,'bWA[1]'])
   ## which returns a list. The last column is the log-posterior density (lp__)
   ## and needs to be dropped
 # This only works for single values e.g. sd0 is only element
-obj$report(post[1,-ncol(post)])   
+obj$report(post[1,-ncol(post)])
 outs <- rep(NA, length.out=nrow(post))
+  # This is a list of 18000 long
+
+# I need a matrix that is:
+  # .
+  # .
 
 for(i in 1:nrow(post)){
   r <- obj$report(post[i,-ncol(post)])
@@ -507,3 +526,10 @@ summary(coda::mcmc(post.report))
 library(rstan)
 
 str(rstan::extract(fitstan)) # this is a list format of post
+wstanout <- rstan::extract(fitstan) # a subsettable version of the above
+
+# Drawing Point summaries and intervals
+  # This is only for parameter estimates themselves
+fitstan |> 
+  spread_draws(logESD) |> 
+  median_qi()
