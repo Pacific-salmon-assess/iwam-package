@@ -15,6 +15,10 @@ library(viridis)
 source(here::here("R/PDF_plot.r"))
 source(here::here("R/IWAM_model.R"))
 
+# source(here::here("R/Liermann_RTMB_model.R")) # RTMB Liermann model function
+  # Contains: derived_post.R source
+# source(here::here("R/IWAMsrep_RTMB_model.R")) # Original SREP RTMB model for comparison
+
 # Functions
 t_col <- function(color, percent = 50, name = NULL) {
   #      color = color name
@@ -166,81 +170,89 @@ parken <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
 parken <- parken |> 
   rename("SMSY_i" = SMSY, "lwr" = SMSY_5, "upr" = SMSY_95)
 
-# eval_dat <- Parken_WCVI %>% left_join(SMSY_tmb_v, by=join_by(Stock)) %>% 
-#   rename("UL SMSY" = upr, "LL SMSY" = lwr) %>%
-#   select(-RP) %>% 
-#   left_join(SREP_tmb_v, by=join_by(Stock)) %>%
-#   rename("UL SREP" = upr, "LL SREP" = lwr) %>%
-#   select(-RP, -lh.y, -lh.x, -WA.x, -WA.y)
-# benchmarks <- eval_dat
-
 cols <- viridis(8, alpha=0.9, option = "mako", direction = -1)
 
-ggplot(SMSY_tmb_v, aes(x = Stock, y = SMSY_i)) +
-  geom_errorbar(data = SMSY_tmb_v, aes(ymax = lwr, ymin = upr,
-                                       color = 'Static 0.66',
-                                       width=.5)) +
-  geom_point(data = SMSY_tmb_v,
-             aes(color = 'Static 0.66')) +
+ggplot() + # SMSY_tmb_v, aes(x = Stock, y = SMSY_i)
   
-  geom_errorbar(data = SMSY_tmb_v.4, aes(ymax = lwr, ymin = upr,
+  geom_errorbar(data = SMSY_tmb_v, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+                                       color = 'Static 0.66',
+                                       width=.1)) +
+  geom_point(data = SMSY_tmb_v,
+             aes(x = Stock, y = SMSY_i, color = 'Static 0.66')) +
+  
+  
+  geom_errorbar(data = SMSY_tmb_v.4, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
                                          color = "Static 0.4",
-                                         width=.5),
+                                         width=.1),
                 position = position_nudge(0.1)) +
   geom_point(data = SMSY_tmb_v.4,
              position = position_nudge(0.1),
-             aes(color = "Static 0.4")) +
+             aes(x = Stock, y = SMSY_i, color = "Static 0.4")) +
   
-  geom_errorbar(data = SMSY_tmb_v.8, aes(ymax = lwr, ymin = upr,
+  geom_errorbar(data = SMSY_tmb_v.8, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
                                          color = "Static 0.8",
-                                         width=.5),
+                                         width=.1),
                 position = position_nudge(-0.1)) +
   geom_point(data = SMSY_tmb_v.8,
              position = position_nudge(-0.1),
-             aes(color = "Static 0.8")) + 
+             aes(x = Stock, y = SMSY_i, color = "Static 0.8")) + 
   
-  geom_errorbar(data = SMSY_tmb_v1, aes(ymax = lwr, ymin = upr,
+  geom_errorbar(data = SMSY_tmb_v1, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
                                         color = "Static 1",
-                                        width=.5),
+                                        width=.1),
                 position = position_nudge(-0.2)) +
   geom_point(data = SMSY_tmb_v1,
              position = position_nudge(-0.2),
-             aes(color = "Static 1")) +
+             aes(x = Stock, y = SMSY_i, color = "Static 1")) +
   
-  geom_errorbar(data = SMSY_tmb_d, aes(ymax = lwr, ymin = upr,
+  geom_errorbar(data = SMSY_tmb_d, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
                                         color = "IWAM Default",
-                                       width=.5),
+                                       width=.1),
                 position = position_nudge(-0.3)) +
   geom_point(data = SMSY_tmb_d,
              position = position_nudge(-0.3),
-             aes(color = "IWAM Default")) +
+             aes(x = Stock, y = SMSY_i, color = "IWAM Default")) +
   
-  geom_errorbar(data = SMSY_tmb_b, aes(ymax = lwr, ymin = upr,
+  geom_errorbar(data = SMSY_tmb_b, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
                                        color = "close to zero",
-                                       width=.5),
+                                       width=.1),
                 position = position_nudge(.2)) +
   geom_point(data = SMSY_tmb_b,
              position = position_nudge(.2),
-             aes(color = "close to zero")) +
+             aes(x = Stock, y = SMSY_i, color = "close to zero")) +
   
-  geom_errorbar(data = parken, aes(ymax = lwr, ymin = upr,
+  geom_errorbar(data = parken, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
                                        color = "Parken",
-                                       width=.5),
+                                       width=.1),
                 position = position_nudge(-0.4)) +
   geom_point(data = parken,
              position = position_nudge(-0.4),
-             aes(color = "Parken")) +
+             aes(x = Stock, y = SMSY_i, color = "Parken")) +
   
-  # Add in RTMB from IWAMsrep_RTMB_model.R as a global object
+  # Add in RTMB from IWAMsrep_RTMB_model.R as a global object (run internal - function is broken)
     # otherwise comment this one out
-  geom_errorbar(data = rtmb, aes(ymax = SMSY.LQ, ymin = SMSY.UQ,
-                                   color = "RTMB Liermann",
-                                   width=.5),
+  geom_errorbar(data = rtmb, aes(x = Stock, y = SMSY.Mean, ymax = SMSY.LQ, ymin = SMSY.UQ,
+                                   color = "RTMB MLE",
+                                   width=.1),
                 position = position_nudge(-0.5)) +
   geom_point(data = rtmb,
              position = position_nudge(-0.5),
-             aes(color = "RTMB Liermann")) +
-
+             aes(x = Stock, y = SMSY.Mean, color = "RTMB MLE")) +
+  
+  # Add in LIERMANN from Liermann_RTMB_model.R as a global object
+    # otherwise comment this one out
+    # Global object transform: derived_obj --> derived_obj$deripost_summary$SMSY
+  geom_errorbar(data = derived_obj$deripost_summary$SMSY, aes(x = Stock,
+                                                              y = Mean,
+                                                              ymax = UQ_95, 
+                                                              ymin = LQ_5,
+                                 color = "Liermann MCMC",
+                                 width=.1),
+                position = position_nudge(-0.6)) +
+  geom_point(data = derived_obj$deripost_summary$SMSY,
+             position = position_nudge(-0.6),
+             aes(x = Stock, y = Mean, color = "Liermann MCMC")) +
+  
   theme_classic() +
   scale_y_continuous(transform = "log", 
                      breaks = c(0, 10, 100, 1000, 10000, 100000)) +
@@ -255,7 +267,8 @@ ggplot(SMSY_tmb_v, aes(x = Stock, y = SMSY_i)) +
                               'IWAM Default',
                               'close to zero',
                               'Parken',
-                              'RTMB Liermann'),
+                              'RTMB MLE',
+                              'Liermann MCMC'),
                      values=c('Static 0.4' = cols[1],
                               'Static 0.66' = cols[2],
                               'Static 0.8' = cols[3],
@@ -263,41 +276,41 @@ ggplot(SMSY_tmb_v, aes(x = Stock, y = SMSY_i)) +
                               'close to zero' = cols[5],
                               'IWAM Default' = "orange",
                               'Parken' = cols[7],
-                              'RTMB Liermann' = "red"))
+                              'RTMB MLE' = "red",
+                              'Liermann MCMC' = "black"))
 
 
 
 
-
-ggplot(benchmarks, aes(x=Stock, y = SMSY_i)) +
-  # error bars for default IWAM model
-  geom_errorbar(aes(ymax = `UL SMSY`, ymin = `LL SMSY`, 
-                    color='Integrated Watershed Area Model',), 
-                width = 0.2, position = position_nudge(0.1)) +
-  # points for default iwam model
-  geom_point(aes(color = 'Integrated Watershed Area Model'), 
-             position = position_nudge(0.1)) +
-  # points for parken est.
-  geom_point(aes(x = Stock, y = SMSY, color='Parken et al. 2006'), 
-             position = position_nudge(-0.1)) +
-  # errorbars for parken est.
-  geom_errorbar(aes(x = Stock, ymax = SMSY_95, ymin = SMSY_5, 
-                    color='Parken et al. 2006'), width = 0.2, 
-                position = position_nudge(-0.1)) +
-  
-  theme_classic() +
-  
-  scale_y_continuous(transform = "log", 
-                     breaks = c(0, 10, 100, 1000, 10000, 100000)) +
-  
-  ylab(TeX("$S_{MSY}$ Estimate")) +
-  
-  xlab("Stock Name") + 
-  
-  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
-  
-  scale_color_manual(name='Model',
-                     breaks=c('Parken et al. 2006', 
-                              'Integrated Watershed Area Model'),
-                     values=c('Parken et al. 2006'='black', 
-                              'Integrated Watershed Area Model'='red'))
+# ggplot(benchmarks, aes(x=Stock, y = SMSY_i)) +
+#   # error bars for default IWAM model
+#   geom_errorbar(aes(ymax = `UL SMSY`, ymin = `LL SMSY`, 
+#                     color='Integrated Watershed Area Model',), 
+#                 width = 0.2, position = position_nudge(0.1)) +
+#   # points for default iwam model
+#   geom_point(aes(color = 'Integrated Watershed Area Model'), 
+#              position = position_nudge(0.1)) +
+#   # points for parken est.
+#   geom_point(aes(x = Stock, y = SMSY, color='Parken et al. 2006'), 
+#              position = position_nudge(-0.1)) +
+#   # errorbars for parken est.
+#   geom_errorbar(aes(x = Stock, ymax = SMSY_95, ymin = SMSY_5, 
+#                     color='Parken et al. 2006'), width = 0.2, 
+#                 position = position_nudge(-0.1)) +
+#   
+#   theme_classic() +
+#   
+#   scale_y_continuous(transform = "log", 
+#                      breaks = c(0, 10, 100, 1000, 10000, 100000)) +
+#   
+#   ylab(TeX("$S_{MSY}$ Estimate")) +
+#   
+#   xlab("Stock Name") + 
+#   
+#   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+#   
+#   scale_color_manual(name='Model',
+#                      breaks=c('Parken et al. 2006', 
+#                               'Integrated Watershed Area Model'),
+#                      values=c('Parken et al. 2006'='black', 
+#                               'Integrated Watershed Area Model'='red'))

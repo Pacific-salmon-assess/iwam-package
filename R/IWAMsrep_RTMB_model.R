@@ -117,7 +117,9 @@ par <- list(b0 = c(10, 10), # Initial values for WA regression intercepts
              logE0 = numeric(N_Stk),
              logE0_ = numeric(nrow(dat$WAin)),
              tauobs = 0.01 + numeric(N_Stk), # Why can't this be zero? This doesn't run as just a string of zeros.
-             logAlpha0 = 1.5,
+            
+             # logAlpha0 = 1.5, # Trying to match with Liermann version
+             
              logESD = 1,
              logAlphaSD = 10
 )
@@ -155,6 +157,8 @@ f_srep <- function(par){
   # }
     # Alternative version of alpha terms - see f_nim's translation
   
+  
+  
   ## Watershed Model
   for ( i in 1:N_Stk){
     # nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Test
@@ -163,6 +167,8 @@ f_srep <- function(par){
     # nll <- nll - sum(dnorm(logAlpha[i], logAlpha0, sd = logAlphaSD)) # Test
     # nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD)) # Test
     
+    nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Liermann prior table
+    
     nll <- nll - sum(dnorm(logAlpha_re[i], 0, sd = logAlphaSD, log = TRUE)) # Random effect on logAlpha
     logAlpha[i] <- logAlpha0 + logAlpha_re[i] # Moving the scale
     
@@ -170,7 +176,8 @@ f_srep <- function(par){
     log_E <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i] # Stock level regression
     E[i] <- exp(log_E)
     
-    nll <- nll - sum(dgamma(tauobs[i], shape = 0.001, scale = 0.001)) 
+    nll <- nll - sum(dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001)) 
+      # Originally was 0.001 for both - changed to 0.0001 and 1/0.0001 to match 
       # Should be removed as a prior - given an initial value instead?
   }
   
@@ -286,7 +293,7 @@ colnames(BETA_boot_) <- c("Median","LQ","Mean","UQ")
     # and are of length (nrow(t(test))) for e.g.
 # nrow(SGEN_boot_)
 
-sdr <- sdreport(obj)
+sdr <- RTMB::sdreport(obj)
 sdr_full <- summary(RTMB::sdreport(obj))
 
 sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
@@ -341,11 +348,12 @@ test_srep <- IWAMsrep_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
                       # Parken_evalstocks.csv
                       # WCVIStocks.csv
                       nsim = 1000) # default test run for outputs
-
+rtmb <- test_srep
+rtmb <- WArefpoints
 
 ## MCMC run through tmbstan ####
-library(tmbstan)
-library(tidybayes) # Plotting usage
+# library(tmbstan)
+# library(tidybayes) # Plotting usage
 
 # Create a initial value function 
   # EXAMPLE from TMB_rtmb.R using the SMAX model version
@@ -370,58 +378,56 @@ library(tidybayes) # Plotting usage
 #   )
 # }
 
-initf1 <- function(){
-  list( # list out pars
-    b0 = c(10, 10),
-    bWA = c(0, 0),
-    logAlpha_re = numeric(nrow(dat$WAbase)), 
-    logAlpha_re_pred = numeric(nrow(dat$WAin)),
-    logE0 = numeric(N_Stk),
-    logE0_ = numeric(nrow(dat$WAin)),
-    tauobs = 0.01 + numeric(N_Stk),
-    logAlpha0 = 1.5,
-    logESD = 1,
-    logAlphaSD = 10
-  )
-}
+# initf1 <- function(){
+#   list( # list out pars
+#     b0 = c(10, 10),
+#     bWA = c(0, 0),
+#     logAlpha_re = numeric(nrow(dat$WAbase)), 
+#     logAlpha_re_pred = numeric(nrow(dat$WAin)),
+#     logE0 = numeric(N_Stk),
+#     logE0_ = numeric(nrow(dat$WAin)),
+#     tauobs = 0.01 + numeric(N_Stk),
+#     logAlpha0 = 1.5,
+#     logESD = 1,
+#     logAlphaSD = 10
+#   )
+# }
 
 # Run the cores using:
   # obj <- RTMB object
   # init <- initial value function defined above
   # rest of usual chain and iter parameters
-fitstan <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
-                    chains=4, open_progress=FALSE, silent=TRUE)
+# fitstan <- tmbstan(obj, iter=2000, warmup=200, init=initf1,
+#                     chains=4, open_progress=FALSE, silent=TRUE)
 # https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
 # Examine the pairs() plot to diagnose sampling problems
 
 # Getting things out 
   # Probably use tidybayes or something
-traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
-pairs(fitstan, pars=names(obj$par))
+# traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
+# pairs(fitstan, pars=names(obj$par))
 
 
 ## Can extract marginal posteriors easily
-post <- as.matrix(fitstan)
-hist(post[,'b0[1]'])
-hist(post[,'logAlpha0'])
+# post <- as.matrix(fitstan)
+# hist(post[,'b0[1]'])
+# hist(post[,'logAlpha0'])
 ## What if you want a posterior for derived quantities in the report? Just
 ## loop through each posterior sample (row) and call the report function
 ## which returns a list. The last column is the log-posterior density (lp__)
 ## and needs to be dropped
   # This only works for single values
-obj$report(post[1,-ncol(post)])         # sd0 is only element
-SMSY_mc <- rep(NA, length.out=nrow(post))
-for(i in 1:nrow(post)){
-  r <- obj$report(post[i,-ncol(post)])
-  SMSY_mc[i] <- r$SMSY_mc
-}
-hist(sd0)
+# obj$report(post[1,-ncol(post)])         # sd0 is only element
+# SMSY_mc <- rep(NA, length.out=nrow(post))
+# for(i in 1:nrow(post)){
+#   r <- obj$report(post[i,-ncol(post)])
+#   SMSY_mc[i] <- r$SMSY_mc
+# }
+# hist(sd0)
 
 # shinystan example:
-library(shinystan)
-launch_shinystan(fitstan)
-
-
+# library(shinystan)
+# launch_shinystan(fitstan)
 
 
 

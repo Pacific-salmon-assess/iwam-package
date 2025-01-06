@@ -36,14 +36,14 @@ nsim <- 10
 lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                           nsim = 10 # default nsim for bootstrapping
                           # remove.EnhStocks = FALSE,
-                          # run.bootstraps = TRUE, # to turn on or off the bootstrap 
+                          # run.bootstraps = TRUE, # to turn on or off the bootstrap
                               # function added at the end
                           # bs_seed = 1, # seed for bootstrapping
                           # bs_nBS = 10, # trials for bootstrapping
                           # plot = FALSE # whether or not to create plots stored in DataOut/
 )
 {
-  
+
   # Just in case atm
   # compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
   
@@ -196,19 +196,23 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     
     
     ## ADREPORT - internals
+      # ALWAYS THE NUMBER OF SYNOPTIC SETS - RN 25
     # ADREPORT(logRS) # logRS for all 501 data points
     # I think it might be worth it not to report for model speed?
     # Question: Does ADREPORT slow down RTMB? It is more to calculate.
-    REPORT(E) # E (Srep) for all synoptic data set rivers (25)
-    REPORT(logAlpha) # model logAlpha (25)
     ADREPORT(E)
     ADREPORT(logAlpha)
+  
+    REPORT(E) # E (Srep) for all synoptic data set rivers (25)
+    REPORT(logAlpha) # model logAlpha (25)
     
     # ADREPORT - predicted
+      # NUMBER OF PREDICTED STOCKS WILL CHANGE
     # Mean estimate of the median (without bias correction)
     ADREPORT(E_tar) # target E (Srep) (21)
     ADREPORT(log_E_tar) # exp these for the correct confidence intervals
     # ADREPORT(logAlpha_tar)
+    
     REPORT(E_tar)
     REPORT(logAlpha_tar)
     
@@ -216,6 +220,7 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     ADREPORT(SMSY)
     ADREPORT(SGEN)
     # Symmetrical - would need to get the confidence interval on the log-scale and then exp()
+    
     REPORT(BETA)
     REPORT(SMSY)
     REPORT(SGEN)
@@ -234,20 +239,19 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                          silent=TRUE)
   
   # New limits
-  # upper <- numeric(length(obj$par)) + Inf
-  # lower <- numeric(length(obj$par)) + -Inf
-  # lower[names(obj$par) == "tauobs"] <- 0
-  # upper[names(obj$par) == "logESD"] <- 100
-  # lower[names(obj$par) == "logESD"] <- 0
-  # upper[names(obj$par) == "logAlphaSD"] <- 100
-  # lower[names(obj$par) == "logAlphaSD"] <- 0
+  upper <- numeric(length(obj$par)) + Inf
+  lower <- numeric(length(obj$par)) + -Inf
+  lower[names(obj$par) == "tauobs"] <- 0
+  upper[names(obj$par) == "logESD"] <- 100
+  lower[names(obj$par) == "logESD"] <- 0
+  upper[names(obj$par) == "logAlphaSD"] <- 100
+  lower[names(obj$par) == "logAlphaSD"] <- 0
   
   # old limits:
   # upper <- unlist(obj$par)
   # upper[1:length(upper)]<- Inf
   # lower <- unlist(obj$par)
   # lower[1:length(lower)]<- -Inf
-  
   # Tor: Limits (upper/lower) for nlminb do not seem to effect the convergence
     # or objective function
   
@@ -255,9 +259,9 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                 obj$fn, 
                 obj$gr, 
                 # control = list(trace = 0) # ,
-                control = list(eval.max = 1e5, iter.max = 1e5, trace = 0)
-                # lower = lower,
-                # upper = upper
+                control = list(eval.max = 1e5, iter.max = 1e5, trace = 0),
+                lower = lower,
+                upper = upper
   )
                 
   # osdr <- sdreport(obj)
@@ -336,9 +340,45 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   #                      SMSY = SMSY_boot_,
   #                      BETA = BETA_boot_
   # )
-
+  
+  
+  # MCMC ####
+    # INIT FUNCTION
+  init <- function(){
+    list(b0 = c(10, 10), # Initial values for WA regression intercepts
+         bWA = c(0, 0), # Inital values for WA regression slopes
+         
+         logE0 = numeric(N_Stk),
+         logE0_pred = numeric(nrow(dat$WAin)),
+         hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
+         hj_pred = numeric(nrow(dat$WAin)),
+         # WAin or WAbase
+         rm = 1,
+         
+         tauobs = 0.01 + numeric(N_Stk),
+         
+         logESD = 1,
+         logAlphaSD = 1
+    )
+  }
+    # SETTING LIMITS
+  upper <- numeric(length(obj$par)) + Inf
+  lower <- numeric(length(obj$par)) + -Inf
+  
+  lower[names(obj$par) == "tauobs"] <- 0
+  upper[names(obj$par) == "logESD"] <- 100
+  lower[names(obj$par) == "logESD"] <- 0
+  upper[names(obj$par) == "logAlphaSD"] <- 100
+  lower[names(obj$par) == "logAlphaSD"] <- 0
+  
+    # SAMPLE
+  fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init,
+                     lower = lower, upper = upper,
+                     chains = 4, open_progress = FALSE, silent = TRUE)
+  
   return(list(opt = opt,
-              obj = obj #,
+              obj = obj,
+              fitstan = fitstan # MCMC object for processing
               # sdr = sdr,
               # sdr_full = sdr_full,
               # sdr_est = sdr_est,
@@ -348,14 +388,16 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 
 }
 
-# Testing ####
+# Run the function test ####
 test_srep <- lier_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
                            # Parken_evalstocks.csv
                            # WCVIStocks.csv
                            nsim = 10) # default test run for outputs
 
+source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
+derived_obj <- derived_post(fitstan)
 
-## MCMC run through tmbstan ####
+## MCMC run through tmbstan - OUTSIDE OF FUNCTION ####
 
 # Create a initial value function 
 # EXAMPLE from TMB_rtmb.R using the SMAX model version
@@ -435,15 +477,27 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = initf2,
 # https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
 # Examine the pairs() plot to diagnose sampling problems
 
-# Getting things out 
-# Probably use tidybayes or something
+source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
+derived_obj <- derived_post(fitstan)
+  # Will contain df and matrices of derived posteriors
+
+# Test plots
 traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
 pairs(fitstan, pars=names(obj$par))
 
 
+
+
+
+
+# ******************************************************************************
+# ********************** TESTING ***********************************************
+# ******************************************************************************
+# Getting things out 
+# Probably use tidybayes or something
 ## Can extract marginal posteriors easily
 post <- as.matrix(fitstan)
-  # post is 133 by 18000
+  # post is 133 by 18000 as a matrix
   # which is 133: the number of parameters (for each iteration)
   # 18000 is 4500 x 4
 hist(post[,'b0[1]'])
@@ -453,43 +507,181 @@ hist(post[,'bWA[1]'])
   ## loop through each posterior sample (row) and call the report function
   ## which returns a list. The last column is the log-posterior density (lp__)
   ## and needs to be dropped
+
 # This only works for single values e.g. sd0 is only element
-obj$report(post[1,-ncol(post)])
-outs <- rep(NA, length.out=nrow(post))
+# obj$report(post[1,-ncol(post)])
+  # Can be subset by obj$report(post)$NAME e.g. SGEN or something
+  # obj$report(post[18000,133]) - but 133 is a TRUE/FALSE issue
+# outs <- rep(NA, length.out=nrow(post))
   # This is a list of 18000 long
 
 # I need a matrix that is:
-  # .
-  # .
+  # [18000, 132] ? because of the issue of lp__ as above?
+  # [rows, columns]
 
-for(i in 1:nrow(post)){
-  r <- obj$report(post[i,-ncol(post)])
-  # loop through all the obj$report names
-  for (i in 1:length(names(obj$report()))) {
-    # sd0[i] <- r$
-    outs
+# What is the contents of obj$report(post[,X])
+  # Are these the standard error's? Or the false reports of the parameters
+  # hence why [,1] and [,2] are massive
+
+# Therefore I don't want to deal with [,X] and only loop through the rows of 
+  # samples
+  # But I want to loop into a matrix that is 
+  # 18000 long and length(names(obj$report(post))) <- 7
+  # This will be a long dataframe of all derived posteriors?
+  # AND another dimension for all of the 25 stocks
+    # e.g. length(obj$report(post)$E)
+
+# deripost <- matrix(0, nrow = nrow(post), ncol = length(obj$report(post)))
+# deripost <- data.frame()
+  # create a df that has 18000 rows, 7 normal columns, and an 
+  # 8th column for stock that is 1:25 repeated
+  # This will mean that the total number of rows is 18000 X 25
+  # The other way to do this would be 18000 X 7 - and then have 25 + 1 columns
+
+  # obj$report(post[1,])[1][[1]][1] refers to the:
+    # 1st value - ie. stock #1
+    # in the list of values in the 1st named derived parameter out of 7
+    # therefore one could generalize this statement
+    # by: obj$report(post[1:18000,])[1:7][[1]][[1:25]]
+    # and that would result in a single value out of 18000 X 7 X 25 total values
+
+  # Does it make sense to create a series of lists for each stock or par?
+
+# Kasper's method?
+# for(i in 1:nrow(post)){ # 18000 iterations
+#   r <- obj$report(post[i,]) # loop through all the obj$report names
+#   for (j in 1:length(obj$report(post[1,])$E)) { # 25 stocks
+#     
+#   }
+#     for (k in 1:length(obj$report(post))) { # 7 parameters
+#       deripost[i, k] <- r[k]
+#         # creating an error b/c r[k] has 25 objects within it
+#     }
+# }
+
+# Alternate method of 7 matrices of 25 by 18000
+  # Create matrices
+    # Define dimensions
+n_rows <- 18000
+# n_cols <- 25 # This will be subject to change depending on the variable
+n_cols <- sapply(obj$report(post), function(x) length(x))
+n_matrices <- 7
+
+# This takes A LONG time - requires speeding up
+# for (k in 1:length(obj$report(post))) { # 7 Total
+#   for (j in 1:length(obj$report(post[1,])[1][[1]])) { # 25 Total
+#     for (i in 1:nrow(post)) { # 18000 Total
+#       matrices[k][[k]][j] <- obj$report(post[i,])[k][[1]][[j]]
+#     }
+#   }
+# }
+
+# Vectorized form of above
+# matrices <- lapply(1:n_matrices, function(x) matrix(NA, nrow = n_rows, ncol = n_cols))
+matrices <- lapply(seq_len(n_matrices), function(k) {
+  matrix(NA, nrow = n_rows, ncol = n_cols[k])
+})
+  # This needs to be changed such that the matrix made is matched to the length
+  # of the parameter it is describing
+names(matrices) <- names(obj$report(post[1,]))
+    # Perform the nested loop
+
+pb <- txtProgressBar(min = 0, max = n_rows, style = 3)
+report_i <- NULL
+for (i in 1:n_rows) {  # Outer loop over rows of 'post'
+  report_i <- obj$report(post[i,])  # Extract report once per row
+  for (k in 1:n_matrices) {  # Loop over matrices
+    for (j in 1:n_cols) {  # Loop over columns
+      matrices[[k]][i, j] <- report_i[[k]][[j]]  # Fill pre-allocated matrices
+    }
   }
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+  # This produces 7 different matrices - 1 for each derived parameter
+  # Each matrix is 25 columns by 18000 rows
+
+pb <- txtProgressBar(min = 0, max = n_rows, style = 3)
+for (i in seq_len(n_rows)) {  
+  report_i <- obj$report(post[i,])  
+  for (k in seq_len(n_matrices)) {  # This is pretty instant
+    matrices[[k]][i, seq_len(n_cols[k])] <- report_i[[k]]
+  }
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+
+# The next step is to make these more usable for final data visualization etc.
+  # Therefore we need: 
+    # - Mean
+    # - Median
+    # - Quantiles (5% and 95%)
+    # - Std. Error?
+  # In the form of columns: Stockname, PAR X mean, PAR X median, PAR X LQ, PAR X UQ, etc...
+    # Therefore for each matrix I need the following transformations:
+      # - Extract mean, median, and quantile
+      # - Create a new dataframe PER PARAMETER w/ Stock, Mean, Median, LQ, UQ columns
+      # - Merge these dataframe's together if needed
+      # - Or make a generalized statement for them to be added to
+
+# summary(coda::mcmc(matrices$E))
+# quantile(matrices$E, probs = c(0.05, 0.95))
+# apply(matrices$E, 2 , median) or for mean - 2 refers to BY COLUMN
+
+# The following code needs to be generalized to be looped over
+# testdf <- data.frame(
+#   Stock = character(25),
+#   Mean = numeric(25),
+#   Median = numeric(25),
+#   LQ = numeric(25),
+#   UQ = numeric(25)
+# )
+# 
+# testdf$Stock <- c(1:ncol(matrices$E))
+# testdf$Mean <- apply(matrices$E, 2 , mean)
+# testdf$Median <- apply(matrices$E, 2 , median)
+# testdf$LQ <- apply(matrices$E, 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
+# testdf$UQ <- apply(matrices$E, 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
+
+# Loop above
+  # 1. Create a series of blank df's like the matrices
+  # 2. loop through the above creations
+# Use replicate to create 7 identical dataframes
+dataframes <- lapply(seq_len(n_matrices), function(k) {
+  data.frame(
+    Stock = character(n_cols[k]),
+    Mean = numeric(n_cols[k]),
+    Median = numeric(n_cols[k]),
+    LQ_5 = numeric(n_cols[k]),
+    UQ_95 = numeric(n_cols[k])
+  )
+})
+names(dataframes) <- names(matrices)
+
+for (i in 1:n_matrices) {
+  dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
+  dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
+  dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
+  dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
+  dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
 }
 
-outsmatrix <- matrix(0, nrow = nrow(post), ncol = length(report))
-for(i in 1:nrow(post)){
-  r <- obj$report(post[i,-ncol(post)])
-  outsmatrix[i] <- r$E
-}
+# Now have dataframes that can be joined by stock id for E_tar (SREP), SMSY, and SGEN
+# ******************************************************************************
 
-# Below doesn't work because 
-obj$report(post[1,-ncol(post)]) # sd0 is only element
-E <- rep(NA, length.out=nrow(post))
-for(i in 1:nrow(post)){
-  r <- obj$report(post) # -ncol(post) is doing nothing
-  E[i] <- r$E
-}
+# Next step is to plot them against the LoopedIWAMruns.R point comparison plot
+  # to see how the MCMC and Liermann model stand up against others
+  # Most importantly - how the quantiles appear.
 
 
 
+
+
+
+  
+# ******************************************************************************
 ## Let's get posterior samples for all our REPORTS.
 # https://github.com/pbs-assess/renewassess/blob/main/material/RTMB%20Recap%20and%20Nimble%20Demo/Jacobians.Rmd
-
 post <- as.matrix(fit.stan)
 report <- obj$report()
 post.report <- matrix(0,  nrow = nrow(post), ncol = length(report))
@@ -502,24 +694,15 @@ for (i in 1:nrow(post)) { # 18000 iterations
     post.report[i, k] <- obj$report(post[i,k])
   }
 }
-  post.report[i,] <- do.call('c', 
-                             obj$report(post[i,seq_along(obj$par)]))
-
+  post.report[i,] <- do.call('c', obj$report(post[i,seq_along(obj$par)]))
+  
 summary(coda::mcmc(post.report))
 
 
-
-# ## Let's get posterior samples for all our REPORTS.
-# post <- as.matrix(fitstan)
-# post.report <- NULL
-# for( i in 1:nrow(post) )
-#   post.report <- rbind(post.report, 
-#                        unlist(obj$report(post[i,seq_along(obj$par)])))
-# 
-# sum.out <- summary(coda::mcmc(post.report))
-# summary <- data.frame(do.call('cbind', sum.out))
-# summary$params <- rownames(summary)
-
+# ******************************************************************************
+# Posterior
+library(posterior)
+summarise_draws(fitstan)
 
 
 # Rstan and tidybayes
