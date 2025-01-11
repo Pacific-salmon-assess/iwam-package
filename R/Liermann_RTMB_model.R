@@ -7,11 +7,6 @@
 # using explicit betas (intercepts and slopes)
 # The following wrapper function will initially focus only on the explicit model.
 
-# MODEL DESCRIPTION ####
-
-# This is the model from Liermann et al. (CITATION YEAR).
-# ....
-
 # Libaries ####
 library(RTMB)
 library(ggplot2)
@@ -27,9 +22,7 @@ source(here::here("R/LambertWs.R"))
 compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 # seems not to run on the first attempt - answers [3] instead of [0]
 
-# Internal running
-# WAin <- c("DataIn/WCVIStocks.csv")
-# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+# Saves for internal runs without the wrapper function
 WAin <- c("DataIn/Parken_evalstocks.csv")
 nsim <- 10
 
@@ -49,15 +42,20 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   
   pb <- progress_bar$new(total = nsim)
   
+  # Original LambertW0
   LambertW0 <- RTMB:::ADjoint(LambertW0_internal, dLambertW0_internal)
+  
+  # New LambertW0
+  # See: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
+  # LambertW0 <- ADjoint(
+  #   function(x){gsl::lambert_W0(x)},
+  #   function(x, y, dy) {dy / (x + exp(y))}
+  # )
   
   # Data ####
   srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
   WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
-  # WAin <- read.csv(here::here("DataIn/WCVIStocks.csv"))
   WAin <- read.csv(here::here(WAin))
-  # WAin2 = read.csv(here::here(c("DataIn/Ordered_backcalculated_noagg.csv")))
-  
   
   # Data setup ####
   srdatwna <- srdatwna %>% 
@@ -96,7 +94,6 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     summarize(lh=max(Stream))
   
   ## RTMB dat and par setup ####
-  
   # Dat
   dat <- list(srdat = srdat,
               WAbase = WAbase,
@@ -159,6 +156,8 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
       nll <- nll - sum(dnorm(rm, 0.6, sd = 0.45, log = TRUE)) # Liermann prior table
       nll <- nll - sum(dnorm(hj[i], 0, sd  = logAlphaSD, log = TRUE)) # Liermann prior table
       logAlpha[i] <- rm + hj[i]
+      # Re-write as a non-zero distribution, e.g.
+       # nll <- nll - sum(dnorm())
       
       nll <- nll - sum(dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE))
     }
@@ -177,10 +176,12 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     
     # MAKE SURE THIS MIRRORS ABOVE - with terms - match terms to param list too
     for (i in 1:N_Pred){
-      nll <- nll - sum(dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE)) # ***
-      # nll <- nll - sum(dnorm(rm, 0.6, sd = 0.45, log = TRUE)) # IS THIS NECESSARY HERE?
-      logAlpha_tar[i] <- rm + hj_pred[i] # *************************************
+      nll <- nll - sum(dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE)) 
+      logAlpha_tar[i] <- rm + hj_pred[i]
 
+      nll <- nll - sum(dnorm(hj_pred[i], rm, sd = logAlphaSD, log = TRUE))
+      # hj_pred[i] goes onwards instead of logAlpha_tar[i]
+      
       # Predict E for target watershed areas
       nll <- nll - sum(dnorm(logE0_pred[i], 0, sd = logESD, log = TRUE))
       log_E_tar[i] <- b0[type[i]] + bWA[type[i]]*WAin$logWAshifted_t[i] + logE0_pred[i]
@@ -193,7 +194,6 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
       # Predict SGEN
       SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logAlpha_tar[i])))
     }
-    
     
     ## ADREPORT - internals
       # ALWAYS THE NUMBER OF SYNOPTIC SETS - RN 25
@@ -236,6 +236,7 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   obj <- RTMB::MakeADFun(f_srep,
                          par,
                          random = c("hj", "hj_pred", "logE0", "logE0_pred"),
+                         # random = c("hj", "logE0"),
                          silent=TRUE)
   
   # New limits
@@ -246,12 +247,6 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   lower[names(obj$par) == "logESD"] <- 0
   upper[names(obj$par) == "logAlphaSD"] <- 100
   lower[names(obj$par) == "logAlphaSD"] <- 0
-  
-  # old limits:
-  # upper <- unlist(obj$par)
-  # upper[1:length(upper)]<- Inf
-  # lower <- unlist(obj$par)
-  # lower[1:length(lower)]<- -Inf
   # Tor: Limits (upper/lower) for nlminb do not seem to effect the convergence
     # or objective function
   
@@ -265,6 +260,31 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   )
                 
   # osdr <- sdreport(obj)
+  
+  # SAVE MLE ####
+  sdr <- RTMB::sdreport(obj)
+  sdr_full <- summary(RTMB::sdreport(obj))
+
+  sdr_est <- as.list(sdr, "Est", report=TRUE) ## ADREPORT estimates
+  sdr_se <- as.list(sdr, "Std", report=TRUE) ## ADREPORT standard error
+
+  # Create the correct quantiles for E
+  # log_E_tar for sdr_est and sdr_se
+  # Must first calculate their quantile in log-space AND THEN exponentiate
+  E_quant <- cbind(WAin,
+    E_tar = exp(sdr_est$log_E_tar), # Mean
+    E_LQ = exp(sdr_est$log_E_tar - (sdr_se$log_E_tar*1.96)), # E LQ
+    E_UQ = exp(sdr_est$log_E_tar + (sdr_se$log_E_tar*1.96)), # E UQ
+    SGEN.Mean = sdr_est$SGEN, # SGEN
+    SGEN.LQ = sdr_est$SGEN - (sdr_se$SGEN*1.96),
+    SGEN.UQ = sdr_est$SGEN + (sdr_se$SGEN*1.96),
+    SMSY.Mean = sdr_est$SMSY, # SMSY
+    SMSY.LQ = sdr_est$SMSY - (sdr_se$SMSY*1.96),
+    SMSY.UQ = sdr_est$SMSY + (sdr_se$SMSY*1.96)
+  )
+  
+  rtmb_full <- E_quant
+  # rtmb <- E_quant # Saved as version with no nll for predictions
   
   # Simulate #### THIS SECTION IS COMMENTED OUT ####
   # sgen = smsy = beta = NULL
@@ -389,14 +409,25 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
 }
 
 # Run the function test ####
-test_srep <- lier_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
-                           # Parken_evalstocks.csv
-                           # WCVIStocks.csv
-                           nsim = 10) # default test run for outputs
+# test_srep <- lier_rtmb(WAin = c("DataIn/Parken_evalstocks.csv"),
+#                            # Parken_evalstocks.csv
+#                            # WCVIStocks.csv
+#                            nsim = 10) # default test run for outputs
 
 source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
 derived_obj <- derived_post(fitstan)
 
+# Test plots
+traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
+pairs(fitstan, pars=names(obj$par))
+
+
+# Saving for plotting
+# rtmb_full <- rtmb_full |> 
+#    rename("Stock_name" = Stock_num)
+# testfull <- cbind(rtmb_full, derived_obj$deripost_summary$SMSY)
+
+# ******************************************************************************
 ## MCMC run through tmbstan - OUTSIDE OF FUNCTION ####
 
 # Create a initial value function 
@@ -437,53 +468,53 @@ derived_obj <- derived_post(fitstan)
 #   )
 # }
 
-initf2 <- function(){
-  list(b0 = c(10, 10), # Initial values for WA regression intercepts
-       bWA = c(0, 0), # Inital values for WA regression slopes
-       
-       logE0 = numeric(N_Stk),
-       logE0_pred = numeric(nrow(dat$WAin)),
-       hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
-       hj_pred = numeric(nrow(dat$WAin)),
-          # WAin or WAbase
-       rm = 1,
-       
-       tauobs = 0.01 + numeric(N_Stk),
-       
-       logESD = 1,
-       logAlphaSD = 1
-       )
-}
-
-# Run the cores using:
-  # obj <- RTMB object
-  # init <- initial value function defined above
-  # rest of usual chain and iter parameters
-
-# Create bounds - moved upwards to creation of rtmb obj
-upper <- numeric(length(obj$par)) + Inf
-lower <- numeric(length(obj$par)) + -Inf
-
-lower[names(obj$par) == "tauobs"] <- 0
-upper[names(obj$par) == "logESD"] <- 100
-lower[names(obj$par) == "logESD"] <- 0
-upper[names(obj$par) == "logAlphaSD"] <- 100
-lower[names(obj$par) == "logAlphaSD"] <- 0
-
-fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = initf2,
-                   lower = lower, upper = upper,
-                   chains = 4, open_progress = FALSE, silent = TRUE)
-  # Can I add in a beepr?
-# https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
-# Examine the pairs() plot to diagnose sampling problems
-
-source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
-derived_obj <- derived_post(fitstan)
-  # Will contain df and matrices of derived posteriors
-
-# Test plots
-traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
-pairs(fitstan, pars=names(obj$par))
+# initf2 <- function(){
+#   list(b0 = c(10, 10), # Initial values for WA regression intercepts
+#        bWA = c(0, 0), # Inital values for WA regression slopes
+#        
+#        logE0 = numeric(N_Stk),
+#        logE0_pred = numeric(nrow(dat$WAin)),
+#        hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
+#        hj_pred = numeric(nrow(dat$WAin)),
+#           # WAin or WAbase
+#        rm = 1,
+#        
+#        tauobs = 0.01 + numeric(N_Stk),
+#        
+#        logESD = 1,
+#        logAlphaSD = 1
+#        )
+# }
+# 
+# # Run the cores using:
+#   # obj <- RTMB object
+#   # init <- initial value function defined above
+#   # rest of usual chain and iter parameters
+# 
+# # Create bounds - moved upwards to creation of rtmb obj
+# upper <- numeric(length(obj$par)) + Inf
+# lower <- numeric(length(obj$par)) + -Inf
+# 
+# lower[names(obj$par) == "tauobs"] <- 0
+# upper[names(obj$par) == "logESD"] <- 100
+# lower[names(obj$par) == "logESD"] <- 0
+# upper[names(obj$par) == "logAlphaSD"] <- 100
+# lower[names(obj$par) == "logAlphaSD"] <- 0
+# 
+# fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = initf2,
+#                    lower = lower, upper = upper,
+#                    chains = 4, open_progress = FALSE, silent = TRUE)
+#   # Can I add in a beepr?
+# # https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
+# # Examine the pairs() plot to diagnose sampling problems
+# 
+# source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
+# derived_obj <- derived_post(fitstan)
+#   # Will contain df and matrices of derived posteriors
+# 
+# # Test plots
+# traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
+# pairs(fitstan, pars=names(obj$par))
 
 
 
@@ -562,10 +593,10 @@ hist(post[,'bWA[1]'])
 # Alternate method of 7 matrices of 25 by 18000
   # Create matrices
     # Define dimensions
-n_rows <- 18000
-# n_cols <- 25 # This will be subject to change depending on the variable
-n_cols <- sapply(obj$report(post), function(x) length(x))
-n_matrices <- 7
+# n_rows <- 18000
+# # n_cols <- 25 # This will be subject to change depending on the variable
+# n_cols <- sapply(obj$report(post), function(x) length(x))
+# n_matrices <- 7
 
 # This takes A LONG time - requires speeding up
 # for (k in 1:length(obj$report(post))) { # 7 Total
@@ -578,38 +609,38 @@ n_matrices <- 7
 
 # Vectorized form of above
 # matrices <- lapply(1:n_matrices, function(x) matrix(NA, nrow = n_rows, ncol = n_cols))
-matrices <- lapply(seq_len(n_matrices), function(k) {
-  matrix(NA, nrow = n_rows, ncol = n_cols[k])
-})
-  # This needs to be changed such that the matrix made is matched to the length
-  # of the parameter it is describing
-names(matrices) <- names(obj$report(post[1,]))
-    # Perform the nested loop
-
-pb <- txtProgressBar(min = 0, max = n_rows, style = 3)
-report_i <- NULL
-for (i in 1:n_rows) {  # Outer loop over rows of 'post'
-  report_i <- obj$report(post[i,])  # Extract report once per row
-  for (k in 1:n_matrices) {  # Loop over matrices
-    for (j in 1:n_cols) {  # Loop over columns
-      matrices[[k]][i, j] <- report_i[[k]][[j]]  # Fill pre-allocated matrices
-    }
-  }
-  setTxtProgressBar(pb, i)
-}
-close(pb)
-  # This produces 7 different matrices - 1 for each derived parameter
-  # Each matrix is 25 columns by 18000 rows
-
-pb <- txtProgressBar(min = 0, max = n_rows, style = 3)
-for (i in seq_len(n_rows)) {  
-  report_i <- obj$report(post[i,])  
-  for (k in seq_len(n_matrices)) {  # This is pretty instant
-    matrices[[k]][i, seq_len(n_cols[k])] <- report_i[[k]]
-  }
-  setTxtProgressBar(pb, i)
-}
-close(pb)
+# matrices <- lapply(seq_len(n_matrices), function(k) {
+#   matrix(NA, nrow = n_rows, ncol = n_cols[k])
+# })
+#   # This needs to be changed such that the matrix made is matched to the length
+#   # of the parameter it is describing
+# names(matrices) <- names(obj$report(post[1,]))
+#     # Perform the nested loop
+# 
+# pb <- txtProgressBar(min = 0, max = n_rows, style = 3)
+# report_i <- NULL
+# for (i in 1:n_rows) {  # Outer loop over rows of 'post'
+#   report_i <- obj$report(post[i,])  # Extract report once per row
+#   for (k in 1:n_matrices) {  # Loop over matrices
+#     for (j in 1:n_cols) {  # Loop over columns
+#       matrices[[k]][i, j] <- report_i[[k]][[j]]  # Fill pre-allocated matrices
+#     }
+#   }
+#   setTxtProgressBar(pb, i)
+# }
+# close(pb)
+#   # This produces 7 different matrices - 1 for each derived parameter
+#   # Each matrix is 25 columns by 18000 rows
+# 
+# pb <- txtProgressBar(min = 0, max = n_rows, style = 3)
+# for (i in seq_len(n_rows)) {  
+#   report_i <- obj$report(post[i,])  
+#   for (k in seq_len(n_matrices)) {  # This is pretty instant
+#     matrices[[k]][i, seq_len(n_cols[k])] <- report_i[[k]]
+#   }
+#   setTxtProgressBar(pb, i)
+# }
+# close(pb)
 
 # The next step is to make these more usable for final data visualization etc.
   # Therefore we need: 
@@ -647,24 +678,24 @@ close(pb)
   # 1. Create a series of blank df's like the matrices
   # 2. loop through the above creations
 # Use replicate to create 7 identical dataframes
-dataframes <- lapply(seq_len(n_matrices), function(k) {
-  data.frame(
-    Stock = character(n_cols[k]),
-    Mean = numeric(n_cols[k]),
-    Median = numeric(n_cols[k]),
-    LQ_5 = numeric(n_cols[k]),
-    UQ_95 = numeric(n_cols[k])
-  )
-})
-names(dataframes) <- names(matrices)
-
-for (i in 1:n_matrices) {
-  dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
-  dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
-  dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
-  dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
-  dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
-}
+# dataframes <- lapply(seq_len(n_matrices), function(k) {
+#   data.frame(
+#     Stock = character(n_cols[k]),
+#     Mean = numeric(n_cols[k]),
+#     Median = numeric(n_cols[k]),
+#     LQ_5 = numeric(n_cols[k]),
+#     UQ_95 = numeric(n_cols[k])
+#   )
+# })
+# names(dataframes) <- names(matrices)
+# 
+# for (i in 1:n_matrices) {
+#   dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
+#   dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
+#   dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
+#   dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
+#   dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
+# }
 
 # Now have dataframes that can be joined by stock id for E_tar (SREP), SMSY, and SGEN
 # ******************************************************************************
@@ -682,25 +713,25 @@ for (i in 1:n_matrices) {
 # ******************************************************************************
 ## Let's get posterior samples for all our REPORTS.
 # https://github.com/pbs-assess/renewassess/blob/main/material/RTMB%20Recap%20and%20Nimble%20Demo/Jacobians.Rmd
-post <- as.matrix(fit.stan)
-report <- obj$report()
-post.report <- matrix(0,  nrow = nrow(post), ncol = length(report))
-colnames(post.report) <- names(report)
-
-for (i in 1:nrow(post)) { # 18000 iterations 
-  # i is length of post
-  # need a second one that is k for length of report
-  for (k in 1:length(report)) {
-    post.report[i, k] <- obj$report(post[i,k])
-  }
-}
-  post.report[i,] <- do.call('c', obj$report(post[i,seq_along(obj$par)]))
+# post <- as.matrix(fit.stan)
+# report <- obj$report()
+# post.report <- matrix(0,  nrow = nrow(post), ncol = length(report))
+# colnames(post.report) <- names(report)
+# 
+# for (i in 1:nrow(post)) { # 18000 iterations 
+#   # i is length of post
+#   # need a second one that is k for length of report
+#   for (k in 1:length(report)) {
+#     post.report[i, k] <- obj$report(post[i,k])
+#   }
+# }
+#   post.report[i,] <- do.call('c', obj$report(post[i,seq_along(obj$par)]))
   
 summary(coda::mcmc(post.report))
 
 
 # ******************************************************************************
-# Posterior
+# Posterior package usage
 library(posterior)
 summarise_draws(fitstan)
 

@@ -174,110 +174,114 @@ cols <- viridis(8, alpha=0.9, option = "mako", direction = -1)
 
 ggplot() + # SMSY_tmb_v, aes(x = Stock, y = SMSY_i)
   
-  geom_errorbar(data = SMSY_tmb_v, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
-                                       color = 'Static 0.66',
-                                       width=.1)) +
-  geom_point(data = SMSY_tmb_v,
-             aes(x = Stock, y = SMSY_i, color = 'Static 0.66')) +
+  # geom_errorbar(data = SMSY_tmb_v, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  #                                      color = 'Static 0.66',
+  #                                      width=.1)) +
+  # geom_point(data = SMSY_tmb_v,
+  #            aes(x = Stock, y = SMSY_i, color = 'Static 0.66')) +
   
   
-  geom_errorbar(data = SMSY_tmb_v.4, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
-                                         color = "Static 0.4",
-                                         width=.1),
-                position = position_nudge(0.1)) +
-  geom_point(data = SMSY_tmb_v.4,
-             position = position_nudge(0.1),
-             aes(x = Stock, y = SMSY_i, color = "Static 0.4")) +
+  # geom_errorbar(data = SMSY_tmb_v.4, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  #                                        color = "Static 0.4",
+  #                                        width=.1),
+  #               position = position_nudge(0.1)) +
+  # geom_point(data = SMSY_tmb_v.4,
+  #            position = position_nudge(0.1),
+  #            aes(x = Stock, y = SMSY_i, color = "Static 0.4")) +
   
-  geom_errorbar(data = SMSY_tmb_v.8, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
-                                         color = "Static 0.8",
-                                         width=.1),
-                position = position_nudge(-0.1)) +
-  geom_point(data = SMSY_tmb_v.8,
-             position = position_nudge(-0.1),
-             aes(x = Stock, y = SMSY_i, color = "Static 0.8")) + 
+  # geom_errorbar(data = SMSY_tmb_v.8, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  #                                        color = "Static 0.8",
+  #                                        width=.1),
+  #               position = position_nudge(-0.1)) +
+  # geom_point(data = SMSY_tmb_v.8,
+  #            position = position_nudge(-0.1),
+  #            aes(x = Stock, y = SMSY_i, color = "Static 0.8")) + 
   
-  geom_errorbar(data = SMSY_tmb_v1, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
-                                        color = "Static 1",
-                                        width=.1),
-                position = position_nudge(-0.2)) +
-  geom_point(data = SMSY_tmb_v1,
-             position = position_nudge(-0.2),
-             aes(x = Stock, y = SMSY_i, color = "Static 1")) +
+  # geom_errorbar(data = SMSY_tmb_v1, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  #                                       color = "Static 1",
+  #                                       width=.1),
+  #               position = position_nudge(-0.2)) +
+  # geom_point(data = SMSY_tmb_v1,
+  #            position = position_nudge(-0.2),
+  #            aes(x = Stock, y = SMSY_i, color = "Static 1")) +
   
-  geom_errorbar(data = SMSY_tmb_d, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
-                                        color = "IWAM Default",
-                                       width=.1),
-                position = position_nudge(-0.3)) +
-  geom_point(data = SMSY_tmb_d,
-             position = position_nudge(-0.3),
-             aes(x = Stock, y = SMSY_i, color = "IWAM Default")) +
+  # geom_errorbar(data = SMSY_tmb_d, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  #                                       color = "IWAM Default",
+  #                                      width=.1),
+  #               position = position_nudge(-0.3)) +
+  # geom_point(data = SMSY_tmb_d,
+  #            position = position_nudge(-0.3),
+  #            aes(x = Stock, y = SMSY_i, color = "IWAM Default")) +
   
-  geom_errorbar(data = SMSY_tmb_b, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
-                                       color = "close to zero",
-                                       width=.1),
-                position = position_nudge(.2)) +
-  geom_point(data = SMSY_tmb_b,
-             position = position_nudge(.2),
-             aes(x = Stock, y = SMSY_i, color = "close to zero")) +
+  # geom_errorbar(data = SMSY_tmb_b, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  #                                      color = "close to zero",
+  #                                      width=.1),
+  #               position = position_nudge(.2)) +
+  # geom_point(data = SMSY_tmb_b,
+  #            position = position_nudge(.2),
+  #            aes(x = Stock, y = SMSY_i, color = "close to zero")) +
   
-  geom_errorbar(data = parken, aes(x = Stock, y = SMSY_i, ymax = lwr, ymin = upr,
+  # Re-written as the Parken model is included in WAin - bound to rtmb MLE version
+  geom_errorbar(data = rtmb_full, aes(x = Stock_name, y = SMSY, ymax = SMSY_95, ymin = SMSY_5,
                                        color = "Parken",
                                        width=.1),
-                position = position_nudge(-0.4)) +
-  geom_point(data = parken,
-             position = position_nudge(-0.4),
-             aes(x = Stock, y = SMSY_i, color = "Parken")) +
+                # position = position_nudge(-0.4)
+    ) +
+  geom_point(data = rtmb_full,
+             # position = position_nudge(-0.4),
+             aes(x = Stock_name, y = SMSY, color = "Parken")) +
   
   # Add in RTMB from IWAMsrep_RTMB_model.R as a global object (run internal - function is broken)
     # otherwise comment this one out
-  geom_errorbar(data = rtmb, aes(x = Stock, y = SMSY.Mean, ymax = SMSY.LQ, ymin = SMSY.UQ,
+  # rtmb <- no nll with predictions
+  # rtmb_full <- original
+  geom_errorbar(data = testfull, aes(x = Stock_name, y = SMSY.Mean, ymax = SMSY.UQ, ymin = SMSY.LQ,
                                    color = "RTMB MLE",
                                    width=.1),
-                position = position_nudge(-0.5)) +
-  geom_point(data = rtmb,
-             position = position_nudge(-0.5),
-             aes(x = Stock, y = SMSY.Mean, color = "RTMB MLE")) +
+                position = position_nudge(-0.2)) +
+  geom_point(data = testfull,
+             position = position_nudge(-0.2),
+             aes(x = Stock_name, y = SMSY.Mean, color = "RTMB MLE")) +
   
   # Add in LIERMANN from Liermann_RTMB_model.R as a global object
     # otherwise comment this one out
     # Global object transform: derived_obj --> derived_obj$deripost_summary$SMSY
-  geom_errorbar(data = derived_obj$deripost_summary$SMSY, aes(x = Stock,
-                                                              y = Mean,
-                                                              ymax = UQ_95, 
-                                                              ymin = LQ_5,
+  geom_errorbar(data = testfull, aes(x = Stock_name,
+                                     y = Mean,
+                                     ymax = UQ_95, 
+                                     ymin = LQ_5,
                                  color = "Liermann MCMC",
                                  width=.1),
-                position = position_nudge(-0.6)) +
-  geom_point(data = derived_obj$deripost_summary$SMSY,
-             position = position_nudge(-0.6),
-             aes(x = Stock, y = Mean, color = "Liermann MCMC")) +
+                position = position_nudge(+0.2)) +
+  geom_point(data = testfull,
+             position = position_nudge(+0.2),
+             aes(x = Stock_name, y = Mean, color = "Liermann MCMC")) +
   
   theme_classic() +
   scale_y_continuous(transform = "log", 
-                     breaks = c(0, 10, 100, 1000, 10000, 100000)) +
+                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
   ylab(TeX("$S_{MSY}$ Estimate")) +
   xlab("Stock Name") + 
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
   scale_color_manual(name='Model',
-                     breaks=c('Static 0.4',
-                              'Static 0.66',
-                              'Static 0.8',
-                              'Static 1',
-                              'IWAM Default',
-                              'close to zero',
+                     breaks=c(# 'Static 0.4',
+                              # 'Static 0.66',
+                              # 'Static 0.8',
+                              # 'Static 1',
+                              # 'IWAM Default',
+                              # 'close to zero',
                               'Parken',
                               'RTMB MLE',
                               'Liermann MCMC'),
-                     values=c('Static 0.4' = cols[1],
-                              'Static 0.66' = cols[2],
-                              'Static 0.8' = cols[3],
-                              'Static 1' = cols[4],
-                              'close to zero' = cols[5],
-                              'IWAM Default' = "orange",
-                              'Parken' = cols[7],
-                              'RTMB MLE' = "red",
-                              'Liermann MCMC' = "black"))
+                     values=c(# 'Static 0.4' = cols[1],
+                              # 'Static 0.66' = cols[2],
+                              # 'Static 0.8' = cols[3],
+                              # 'Static 1' = cols[4],
+                              # 'close to zero' = cols[5],
+                              # 'IWAM Default' = "orange",
+                              'Parken' = "black",
+                              'RTMB MLE' = "orange",
+                              'Liermann MCMC' = "skyblue"))
 
 
 

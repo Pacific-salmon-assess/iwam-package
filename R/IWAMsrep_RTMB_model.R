@@ -259,6 +259,8 @@ opt <- nlminb(obj$par,
 
 osdr <- sdreport(obj)
 
+# Get 
+
 # Simulate ####
 sgen = smsy = beta = NULL
 # obj$simulate() # 1000 times in a for loop and then track it - as a bootstrap
