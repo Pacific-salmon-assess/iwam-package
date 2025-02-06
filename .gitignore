@@ -338,3 +338,4 @@ DataOut/WAregSREP_test_ricaltgamma_wagammaprec_IWAM_Liermann_wBC.png
 DataOut/rtmb_dataout_target_ocean_wEnh.csv
 DataOut/rtmb_dataout_target_ocean_wEnh.csv
 R/derived_post2.R
+R/PosteriorPredictiveSample.r

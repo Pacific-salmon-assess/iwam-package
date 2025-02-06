@@ -10,7 +10,7 @@ derived_post <- function(x) {
   # MATRIX EXTRACTION of full samples
   n_rows <- 18000
   n_cols <- sapply(obj$report(post), function(x) length(x))
-  n_matrices <- 7
+  n_matrices <- length(n_cols)
   
   matrices <- lapply(seq_len(n_matrices), function(k) {
     matrix(NA, nrow = n_rows, ncol = n_cols[k])

@@ -36,15 +36,12 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
                           # plot = FALSE # whether or not to create plots stored in DataOut/
 )
 {
-
-  # Just in case atm
   # compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
   
   pb <- progress_bar$new(total = nsim)
   
   # Original LambertW0
   LambertW0 <- RTMB:::ADjoint(LambertW0_internal, dLambertW0_internal)
-  
   # New LambertW0
   # See: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
   # LambertW0 <- ADjoint(
@@ -93,8 +90,8 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     group_by(Stocknumber) %>% 
     summarize(lh=max(Stream))
   
-  ## RTMB dat and par setup ####
-  # Dat
+  ## RTMB data and par setup ####
+  # Data
   dat <- list(srdat = srdat,
               WAbase = WAbase,
               WAin = WAin,
@@ -103,15 +100,17 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   # External vectors
   N_Stk <- max(srdat$Stocknumber + 1) # 25
   
-  # Parameters/Initial values
+  # Parameters
   par <- list(b0 = c(10, 10), # Initial values for WA regression intercepts
               bWA = c(0, 0), # Inital values for WA regression slopes
               
+              # logE = numeric(N_Stk), # Was logE0
               logE0 = numeric(N_Stk),
-              logE0_pred = numeric(nrow(dat$WAin)), # Targets
+              # logE_tar = numeric(nrow(dat$WAin)), # Targets, was logE0_tar
+              logE0_tar = numeric(nrow(dat$WAin)),
               rm = 1,
-              hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
-              hj_pred = numeric(nrow(dat$WAin)),
+              # hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
+              # hj_pred = numeric(nrow(dat$WAin)),
 
               tauobs = 0.01 + numeric(N_Stk),
 
@@ -131,33 +130,41 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     type = lifehist$lh + 1
     
     E <- numeric(N_Stk)
-    log_E <- numeric(N_Stk)
+    logE <- numeric(N_Stk)
     logAlpha <- numeric(N_Stk) # comment on or off
     
     E_tar <- numeric(N_Pred)
-    log_E_tar <- numeric(N_Pred)
+    logE_tar <- numeric(N_Pred)
     logAlpha_tar <- numeric(N_Pred)
+    
+    # logE_pred <- numeric(N_Stk)
+    # logE_pred_tar <- numeric(N_Pred)
     
     nll <- 0
     
     nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE))
     nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE))
-    nll <- nll - sum(dnorm(bWA[1], 10, sd = 31.6, log = TRUE)) 
+    nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Was 10, 31.6
     nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE))
+    
+    nll <- nll - sum(dnorm(rm, 0.6, sd = 0.45, log = TRUE)) # New position.
     
     ## Second level of hierarchy - Ricker parameters:
     for ( i in 1:N_Stk){
-      nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE))
-
-      log_E <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i]
-      E[i] <- exp(log_E)
+      # logE_pred[i] <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] # + logE0[i]
+      # nll <- nll - sum(dnorm(logE[i], logE_pred[i], sd = logESD, log = TRUE))
+      # E[i] <- exp(logE[i])
       
-        # incompatible types in sub-assignment type fix
-      nll <- nll - sum(dnorm(rm, 0.6, sd = 0.45, log = TRUE)) # Liermann prior table
+      nll <- nll - sum(dnorm(logE0[i], 0, sd = logESD, log = TRUE))
+      logE <- b0[type[i]] + bWA[type[i]]*WAbase$logWAshifted[i] + logE0[i]
+      E[i] <- exp(logE)
+
+            
       nll <- nll - sum(dnorm(hj[i], 0, sd  = logAlphaSD, log = TRUE)) # Liermann prior table
       logAlpha[i] <- rm + hj[i]
-      # Re-write as a non-zero distribution, e.g.
-       # nll <- nll - sum(dnorm())
+      
+      # nll <- nll - sum(dnorm(logAlpha[i], rm, sd = logAlphaSD, log = TRUE)) # Was hj[i] --> logAlpha[i]
+      
       
       nll <- nll - sum(dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE))
     }
@@ -169,23 +176,29 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     }
     
     
+    
     ## PREDICTIONS
     BETA = numeric(nrow(WAin))
     SMSY = numeric(nrow(WAin))
     SGEN = numeric(nrow(WAin))
     
-    # MAKE SURE THIS MIRRORS ABOVE - with terms - match terms to param list too
     for (i in 1:N_Pred){
-      nll <- nll - sum(dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE)) 
-      logAlpha_tar[i] <- rm + hj_pred[i]
-
-      nll <- nll - sum(dnorm(hj_pred[i], rm, sd = logAlphaSD, log = TRUE))
-      # hj_pred[i] goes onwards instead of logAlpha_tar[i]
+      # nll <- nll - sum(dnorm(hj_tar[i], 0, sd = logAlphaSD, log  = TRUE))
+      # logAlpha_tar[i] <- rm + hj_tar[i]
+      # nll <- nll - sum(dnorm(hj_tar[i], rm, sd = logAlphaSD, log = TRUE))
+              # hj_pred[i] goes onwards instead of logAlpha_tar[i]
       
+      logAlpha_tar[i] <- dnorm(logAlpha_tar[i], rm, sd = logAlphaSD, log = TRUE)
+              # What is this alpha?
+
       # Predict E for target watershed areas
-      nll <- nll - sum(dnorm(logE0_pred[i], 0, sd = logESD, log = TRUE))
-      log_E_tar[i] <- b0[type[i]] + bWA[type[i]]*WAin$logWAshifted_t[i] + logE0_pred[i]
-      E_tar[i] <- exp(log_E_tar[i])
+      # logE_pred_tar[i] <- b0[type[i]] + bWA[type[i]]*WAin$logWAshifted_t[i] # + logE0_tar[i]
+      # logE_tar[i] <- dnorm(logE_tar[i], logE_pred_tar[i], sd = logESD, log = TRUE)
+      # E_tar[i] <- exp(logE_tar[i])
+
+      logE0_tar[i] <- dnorm(logE0_tar[i], 0, sd = logESD, log = TRUE)
+      logE_tar[i] <- b0[type[i]] + bWA[type[i]]*WAin$logWAshifted_t[i] + logE0_tar[i]
+      E_tar[i] <- exp(logE_tar[i])
 
       # Predict BETA
       BETA[i] <- logAlpha_tar[i]/E_tar[i]
@@ -198,8 +211,6 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
     ## ADREPORT - internals
       # ALWAYS THE NUMBER OF SYNOPTIC SETS - RN 25
     # ADREPORT(logRS) # logRS for all 501 data points
-    # I think it might be worth it not to report for model speed?
-    # Question: Does ADREPORT slow down RTMB? It is more to calculate.
     ADREPORT(E)
     ADREPORT(logAlpha)
   
@@ -210,8 +221,8 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
       # NUMBER OF PREDICTED STOCKS WILL CHANGE
     # Mean estimate of the median (without bias correction)
     ADREPORT(E_tar) # target E (Srep) (21)
-    ADREPORT(log_E_tar) # exp these for the correct confidence intervals
-    # ADREPORT(logAlpha_tar)
+    ADREPORT(logE_tar) # exp these for the correct confidence intervals
+    ADREPORT(logAlpha_tar)
     
     REPORT(E_tar)
     REPORT(logAlpha_tar)
@@ -229,15 +240,15 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
   }
   
   ## MakeADFun ####
-  # obj <- RTMB::MakeADFun(f_srep,
-  #                        par,
-  #                        random = c("logAlpha_re", "logAlpha_re_pred", "logE0", "logE0_"),
-  #                        silent=TRUE)
   obj <- RTMB::MakeADFun(f_srep,
                          par,
-                         random = c("hj", "hj_pred", "logE0", "logE0_pred"),
-                         # random = c("hj", "logE0"),
                          silent=TRUE)
+  # obj <- RTMB::MakeADFun(f_srep,
+  #                        par,
+  #                        # random = c("hj", "hj_pred", "logE0", "logE0_pred"),
+  #                        # random = c("hj", "logE0"),
+  #                        random = c("logE0", "rm"), # ?
+  #                        silent=TRUE)
   
   # New limits
   upper <- numeric(length(obj$par)) + Inf
@@ -369,7 +380,7 @@ lier_rtmb <- function(WAin = c("DataIn/WCVIStocks.csv"),
          bWA = c(0, 0), # Inital values for WA regression slopes
          
          logE0 = numeric(N_Stk),
-         logE0_pred = numeric(nrow(dat$WAin)),
+         logE0_tar = numeric(nrow(dat$WAin)),
          hj = numeric(nrow(dat$WAbase)), # numeric(nrow(dat$WAbase)) or numeric(N_Stk)
          hj_pred = numeric(nrow(dat$WAin)),
          # WAin or WAbase
