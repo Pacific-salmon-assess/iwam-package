@@ -291,13 +291,11 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init,
 source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
 derived_obj <- derived_post(fitstan)
 
-# Test plots ####
-traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
-# names(obj$par)
-pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
-# pairs(fitstan, pars=names(obj$par))
-pairs(fitstan, pars = pairs_pars) # for specific par names from above
-fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
+# Test and diagnositic plots ####
+# traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
+# pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
+# pairs(fitstan, pars = pairs_pars) # for specific par names from above
+# fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
 
 # Saving for plotting ####
 targets <- WAin |> 
