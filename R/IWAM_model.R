@@ -57,14 +57,14 @@ library(viridis)
 library(hrbrthemes)
 library(beepr) # add sounds upon function completion
 library(tictoc)
-library(furrr)
+# library(furrr)
 
 # Tor- based on your experience with COSEWIC R package, can we remove here::here 
 # to avoid problems when using in pkg? And in the meantime, if we're running 
 # from *.Proj files, a simple source("R/helperFunctions.R") should work.Correct?
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
-source(here::here("R/Get_LRP_bs.R")) # Now no longer includes TMB
+source(here::here("R/Get_LRP_bs.R"))
 
 #### Test wrapper function objects for internal usage  ----------------------------------------
 
@@ -461,7 +461,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   param$logNu1_ocean <- 0
   param$logNu2 <- log(0.72)
   param$Nu2_ocean <- 0
-  param$logNuSigma <- -0.412 #from Parken et al. 2006 where sig=0.66
+  # param$logNuSigma <- -0.412 #from Parken et al. 2006 where sig=0.66
   
   param$logNuSigma <- static_nusigma
 
@@ -1293,12 +1293,13 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       #                     run_logReg = FALSE) 
       #   outBench[[k]] <- out$bench
       # }
-      
+      print(paste("Bootstrapping assumption:", prod, "w/ bias correction =", bias.cor))
       for (k in 1:nBS) {
         # datain must match the above Step 6 for writing output target estimates
         out <- Get.LRP.bs(datain = datain, # "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
                           dataraw = WAinraw,
                           Bern_logistic = FALSE,
+                          bias.cor = bias.cor, # added on/off switch for bias correction terms
                           prod = prod,
                           LOO = NA,
                           run_logReg = FALSE)
@@ -1318,7 +1319,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
     
       stockNames <- read.csv(here::here(datain)) %>% 
-        #  filter(Stock != "Cypre") %>% 
+         filter(Stock != "Cypre") %>% # ********************************************************************** CYPRE FLAG
         pull(Stock)
       stockNames <- unique(stockNames)
       
@@ -1367,39 +1368,39 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
 
   toc()
   #### Table outputs ####
-  if (est.table == TRUE){
-    
-    # Output locations
-      # These locations are specific to WCVI case studies
-    #locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
-
-    # SREP Store
-    SREP_out <- data.frame()
-    SREP_out <- dfout %>%
-      filter(RP=='SREP') %>%
-      #filter(Stock %in% locations) %>%
-      rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
-      mutate(RP = NULL) %>%
-      relocate(Stock)
-
-    # SGEN Store
-    SGEN_out <- data.frame()
-    SGEN_out <- dfout %>%
-      filter(RP=='SGEN') %>%
-      #filter(Stock %in% locations) %>%
-      rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
-      mutate(RP = NULL) %>%
-      relocate(Stock)
-
-    # SMSY Store
-    SMSY_out <-data.frame()
-    SMSY_out <- dfout %>%
-      filter(RP=='SMSY') %>%
-      #filter(Stock %in% locations) %>%
-      rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
-      mutate(RP = NULL) %>%
-      relocate(Stock)
-  }
+  # if (est.table == TRUE){
+  #   
+  #   # Output locations
+  #     # These locations are specific to WCVI case studies
+  #   #locations <- c('Barkley' , 'Clayoquot' , 'Kyuquot' , 'Quatsino' , 'Nootka/Esperanza')
+  # 
+  #   # SREP Store
+  #   SREP_out <- data.frame()
+  #   SREP_out <- dfout %>%
+  #     filter(RP=='SREP') %>%
+  #     #filter(Stock %in% locations) %>%
+  #     rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
+  #     mutate(RP = NULL) %>%
+  #     relocate(Stock)
+  # 
+  #   # SGEN Store
+  #   SGEN_out <- data.frame()
+  #   SGEN_out <- dfout %>%
+  #     filter(RP=='SGEN') %>%
+  #     #filter(Stock %in% locations) %>%
+  #     rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
+  #     mutate(RP = NULL) %>%
+  #     relocate(Stock)
+  # 
+  #   # SMSY Store
+  #   SMSY_out <-data.frame()
+  #   SMSY_out <- dfout %>%
+  #     filter(RP=='SMSY') %>%
+  #     #filter(Stock %in% locations) %>%
+  #     rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
+  #     mutate(RP = NULL) %>%
+  #     relocate(Stock)
+  # }
   
   #### Return function ####
   beep(sound = 2)

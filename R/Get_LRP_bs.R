@@ -66,6 +66,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
                        dataraw = WAinraw, # should be whatever the original input in IWAM_function is e.g. WAinraw
                        remove.EnhStocks = TRUE,  
                        Bern_logistic = FALSE, 
+                       bias.cor = TRUE, # add in bias.cor on/off from IWAM_model inputs
                        prod = "LifeStageModel", 
                        LOO = NA, 
                        run_logReg = FALSE){
@@ -85,11 +86,11 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # if (!remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
   # Remove Cypre as it's not a core indicator (Diana McHugh, 22 Oct 2020)
-  stock_SMSY <- RPs_long %>% # filter(Stock != "Cypre") %>% 
+  stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>%  # ********************************************** CYPRE FLAG
     filter (Param == "SMSY") %>% 
     rename(SMSY=Estimate, SMSYLL=LL, SMSYUL=UL) %>% 
     dplyr::select (-Param, -X) #, -CU)
-  stock_SREP <- RPs_long %>% # filter(Stock != "Cypre") %>% 
+  stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% # ********************************************** CYPRE FLAG
     filter (Param == "SREP") %>% 
     rename(SREP=Estimate, SREPLL=LL, SREPUL=UL) %>% 
     dplyr::select (-Param, -X)
@@ -115,7 +116,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   Scale <- 10^(digits-1)
     # IWAM USES: 10^(maxdigits-1)
   
-  #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96)
+  #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96) **********
   SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96)
   # print(SREP_logSE$SE)
   # The UpperLimit-MLE gives same answer
@@ -167,16 +168,24 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     # (assuming range 0-2.0, mean=1). 0.510*1.96 = 1.0
     
     Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
-    
     if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, Sig.Ric.A))
     
+    if (bias.cor == TRUE) {
+      # print("Bias correction added in bootstrapping")
+      sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, SREP_logSE$SE)) # **
+      if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
+        SREP_logSE$SE))
+    } else {
+      sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE))
+      if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, SREP_SE$SE)) # SREP_SE doesn't exist ***********
+    }
     # sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE)) # **
-    sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, SREP_logSE$SE)) # **
+    # sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, SREP_logSE$SE)) # **
     
-    # if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, 
+    # if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), RPs$SREP,
     #                                      SREP_SE$SE))
-    if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, 
-                                         SREP_SE$SE))
+    # if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
+    #                                      SREP_SE$SE))
 
     SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
       # what are the default parameters of sgen.fn2?
@@ -194,7 +203,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
                          "SREPLL", "SREPUL", "a.par")] #"CU"
     
-  }#End of if(prod == "LifeStageModel")
+  }#End of if(prod == "LifeStageModel6")
   
   # Ricker a's from Diana Dobson's Run Reconstruction (pers.comm) coded in TMB
   # Higher estimate of Ricker a (lower Sgen)  
@@ -274,6 +283,8 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   # PARKEN Method ####
   if(prod == "Parken"){
+    # RPs_e <- RPs # save a version of RPs for explicit calculation
+    
     # print(paste("Productivity Assumption running: Parken"))
     est_loga <- function(SMSY, SREP, shortloga=FALSE){
       
@@ -286,16 +297,11 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
     }
     
-    # Explicit solution for logA
-      # requires definition of SMSY, and SREP
-    loga_2 <- SREP*(SMSY*gsl::lambert_W0(-exp(1-SREP/SMSY)*(SREP-SMSY)/SMSY) + SREP - SMSY)/(SMSY*(SREP-SMSY))
-    beta_2 <- loga_2/SREP
-    
     # Re-label csv's to make sure they are pulling the right ones
       # See above
     # if(!ExtInd) {
-    WCVIStocks <- read.csv(here::here(dataraw)) %>% 
-        filter (Stock != "Cypre") # %>% rename(inlets=Inlet)
+    # WCVIStocks <- read.csv(here::here(dataraw)) %>% 
+    #     filter (Stock != "Cypre") # %>% rename(inlets=Inlet)
           # removed Inlet naming - as most of this code is done without CU's and Inlets
       # if (remove.EnhStocks) wcviRPs_long <- 
       #     read.csv("DataOut/WCVI_SMSY_noEnh_wBC.csv")
@@ -304,6 +310,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     if(remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
     if(!remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
     # }
+    
     # TK: I think ExtInd is FALSE for these runs
     # if(ExtInd) {
     #   WCVIStocks <- read.csv("DataIn/WCVIStocks_ExtInd.csv") %>% 
@@ -316,14 +323,31 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
                                        est_loga)
     
-    # Without log-normal bias correction when sampling log-beta
-    # sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP), SREP_logSE$SE))
-    # With a log-normal bias correction when sampling log-beta
-    sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, 
+    # Explicit solution for logA and beta
+    # SREP_e <- as.numeric(SREP$Estimate)
+    # SMSY_e <- as.numeric(SMSY$Estimate)
+    # loga_e <- SREP_e*(SMSY_e*gsl::lambert_W0(-exp(1-SREP_e/SMSY_e)*(SREP_e-SMSY_e)/SMSY_e) + 
+                # SREP_e - SMSY_e)/(SMSY_e*(SREP_e-SMSY_e))
+    # beta_e <- loga_e/SREP_e
+    
+    if (bias.cor == TRUE) {
+      # print("Bias correction added in bootstrapping")
+          sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
                       SREP_logSE$SE))
-    # if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), wcviRPs$SREP, SREP_SE$SE))
-    if(min(sREP)<0)    sREP <- exp(rnorm(length(Scale), log(wcviRPs$SREP) - 
+      if(min(sREP)<0)    sREP <- exp(rnorm(length(Scale), log(RPs$SREP) -
                                            0.5*SREP_logSE$SE^2, SREP_logSE$SE))
+    } else {
+      sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE))
+      if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, SREP_SE$SE)) # SREP_SE doesn't exist *************
+    }
+    # Without log-normal bias correction when sampling log-beta
+    # sREP <- exp(rnorm(length(Scale), log(RPs$SREP), SREP_logSE$SE))
+    # With a log-normal bias correction when sampling log-beta
+    # sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
+    #                   SREP_logSE$SE))
+    # if(min(sREP)<0)   sREP <- exp(rnorm(length(Scale), RPs$SREP, SREP_SE$SE))
+    # if(min(sREP)<0)    sREP <- exp(rnorm(length(Scale), log(RPs$SREP) -
+    #                                        0.5*SREP_logSE$SE^2, SREP_logSE$SE))
     
     SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP/Scale, Sgen.fn2)
     
@@ -334,8 +358,20 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     RPs <- RPs %>% mutate (SMSY = SGENcalcs$SMSY) %>% 
       mutate(SMSY=round(SMSY*Scale,0))
     
+    # Explicit version
+    # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), sREP/Scale, Sgen.fn2)
+
+    # RPs_e <- RPs_e %>% mutate (SGEN = SGENcalcs_e$SGEN) %>% 
+    #   mutate(SGEN=round(SGEN*Scale,0))
+    # RPs_e <- RPs_e %>% mutate (a.par = SGENcalcs_e$apar) %>% 
+    #   mutate(a.par=round(a.par,2))
+    # RPs_e <- RPs_e %>% mutate (SMSY = SGENcalcs_e$SMSY) %>% 
+    #   mutate(SMSY=round(SMSY*Scale,0))
+    
     RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
                          "SREPLL", "SREPUL", "a.par")] #"CU"
+    # RPs_e <- RPs_e[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
+    #                      "SREPLL", "SREPUL", "a.par")]
   }
   
   #--------------------------------------------------------------------------- #
@@ -344,7 +380,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   
   
-  RPs
+  RPs # Could also output RPs_e?
   # # Write this to a csv file so that it can be called in plotting functions
   # # write.csv(RPs, "DataOut/wcviRPs.csv") # or "targetRPs"
   # if (remove.EnhStocks) write.csv(wcviRPs, "DataOut/wcviRPs_noEnh.csv")
