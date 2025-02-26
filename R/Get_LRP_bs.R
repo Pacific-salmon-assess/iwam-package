@@ -9,7 +9,7 @@
 library(tidyverse)
 library(ggplot2)
 library(gsl)
-#library(TMB) # Required if using: run_logReg
+# library(TMB) # Required if using: run_logReg
 library(viridis)
 
 # library(future)
@@ -203,7 +203,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP", 
                          "SREPLL", "SREPUL", "a.par")] #"CU"
     
-  }#End of if(prod == "LifeStageModel6")
+  } # End of if(prod == "LifeStageModel6")
   
   # Ricker a's from Diana Dobson's Run Reconstruction (pers.comm) coded in TMB
   # Higher estimate of Ricker a (lower Sgen)  

@@ -64,18 +64,18 @@ Type objective_function<Type>:: operator() ()
 
   DATA_INTEGER(biasCor);
     
-  DATA_INTEGER(SigRicPriorNorm); // on/off
+  // DATA_INTEGER(SigRicPriorNorm); // on/off
   DATA_INTEGER(SigRicPriorGamma); // on/off
-  DATA_INTEGER(SigRicPriorCauchy); // on/off
+  // DATA_INTEGER(SigRicPriorCauchy); // on/off
   
-  DATA_INTEGER(SigDeltaPriorNorm); // on/off
+  // DATA_INTEGER(SigDeltaPriorNorm); // on/off
   DATA_INTEGER(SigDeltaPriorGamma); // on/off
-  DATA_INTEGER(SigDeltaPriorCauchy); // on/off
+  // DATA_INTEGER(SigDeltaPriorCauchy); // on/off
   
   // Alternative's
-  DATA_INTEGER(SigRicPenal); // Gamma Ricker penalty on sigma
-  DATA_INTEGER(SigDeltaPenal); // Gamma WA penalty on precision
-  DATA_INTEGER(SigDeltaPenal_Jac); // Invgamma WA penalty on variance
+  // DATA_INTEGER(SigRicPenal); // Gamma Ricker penalty on sigma
+  // DATA_INTEGER(SigDeltaPenal); // Gamma WA penalty on precision
+  // DATA_INTEGER(SigDeltaPenal_Jac); // Invgamma WA penalty on variance
   
   // Depreciated controls for shape and rate
   DATA_SCALAR(Tau_dist); // Turn off to manually change penalties
@@ -158,24 +158,24 @@ Type objective_function<Type>:: operator() ()
     }
     
     // Alternative penalty directly on sigma        
-    if (SigRicPenal == 1) {
-    ans += -dgamma(sigma(i), Type(7.5), Type(0.1), true);
-    // Type(7.5), Type(0.1)
-    }
+    // if (SigRicPenal == 1) {
+    // ans += -dgamma(sigma(i), Type(7.5), Type(0.1), true);
+    // // Type(7.5), Type(0.1)
+    // }
     
     // Half normal
-    if (SigRicPriorNorm == 1) {
-      //ans += -abs( dnorm( sigma(i), HalfNormMean, HalfNormSig, true) );
-      //3 June 2021. abs() function no longer works with TMB, so have removed
-      ans += -(dnorm(sigma(i), HalfNormMean, HalfNormSig, true) );
-    }
+    // if (SigRicPriorNorm == 1) {
+    //   //ans += -abs( dnorm( sigma(i), HalfNormMean, HalfNormSig, true) );
+    //   //3 June 2021. abs() function no longer works with TMB, so have removed
+    //   ans += -(dnorm(sigma(i), HalfNormMean, HalfNormSig, true) );
+    // }
     
     // // Half cauchy
-    if (SigRicPriorCauchy == 1) {
-      //ans += - abs( dt( sigma(i), Type(1), true ));
-      //3 June 2021. abs() function no longer works with TMB, so have removed
-      ans += - (dt(sigma(i), Type(1), true ));
-    }
+    // if (SigRicPriorCauchy == 1) {
+    //   //ans += - abs( dt( sigma(i), Type(1), true ));
+    //   //3 June 2021. abs() function no longer works with TMB, so have removed
+    //   ans += - (dt(sigma(i), Type(1), true ));
+    // }
   }
   
   
@@ -192,22 +192,22 @@ Type objective_function<Type>:: operator() ()
   }
   
   // Alternative penalty directly on sigma
-  if (SigRicPenal == 1) {
-    ans += -dgamma(sigmaA, Type(7.5), Type(0.1), true);
-  }
+  // if (SigRicPenal == 1) {
+  //   ans += -dgamma(sigmaA, Type(7.5), Type(0.1), true);
+  // }
   
   // // Half Normal
-  if (SigRicPriorNorm == 1) {
-    //3June 2021. abs() functin no longer works in TMB
-    //ans += -abs( dnorm( sigmaA, HalfNormMeanA, HalfNormSigA, true) );
-    ans += -(dnorm(sigmaA, HalfNormMeanA, HalfNormSigA, true) );
-  }
+  // if (SigRicPriorNorm == 1) {
+  //   //3June 2021. abs() functin no longer works in TMB
+  //   //ans += -abs( dnorm( sigmaA, HalfNormMeanA, HalfNormSigA, true) );
+  //   ans += -(dnorm(sigmaA, HalfNormMeanA, HalfNormSigA, true) );
+  // }
   
   // Half cauchy
-  if (SigRicPriorCauchy == 1) {
-    //ans += - abs(dt( sigmaA, Type(1), true));
-    ans += -(dt(sigmaA, Type(1), true));
-  }
+  // if (SigRicPriorCauchy == 1) {
+  //   //ans += - abs(dt( sigmaA, Type(1), true));
+  //   ans += -(dt(sigmaA, Type(1), true));
+  // }
   
   
   
@@ -263,10 +263,10 @@ Type objective_function<Type>:: operator() ()
   
   
   // Normal prior on sigma_delta and sigma_nu
-  if (SigDeltaPriorNorm == 1) {
-    ans += -dnorm(sigma_delta, SigDelta_mean, SigDelta_sig, true);
-    ans += -dnorm(sigma_nu, SigNu_mean, SigNu_sig, true);
-  }
+  // if (SigDeltaPriorNorm == 1) {
+  //   ans += -dnorm(sigma_delta, SigDelta_mean, SigDelta_sig, true);
+  //   ans += -dnorm(sigma_nu, SigNu_mean, SigNu_sig, true);
+  // }
   
   // Inverse gamma prior on sigma_delta and sigma_nu
   if (SigDeltaPriorGamma == 1) {
@@ -276,19 +276,19 @@ Type objective_function<Type>:: operator() ()
   
   // Alternative: Gamma penalty on precision
     // Shape = 3, scale = rate = 1
-  if (SigDeltaPenal == 1) {
-    ans += -dgamma(pow(sigma_delta, -2), Type(3), Type(1), true);
-    ans += -dgamma(pow(sigma_nu, -2), Type(3), Type(1), true);
-  }
+  // if (SigDeltaPenal == 1) {
+  //   ans += -dgamma(pow(sigma_delta, -2), Type(3), Type(1), true);
+  //   ans += -dgamma(pow(sigma_nu, -2), Type(3), Type(1), true);
+  // }
   
   // Alternative: Invgamma on variance w/ Jacobian: 
     // Shape 0.75, scale = rate = 1
-  if (SigDeltaPenal_Jac == 1) {
-    ans += -dgamma(pow(sigma_delta,-2), Type(0.75), Type(1), true);
-    ans += Type(2)*log(pow(sigma_delta,2)); //Jacobian adjustment
-    ans += -dgamma(pow(sigma_nu,-2), Type(0.75), Type(1), true);
-    ans += Type(2)*log(pow(sigma_nu,2)); //Jacobian adjustment
-  }
+  // if (SigDeltaPenal_Jac == 1) {
+  //   ans += -dgamma(pow(sigma_delta,-2), Type(0.75), Type(1), true);
+  //   ans += Type(2)*log(pow(sigma_delta,2)); //Jacobian adjustment
+  //   ans += -dgamma(pow(sigma_nu,-2), Type(0.75), Type(1), true);
+  //   ans += Type(2)*log(pow(sigma_nu,2)); //Jacobian adjustment
+  // }
   
   // Alternative: Another Normal
     // ans += -dnorm(sigma_delta, Type(1), Type(0.1), true);
@@ -299,13 +299,13 @@ Type objective_function<Type>:: operator() ()
     // within IWAM_model.R
   
   // Half cauchy prior on sigma_delta and sigma_nu
-  if (SigDeltaPriorCauchy == 1) {
-    //3 June 2021. abs() no longer works in TMB
-    //ans += -abs( dt( sigma_delta, Type(1), true));
-    //ans += - abs( dt( sigma_nu, Type(1), true ));
-    ans += -( dt( sigma_delta, Type(1), true));
-    ans += -( dt( sigma_nu, Type(1), true ));
-  }
+  // if (SigDeltaPriorCauchy == 1) {
+  //   //3 June 2021. abs() no longer works in TMB
+  //   //ans += -abs( dt( sigma_delta, Type(1), true));
+  //   //ans += - abs( dt( sigma_nu, Type(1), true ));
+  //   ans += -( dt( sigma_delta, Type(1), true));
+  //   ans += -( dt( sigma_nu, Type(1), true ));
+  // }
   
   
   

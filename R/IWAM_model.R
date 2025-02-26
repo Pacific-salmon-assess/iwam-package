@@ -344,7 +344,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     group_by(Inlet) %>% 
     summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
-    filter(Inlet !="Nitinat")
+    filter(Inlet != "Nitinat")
   }
   
   if (exists("CU", where = WAin)){
@@ -1359,7 +1359,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
         mutate (upr=signif(upr,2))
       
       # Add a function for IWAM_func to rename outputs?
-      dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
+      dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE) # ?
         # targetname
       write.csv(dfout, here::here(paste("DataOut/", targetname, "_getLRP-BootstrappedRPs.csv", sep = "")))
       print(paste("DataOut/", targetname, "_getLRP-BootstrappedRPs.csv", sep = ""))
