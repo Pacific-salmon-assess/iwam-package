@@ -1405,12 +1405,30 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   #### Return function ####
   beep(sound = 2)
   
+  # RETURNED OUTPUTS ARE:
+      # - opt: the opt object from nlminb.
+      # - modelpars: all iwam model parameter estimates.
+      # - all_Deltas: all watershed area model delta parameter estimates.
+      # - logSigmaA: the parameter estimate of logSigmaA with standard error.
+      # - srdat: original inputs of spawner recruitment data.
+      # - lh: lifehistories by stocknumber.
+      # - WAbase: original inputs of synoptic watershed area.
+      # - pred_lnSREP/pred_lnSMSY: lnSREP and lnSMSY confidence interval
+          # estimates. Used for plotting.
+      # - pred_lnWA: A vector of watershed areas for plotting.
+      # - SRes: Residuals outputs for spawner recruit data.
+      # - r2: r2 valuues per stock.
+      # - pred_lnSREP_pi/pred_lnSMSY_pi: calculated prediction intervals for 
+          # SMSY and SREP for additional stocks.
+      # - dataname: string showing the final bootstrapped estimates file name 
+          # otherwise saved in "dfout".
+  
   # Create a list and then return it
   return.list <- list(opt = opt, 
                       modelpars = pars, 
                       all_Deltas = all_Deltas,
                       logSigmaA = logSigmaA,
-                      srdat = srdat, 
+                      # srdat = srdat, 
                       lh = lifehist, 
                       WAbase = WAbase, 
                       pred_lnSREP = pred_lnSREP, 

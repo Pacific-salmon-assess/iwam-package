@@ -1,4 +1,4 @@
-# IWAM Model Run for RPA on Nanaimo and Puntledge stocks
+# IWAM Model Run for RPA on Nanaimo and Puntledge stocks ####
 
 # Model steps available in the following files:
   # Model function available in IWAM_model.R
@@ -6,43 +6,28 @@
   # Bootstrapping method in Get_LRP_bs.R
 
 # Libraries and Sources ####
-# library(RTMB)
-# library(ggplot2)
-# library(dplyr)
-# library(tidyverse)
-# library(progress)
-# library(diffr)
-
-# source
-# source(here::here("R/helperFunctions.R"))
-# source(here::here("R/PlotFunctions.R"))
 source(here::here("R/IWAM_model.R"))
 
-# Function
+# Function ####
     # 15-30 minutes of run time for 20,000 bootstrap iterations
-iwamnanpunt <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NanPunt.csv"),
-                          targetname = "WCVI_NanPunt_test",
-                          bs_seed = 1,
-                          bs_nBS = 20000,
-                          bias.cor = TRUE,
+iwamobj <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NanPunt.csv"),
+                          targetname = "Target_name", # For user input in naming of outputs
+                          bs_seed = 1, # Will default to 1
+                          bs_nBS = 20000, # Number of bootstrapping iterations
+                          bias.cor = TRUE, # Adding the sigma^2/2 bias correction term
                           # Remaining function parameters are default listed in IWAM_model.R
-                          prod = "Parken") # prod = "LifeStageModel")
+                          prod = "Parken")
 
-# There are two versions of PredInt functions within
-  # helperFunctions.r
-  # This is part of the source of the discrepancy.
-  # There remains a small difference in the upr confidence interval estimate.
 
-# Other known differences
+# Understanding the outputs: ####
 
-# Bias correction
-  # Bias correction terms can be turned on or off in the model.
-  # But must be physically commented out within the bootstrapping stage.
+    # The final output file will be named with the following type:
+      # "DataOut/Target_name_getLRP-BootstrappedRPs.csv"
+    # This can also be accessed by iwamobj$dfout for processing.
+    # The filename will always be saved within iwamobj$dataname.
 
-# Penalty terms:
-  # Utilizing original penalty terms - most notably dgamma on precision for 
-  # Ricker and alpha terms.
+    # The list of other available outputs is available above the return funcion
+      # in the IWAM_model code.
 
-# For reference:
-  # You can get explicit Parken estimates of loga and beta
-  # if you change RPs to RPs_e within the Get_LRP_bs.R.
+
+      
