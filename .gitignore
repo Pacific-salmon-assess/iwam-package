@@ -224,7 +224,6 @@ DataOut/techreport_dataout_target_ocean_wEnh.csv
 DataOut/techreport_getLRP-BootstrappedRPs.csv
 DataOut/WCVI_NanPunt_dataout_target_ocean_wEnh.csv
 DataOut/WCVI_NanPunt_getLRP-BootstrappedRPs.csv
-R/IWAM_NanPunt.R
 Reports/SEP_DraftBenchmarks_20241010.html
 Reports/SEP_DraftBenchmarks_20241010.Rmd
 Reports/TableofEstimates_kable_SEPdraftbenchmarks.csv

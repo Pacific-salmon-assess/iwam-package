@@ -216,7 +216,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
       select(alpha,stkName) %>% rename(inlets=stkName, lnalpha_nBC=alpha)
     targetstocks <- read.csv("DataIn/WCVIStocks.csv") %>% # Previously WCVIStocks - should this be the same as "datain"?
         # now named WAinraw
-      # filter (Stock != "Cypre") %>% 
+      filter (Stock != "Cypre") %>%
       rename(inlets=Inlet)
     Ric.A <- lnalpha_inlet %>% left_join(targetstocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
     

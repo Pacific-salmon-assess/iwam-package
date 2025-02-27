@@ -35,10 +35,10 @@ count.dig <- function(x) {floor(log10(x)) + 1}
 '%not in%' <- function (x, table) is.na(match(x, table, nomatch=NA_integer_))
 
 # PredInt = a function to calculate prediction intervals
-# x = independent variable
-# y = dependenet variable
-# Newx = x variables for which you'd like the prediction intervals
-# Predy = Predicted y variable at those Newx's
+    # x = independent variable
+    # y = dependenet variable
+    # Newx = x variables for which you'd like the prediction intervals
+    # Predy = Predicted y variable at those Newx's
 PredInt <- function(x, y, Newx=x, Predy){
   # n <- length(x)
   fit <- lm(y~x)
@@ -49,7 +49,7 @@ PredInt <- function(x, y, Newx=x, Predy){
   return(PI)
 }
 
-# OLD PredInt
+    # OLD PredInt
 # PredInt <- function(x,y,Newx=x, Predy){
 #   sumXErr <- sum( (x-mean(x))^2 )
 #   sumYErr <- sum( (y-mean(y))^2 )
@@ -68,7 +68,6 @@ PredInt <- function(x, y, Newx=x, Predy){
 #   return(PI)
 # }
 
-
 # Sgen <- -1/beta*lamW::lambertW0(-beta*Smsy/alpha) ## Choose it on the log scale.
 # alpha above is on the REAL SCALE - be careful with this
 
@@ -83,7 +82,6 @@ sGenOptimum <- function ( S, theta ) {
   return( nlogLike )
 }
 
-
 sGenSolver <- function (loga, b) {
   # Function to estimate Sgen from loga and b Ricker parameters
   theta <- c(loga, b)
@@ -92,10 +90,6 @@ sGenSolver <- function (loga, b) {
                   theta = theta)
   return(fit$minimum)
 }
-
-
-
-
 
 bEst <- function(b, SMSY, SREP){
   # Function to estimate Ricker b paramter from SMSY and SREP
@@ -116,6 +110,7 @@ bEst <- function(b, SMSY, SREP){
   nlogLike <- - sum( dnorm ( epsilon, 0, 1, log = T))
   return(nlogLike)
 }
+
 bSolver <- function (SMSY, SREP) {
   # Function to estimate b from SMSY and SREP, where SMAX is bounded between 1/3 of SREP and SREP
   fit <- optimize(f = bEst, interval = c(1/SREP, 3/SREP), SMSY=SMSY, SREP=SREP)
