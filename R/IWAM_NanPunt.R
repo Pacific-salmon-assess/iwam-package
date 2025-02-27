@@ -1,9 +1,9 @@
 # IWAM Model Run for RPA on Nanaimo and Puntledge stocks ####
 
 # Model steps available in the following files:
-  # Model function available in IWAM_model.R
-  # Complete TMB model in IWAM_Liermann.cpp
-  # Bootstrapping method in Get_LRP_bs.R
+  # Model function: IWAM_model.R
+  # TMB model: IWAM_Liermann.cpp
+  # Bootstrapping method code: Get_LRP_bs.R
 
 # Libraries and Sources ####
 source(here::here("R/IWAM_model.R"))
@@ -30,4 +30,5 @@ iwamobj <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NanPunt.csv"),
       # in the IWAM_model code.
 
 
-      
+
+
