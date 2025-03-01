@@ -361,14 +361,15 @@ derived_obj <- derived_post(fitstan)
 # Join above
 # Calculate scale **
 # Select out SE for SREP 
-
-    # 2. PARKEN METHOD
-# Function
 source(here::here("R/helperFunctions.R"))
 bsiters <- 10
 outBench <- list()
 set.seed <- 1
 
+    # 1. LifeStageModel METHOD
+
+    # 2. PARKEN METHOD
+# Function
 for (k in 1:bsiters) {
   est_loga <- function(SMSY, SREP, shortloga=FALSE){
     loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
@@ -407,8 +408,7 @@ for (k in 1:bsiters) {
   # SMSY_e <- SMSY
   # loga_e <- SREP_e*(SMSY_e*gsl::lambert_W0(-exp(1-SREP_e/SMSY_e)*(SREP_e-SMSY_e)/SMSY_e) + SREP_e - SMSY_e)/(SMSY_e*(SREP_e-SMSY_e))
   # beta_e <- loga_e/SREP_e
-  
-  # Do bias correction **
+
   sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
   if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
   
@@ -416,9 +416,7 @@ for (k in 1:bsiters) {
   SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2)
   # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), sREP_e, Sgen.fn2)
   
-  # Mutate for scale **
-  
-  # Bind everything together
+  # Bind everything together ...................................................
   out <- as.data.frame(derived_obj$deripost_summary)
   out <- rbind()
 

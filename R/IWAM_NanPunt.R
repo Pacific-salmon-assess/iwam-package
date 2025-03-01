@@ -11,13 +11,12 @@ source(here::here("R/IWAM_model.R"))
 # Function ####
     # 15-30 minutes of run time for 20,000 bootstrap iterations
 iwamobj <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NanPunt.csv"),
-                          targetname = "Target_name", # For user input in naming of outputs
+                          targetname = "targetname", # For user input in naming of outputs
                           bs_seed = 1, # Will default to 1
                           bs_nBS = 20000, # Number of bootstrapping iterations
                           bias.cor = TRUE, # Adding the sigma^2/2 bias correction term
                           # Remaining function parameters are default listed in IWAM_model.R
                           prod = "Parken")
-
 
 # Understanding the outputs: ####
 

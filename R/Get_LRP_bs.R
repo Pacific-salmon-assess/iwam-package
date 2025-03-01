@@ -86,11 +86,11 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # if (!remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
   # Remove Cypre as it's not a core indicator (Diana McHugh, 22 Oct 2020)
-  stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>%  # ********************************************** CYPRE FLAG
+  stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>%  # ************************************** CYPRE FLAG
     filter (Param == "SMSY") %>% 
     rename(SMSY=Estimate, SMSYLL=LL, SMSYUL=UL) %>% 
     dplyr::select (-Param, -X) #, -CU)
-  stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% # ********************************************** CYPRE FLAG
+  stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% # *************************************** CYPRE FLAG
     filter (Param == "SREP") %>% 
     rename(SREP=Estimate, SREPLL=LL, SREPUL=UL) %>% 
     dplyr::select (-Param, -X)
