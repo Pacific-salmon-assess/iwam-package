@@ -16,7 +16,7 @@ iwamobj <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NanPunt.csv"),
                           bs_nBS = 20000, # Number of bootstrapping iterations
                           bias.cor = TRUE, # Adding the sigma^2/2 bias correction term
                           # Remaining function parameters are default listed in IWAM_model.R
-                          prod = "Parken")
+                          prod = "Parken") # other alpha assumption option is "LifeStageModel"
 
 # Understanding the outputs: ####
 
@@ -27,7 +27,4 @@ iwamobj <- IWAM_func(WAinraw = c("DataIn/WCVIStocks_NanPunt.csv"),
 
     # The list of other available outputs is available above the return funcion
       # in the IWAM_model code.
-
-
-
 

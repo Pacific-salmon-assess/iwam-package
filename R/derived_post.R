@@ -2,6 +2,7 @@
 
 # Library calls
 library(RTMB)
+library(MCMCglmm) # For posterior.mode()
 
 # Function start
 derived_post <- function(x) {
@@ -51,6 +52,7 @@ derived_post <- function(x) {
       Stock = character(n_cols[k]),
       Mean = numeric(n_cols[k]),
       Median = numeric(n_cols[k]),
+      PosteriorMode = numeric(n_cols[k]), # New addition of posterior Mode
       LQ_5 = numeric(n_cols[k]),
       UQ_95 = numeric(n_cols[k])
     )
@@ -61,6 +63,7 @@ derived_post <- function(x) {
     dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
     dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
     dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
+    dataframes[[i]]$PosteriorMode <- apply(matrices[[i]], 2, function(col) {posterior.mode(as.mcmc(col))}) # New addition of posterior Mode
     dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
     dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
   }

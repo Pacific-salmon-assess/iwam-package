@@ -21,7 +21,9 @@ compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 # seems not to run on the first attempt - answers [3] instead of [0]
 
 # Saves for internal runs without the wrapper function
-WAin <- c("DataIn/Parken_evalstocks.csv")
+# WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- c("DataIn/WCVIStocks.csv") # For use in comparing StockRecruit relationships
+  # Unless you don't want Parken estimates alongside
 # WAin <- c("DataIn/WCVIStocks_NanPunt.csv") # For testing
 
 # nsim <- 10
@@ -46,8 +48,8 @@ WAin <- read.csv(here::here(WAin))
 # Remove Hoko and Hoh stocks - consider removing SKagit OR Chehalis
     # Due to sampling reasons explained in Parken 2006.
 srdatwna <- srdatwna %>% 
-  filter(!Name %in% c("Hoko","Hoh")) |> 
-  filter( !(Name == "Skagit")) # |> # Skagit is #22
+  filter(!Name %in% c("Hoko","Hoh")) # |> 
+  # filter( !(Name == "Skagit")) # |> # Skagit is #22
   # filter( !(Name == "Chehalis")) # |> # Chehalis is #19
 
 # Remove years with NAs and renumber.
@@ -95,7 +97,6 @@ dat <- list(srdat = srdat,
             WAbase = WAbase,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), max(WAbase$logWAshifted), 0.1),
-                # WAbase or WAin?
             logRS = log(srdat$Rec) - log(srdat$Sp))
 
 # External vectors
@@ -130,7 +131,7 @@ f_srep <- function(par){
   
   S = srdat$Sp
   type = lifehist$lh # + 1
-  type_tar = WAin$lh_new
+  type_tar = WAin$lh # used to be lh_new --> now changed "lh to lh_old"
   
   E <- numeric(N_Stk)
   logE_pred <- numeric(N_Stk)
@@ -242,6 +243,9 @@ f_srep <- function(par){
   ## ADREPORT - internals
     # ALWAYS THE NUMBER OF SYNOPTIC SETS - RN 25
   # ADREPORT(logRS) # logRS for all 501 data points
+  ADREPORT(logE_re)
+  REPORT(logE_re)
+  
   ADREPORT(E)
   ADREPORT(logAlpha)
   ADREPORT(SMSY_r)
@@ -362,81 +366,164 @@ derived_obj <- derived_post(fitstan)
 # Calculate scale **
 # Select out SE for SREP 
 source(here::here("R/helperFunctions.R"))
-bsiters <- 10
+bsiters <- 20000
+BS <- TRUE # avoid if you don't want to run bootstraps
 outBench <- list()
 set.seed <- 1
+prod <- c("LifeStageModel") # "LifeStageModel"
+#bias.cor is also an option - but I don't needed given that these
+  # are done on posteriors
 
     # 1. LifeStageModel METHOD
+# USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
 
     # 2. PARKEN METHOD
 # Function
-for (k in 1:bsiters) {
-  est_loga <- function(SMSY, SREP, shortloga=FALSE){
-    loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
-                   objective = calc_loga, # Try to fix with a Scheurel version of LW if possible
-                   SMSY= SMSY, 
-                   SREP=SREP)$par
-    if(shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
-    beta <- loga/SREP
-    return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
+if (BS == TRUE) {
+  for (k in 1:bsiters) {
+        # E_tar, SMSY
+    SREP <- derived_obj$deripost_summary$E_tar$Median # Mean or Median?
+        # Calculate SE
+    # SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96) # OLD VERSION
+    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96
+    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96
+    
+    if (prod == "LifeStageModel") {
+      Mean.Ric.A <- 1
+      Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, 0))
+      Sig.Ric.A <- 0.51 
+     
+      Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
+      if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
+      
+      # if (bias.cor == TRUE) {
+      #   sREP <- exp(rnorm(length(SREP), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, SREP_logSE$SE))
+      #   if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
+      #     SREP_logSE$SE))
+      # } else {
+        sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
+        if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
+      # }
+  
+      SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
+    }
+    
+    if (prod == "Parken"){
+      est_loga <- function(SMSY, SREP, shortloga=FALSE){
+        loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
+                       objective = calc_loga, # Try to fix with a Scheurel version of LW if possible
+                       SMSY= SMSY, 
+                       SREP=SREP)$par
+        if(shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
+        beta <- loga/SREP
+        return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
+      }
+      
+      SMSY <- derived_obj$deripost_summary$SMSY$Median # Mean or Median?
+      # RPs_long <- read.csv(here::here(datain))
+      # SMSY <- RPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
+      # SREP <- RPs_long %>% filter(Param == "SREP") %>% select(Estimate)
+      
+      # purrr the est_loga function for logA
+      lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
+                                         est_loga)
+      
+      # Or do explicit method
+      # SREP_e <- SREP
+      # SMSY_e <- SMSY
+      # loga_e <- SREP_e*(SMSY_e*gsl::lambert_W0(-exp(1-SREP_e/SMSY_e)*(SREP_e-SMSY_e)/SMSY_e) + SREP_e - SMSY_e)/(SMSY_e*(SREP_e-SMSY_e))
+      # beta_e <- loga_e/SREP_e
+      
+      # Bias correction could go here - see earlier versions  
+      sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
+      if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
+      
+      # Do SGEN calcs with new variables
+      SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2)
+      # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), sREP_e, Sgen.fn2)
+    }
+    
+    # Bind everything together
+    # outlist_RPs <- list(Stock = WAin$Stock,
+    #   SGEN = SGENcalcs$SGEN,
+    #   SMSY = SGENcalcs$SMSY,
+    #   SMSYLL = derived_obj$deripost_summary$SMSY$LQ_5,
+    #   SMSYUL = derived_obj$deripost_summary$SMSY$UQ_95,
+    #   SREP = derived_obj$deripost_summary$E_tar$Mean,
+    #   SREPLL = derived_obj$deripost_summary$E_tar$LQ_5,
+    #   SREPUL = derived_obj$deripost_summary$E_tar$UQ_95,
+    #   a.par = SGENcalcs$apar
+    #   )
+    
+    out <- list(bench = select(SGENcalcs, -apar, -bpar))
+    
+    # outBench[[k]] <- out # This doesn't translate into the SGEN.bs statement below
+    outBench[k] <- out
   }
+  # beep(sound = 2)
+      # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
+      # 95th percentiles
+  SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   
-  # Get raw stocks/ do another data pull
-      # names(derived_obj$derivpost_summary)
-  import <- list(
-    derived_obj$deripost_summary$E_tar,
-    derived_obj$deripost_summary$SMSY
-  )
-      # E_tar, SMSY
-  SREP <- derived_obj$deripost_summary$E_tar$Mean # Mean or Median?
-      # Calculate SE
-  # SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96) # OLD VERSION
-  SREP_logSE <- (log(SREP) -log(derived_obj$deripost_summary$E_tar$LQ_5))/1.96
-  SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96
+  stockNames <- WAin %>% 
+    # filter(Stock != "Cypre") %>% # **** CYPRE FLAG
+    pull(Stock)
+  stockNames <- unique(stockNames)
   
-  SMSY <- derived_obj$deripost_summary$SMSY$Mean # Mean or Median?
-  # RPs_long <- read.csv(here::here(datain))
-  # SMSY <- RPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
-  # SREP <- RPs_long %>% filter(Param == "SREP") %>% select(Estimate)
+  rownames(SGEN.bs) <- stockNames
+  SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
+                          lwr=apply(SGEN.bs, 1, quantile, 0.025),
+                          upr=apply(SGEN.bs, 1, quantile, 0.975) )
   
-  # purrr the est_loga function for logA
-  lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
-                                     est_loga)
+  SMSY.bs <- select(as.data.frame(outBench), starts_with("SMSY"))
+  rownames(SMSY.bs) <- stockNames
+  SMSY.boot <- data.frame(SMSY= apply(SMSY.bs, 1, quantile, 0.5), 
+                          lwr=apply(SMSY.bs, 1, quantile, 0.025),
+                          upr=apply(SMSY.bs, 1, quantile, 0.975) )
   
-  # Or do explicit method
-  # SREP_e <- SREP
-  # SMSY_e <- SMSY
-  # loga_e <- SREP_e*(SMSY_e*gsl::lambert_W0(-exp(1-SREP_e/SMSY_e)*(SREP_e-SMSY_e)/SMSY_e) + SREP_e - SMSY_e)/(SMSY_e*(SREP_e-SMSY_e))
-  # beta_e <- loga_e/SREP_e
-
-  sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
-  if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
+  SREP.bs <- select(as.data.frame(outBench), starts_with("SREP"))
+  rownames(SREP.bs) <- stockNames
+  SREP.boot <- data.frame(SREP= apply(SREP.bs, 1, quantile, 0.5), 
+                          lwr=apply(SREP.bs, 1, quantile, 0.025),
+                          upr=apply(SREP.bs, 1, quantile, 0.975) )
   
-  # Do SGEN calcs with new variables
-  SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2)
-  # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), sREP_e, Sgen.fn2)
+  boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
+               SREP.boot=SREP.boot)
   
-  # Bind everything together ...................................................
-  out <- as.data.frame(derived_obj$deripost_summary)
-  out <- rbind()
-
-  # RPs <- RPs[c("Stock", "SGEN", "SMSY", "SMSYLL", "SMSYUL", "SREP",
-  #              "SREPLL", "SREPUL", "a.par")]
-  outBench[[k]] <- out$bench
+  df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
+  df1 <- df1 %>% rename(Value=SGEN)
+  df2 <- data.frame(boot[["SREP.boot"]], Stock=rownames(boot[["SREP.boot"]]), RP="SREP")
+  df2 <- df2 %>% rename(Value=SREP)
+  df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
+  df3 <- df3 %>% rename(Value=SMSY)
+  
+  dfout <- add_row(df1, df2)
+  dfout <- add_row(dfout, df3)
+  rownames(dfout) <- NULL
+  # now round to 2 signif digits
+  dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% 
+    mutate(lwr=signif(lwr,2)) %>% 
+    mutate (upr=signif(upr,2))
+  
+  wasample <- WAin %>% 
+        select("Stock", "WA", "lh") %>% 
+        mutate(WA = round(WA, 0))
+  
+  # This should be identical to the dfout standard of the original IWAM_model.R
+  BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
+  
+  beep(sound = 2)
 }
-
-    # 3. Outputs
-# Compile estimates 
-
 
 # Saving for plotting ####
   # Re-order Stocks to be in ascending order by logWA
   # Re-order Stocks to be in order of Ricker variance - which is what term? Is it extracted ???
 
 # Parken Table 1 and 2
-Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv"))
+Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
+ParkenCaseStudy <- read.csv(here::here("DataIn/Parken_evalstocks.csv")) # Case study stocks
 
-pars <- derived_obj$deripost_summary
+dpars <- derived_obj$deripost_summary
 
 targets <- WAin |> 
   rename("Stock_name" = Stock)
@@ -445,15 +532,18 @@ targets <- WAin |>
 # SMSY Estimate for TARGET STOCKS
 targets1 <- cbind(targets, derived_obj$deripost_summary$SMSY) |> 
   rename("SMSY_mean" = Mean, "SMSY_median" = Median,
-    "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock)
+    "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
+    "SMSY_Mode" = PosteriorMode)
 # SGEN Estimate for TARGET STOCKS
 targets2 <- cbind(targets1, derived_obj$deripost_summary$SGEN) |> 
   rename("SGEN_mean" = Mean, "SGEN_median" = Median,
-    "SGEN_LQ_5" = LQ_5, "SGEN_UQ_95" = UQ_95, "SGEN_Stocknum" = Stock)
+    "SGEN_LQ_5" = LQ_5, "SGEN_UQ_95" = UQ_95, "SGEN_Stocknum" = Stock,
+    "SGEN_Mode" = PosteriorMode)
 # SREP ESTIMATE FOR TARGET STOCKS
 targetsAll <- cbind(targets2, derived_obj$deripost_summary$E_tar) |> 
   rename("E_tar_mean" = Mean, "E_tar_median" = Median,
-    "E_tar_LQ_5" = LQ_5, "E_tar_UQ_95" = UQ_95, "E_tar_Stocknum" = Stock)
+    "E_tar_LQ_5" = LQ_5, "E_tar_UQ_95" = UQ_95, "E_tar_Stocknum" = Stock,
+    "E_tar_Mode" = PosteriorMode)
 
 # Ricker sigma for SYNOPTIC STOCKS
 # targets3 <- cbind(targets, derived_obj$deripost_summary$tauobs) |> 
@@ -606,18 +696,18 @@ for(i in 1:length(WAbase$lh)) {
 }
 
     # Step 2. PLOT
-plot(y = pars$E$Mean, x = WAbase$WA, pch = 20, 
+plot(y = dpars$E$Mean, x = WAbase$WA, pch = 20, 
      col = ifelse(WAbase$Name == "Chehalis", 'red', col.use), 
      xlab = expression("Accessible Watershed Area, km"^2), 
      ylab = expression(S[REP]), log = 'xy',
      xlim = c(50,200000) , ylim = c(200,2000000)
   )
 
-points(y =  pars$E$Mean, x = WAbase$WA, pch = 20, 
+points(y =  dpars$E$Mean, x = WAbase$WA, pch = 20, 
        col = ifelse(WAbase$Name == "Chehalis", 'red', col.use), cex = 1.5)
 
 # Target points
-# points(y = pars$E_tar$Mean, x = WAin$WA, pch = 1, col = 'black')
+# points(y = dpars$E_tar$Mean, x = WAin$WA, pch = 1, col = 'black')
 
 # Parken points of SYNOPTIC SET
 # Parkentable1
@@ -691,7 +781,7 @@ lines(x = exp(simWA), y = exp(Predso_Parken), col="dodgerblue3", lwd = 2, lty = 
 
 # Bar plot comparison of SYNOPTIC values of SREP - NOT WORKING (length diffs) ####
   # Compare Parken and Liermann estimates of SREP for the SYNOPTIC STOCKS
-tempEpars <- pars$E |> 
+tempEpars <- dpars$E |> 
   rename("E_stock_temp" = Stock)
 bardf <- cbind(Parkentable1, tempEpars)
 
@@ -737,34 +827,40 @@ par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1))
 Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) 
 
 for (i in Stks){
-  names <- pars %>% dplyr::select ("Name", "Stocknumber") %>% distinct()
-  name <- pars %>% filter (Stocknumber==i) %>% 
-    dplyr::select ("Name") %>% distinct()
+  # Get stocknames and numbers
+      # names <- pars %>% dplyr::select ("Name", "Stocknumber") %>% distinct()
+      # name <- pars %>% filter (Stocknumber==i) %>% 
+      #   dplyr::select ("Name") %>% distinct()
+  name <- names$Name[names$Stocknumber == i]
   
   R <- srdat %>% filter (Stocknumber==i) %>% 
     dplyr::select(Rec) 
   S <- srdat %>% filter (Stocknumber==i) %>% 
     dplyr::select(Sp) 
-  Sc <- srdat %>% filter (Stocknumber==i) %>% 
-    dplyr::select(scale) %>% distinct() %>% 
-    as.numeric()
+      # Sc <- srdat %>% filter (Stocknumber==i) %>% 
+      #   dplyr::select(scale) %>% distinct() %>% 
+      #   as.numeric()
   
-  if(name$Name != "Skagit" & name$Name != "KSR") 
+  if(name != "Skagit" & name != "KSR") 
     plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)), ylim=c(0,max(R$Rec) ) )
-  if(name$Name == "Skagit") 
+  if(name == "Skagit") 
     plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)*3), ylim=c(0,max(R$Rec) ) )
-  if(name$Name == "KSR") 
+  if(name == "KSR") 
     plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,500), ylim=c(0,max(R$Rec) ) )
   
-  a <- pars %>% filter (Stocknumber==i) %>% 
-    filter(Param=="logA") %>% 
-    summarise(A=exp(Estimate)) %>% 
-    as.numeric()
-  # Divide b by scale
-  b <- pars %>% filter (Stocknumber==i) %>% 
-    filter(Param=="logB") %>% 
-    summarise(B=exp(Estimate)/Sc) %>% 
-    as.numeric()
+  # Get alpha and beta parameters
+  a <- as.numeric(derived_obj$deripost_summary$logAlpha$Median[derived_obj$deripost_summary$logAlpha$Stock - 1 == i])
+  b <- as.numeric(derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock-1 == i])
+  
+  # a <- pars %>% filter (Stocknumber==i) %>% 
+  #   filter(Param=="logA") %>% 
+  #   summarise(A=exp(Estimate)) %>% 
+  #   as.numeric()
+  # # Divide b by scale
+  # b <- pars %>% filter (Stocknumber==i) %>% 
+  #   filter(Param=="logB") %>% 
+  #   summarise(B=exp(Estimate)/Sc) %>% 
+  #   as.numeric()
   
   # Parken values for skagit
     # These are from Parken et al. 2006 Table 2 (Ocean life-histories)
@@ -776,70 +872,65 @@ for (i in Stks){
   #RR_std <- NA
   ap <- Parken_ab$Alpha
   bp <- Parken_ab$Beta
+  # ap <- ParkenCaseStudy$ # Do the case study stocks have alpha and beta estimates?
+  # bp <- ParkenCaseStudy$ # Do the case study stocks have alpha and beta estimates?
   
-  if(removeSkagit==FALSE){ # RUNNING FOR IWAM DEFAULT
-    for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
-      if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100) # IF NOT SKAGIT OR KSR
-      if (i==22) SS[j] <- j*(max(S$Sp*3)/100) # Skagit
-      if (i==7) SS[j] <- j*(500/100) # KSR
-      
-      RR[j] <- a * SS[j] * exp(-b * SS[j])
-      RR_parken[j] <- ap[i+1] * SS[j] * exp(-bp[i+1] * SS[j])
-      
-      if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
-        # alpha and beta from Table 1 and 2 from Parken et al. 2006
-    }
-  } 
-  
-  if(removeSkagit==TRUE){
-    for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
-      SS[j] <- j*(max(S$Sp)/100)
-      RR[j] <- a * SS[j] * exp(-b * SS[j]) # Line based on alpha and beta from IWAM model
-    }
-  } 
+  for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
+    if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100) # IF NOT SKAGIT OR KSR
+    if (i==22) SS[j] <- j*(max(S$Sp*3)/100) # Skagit
+    if (i==7) SS[j] <- j*(500/100) # KSR
+    
+    RR[j] <- a * SS[j] * exp(-b * SS[j])
+    RR_parken[j] <- ap[i+1] * SS[j] * exp(-bp[i+1] * SS[j])
+    
+    if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
+      # alpha and beta from Table 1 and 2 from Parken et al. 2006
+  }
   
   col.use <- "black"
   lines(x=SS, y=RR, col=col.use) 
   
   # For Skagit, add Parken et al. 2006 model curve
-  if(removeSkagit==FALSE) {if(i==22) lines(x=SS, y=RR_skagit, lty="dashed")}
+  #if(removeSkagit==FALSE) {
+  if(i==22) lines(x=SS, y=RR_skagit, lty="dashed")# }
   
   # For all stocks, added in Parken et al. 2006 model curve
   lines(x=SS, y=RR_parken, lty="dashed", col="red")
   
-  mtext(name$Name, side=3, cex=0.8)
+  mtext(name, side=3, cex=0.8)
   
-  # Plot SMSY_stream (black for std, red for AR(1), 
+  # Plot SMSY_stream (black for std, red for AR(1),  # *************************
     # and dashed for Parken et al. 2006)
-  SMSY <- pars %>% filter (Stocknumber==i) %>% 
-    filter(Param=="SMSY") %>% 
-    summarise(SMSY = Estimate * Sc) %>% 
-    as.numeric()
-  SMSY_ul <- pars %>% filter (Stocknumber==i) %>% 
-    filter(Param=="SMSY") %>% 
-    summarise(SMSY_ul = Estimate * Sc + 1.96 * Std..Error * Sc ) %>% 
-    as.numeric()
-  SMSY_ll <- pars %>% filter (Stocknumber==i) %>% 
-    filter(Param=="SMSY") %>% 
-    summarise(SMSY_ul = Estimate * Sc - 1.96 * Std..Error * Sc ) %>% 
-    as.numeric()
+  # SMSY <- pars %>% filter (Stocknumber==i) %>% 
+  #   filter(Param=="SMSY") %>% 
+  #   summarise(SMSY = Estimate * Sc) %>% 
+  #   as.numeric()
+  # SMSY_ul <- pars %>% filter (Stocknumber==i) %>% 
+  #   filter(Param=="SMSY") %>% 
+  #   summarise(SMSY_ul = Estimate * Sc + 1.96 * Std..Error * Sc ) %>% 
+  #   as.numeric()
+  # SMSY_ll <- pars %>% filter (Stocknumber==i) %>% 
+  #   filter(Param=="SMSY") %>% 
+  #   summarise(SMSY_ul = Estimate * Sc - 1.96 * Std..Error * Sc ) %>% 
+  #   as.numeric()
+  
+  SMSY <- derived_obj$deripost_summary$SMSY_r$Median[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
+  SMSY_ul <- derived_obj$deripost_summary$SMSY_r$UQ_95[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
+  SMSY_ll <- derived_obj$deripost_summary$SMSY_r$LQ_5[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
   
   abline(v = SMSY, col=col.use, lty='dotted')
   
-  if(mod=="IWAM_FixedSep_RicStd"|mod=="Liermann"|
-     mod=='IWAM_Liermann'|mod=="Liermann_PriorRicSig_PriorDeltaSig"|
-     mod=="Liermann_HalfNormRicVar_FixedDelta")  
-    polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), 
-            y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)), 
-            col=grey(0.8, alpha=0.4), border=NA )
+  polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), 
+          y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)), 
+          col=grey(0.8, alpha=0.4), border=NA )
 
-  if(!is.null(SMSY_std)) {
-    SMSY_std <- SMSY_std %>% right_join(names) %>% filter(Name==name$Name)#filter(Stocknumber != 22) 
-    if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedCombined"|mod=="Ricker_AllMod"){
-      if(i %in% stksNum_ar) abline(v=SMSY_std$Estimate[which(SMSY_std$Stocknumber==i)]*scale.stock[i+1] , col="black")
-      if(i %in% stksNum_surv) abline(v=SMSY_std$Estimate[which(SMSY_std$Stocknumber==i)]*scale.stock[i+1] , col="black")
-    }
-  }
+  # if(!is.null(SMSY_std)) {
+  #   SMSY_std <- SMSY_std %>% right_join(names) %>% filter(Name==name$Name) # filter(Stocknumber != 22) 
+  #   if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedCombined"|mod=="Ricker_AllMod"){ 
+  #     if(i %in% stksNum_ar) abline(v=SMSY_std$Estimate[which(SMSY_std$Stocknumber==i)]*scale.stock[i+1] , col="black")
+  #     if(i %in% stksNum_surv) abline(v=SMSY_std$Estimate[which(SMSY_std$Stocknumber==i)]*scale.stock[i+1] , col="black")
+  #   }
+  # }
   
   # Parken Smsy Estimate (vert. line) from Table 1/2 Parken et al. 2006
     # Stocks not ordered the same way as other files - alphabetical instead
@@ -847,14 +938,15 @@ for (i in Stks){
     # ordered by stocknumber - but starting at 1 instead of 0 (instead of 0:24 as per Stks - 1:25 --> i+1)
   abline(v = Parken_smsy, col="red", lty='dotted')
   
-  if(is.data.frame(r2)==TRUE) {
-    lab <-  r2 %>% 
-      filter(Stocknumber==i) %>% 
-      dplyr::select(r2) %>% 
-      as.numeric() %>% 
-      round(2)
-    legend("topright", legend = "", title= paste0("r2=",lab), bty="n")
-  }
+  # Add r2 coefficient values
+  # if(is.data.frame(r2)==TRUE) {
+  #   lab <-  r2 %>% 
+  #     filter(Stocknumber==i) %>% 
+  #     dplyr::select(r2) %>% 
+  #     as.numeric() %>% 
+  #     round(2)
+  #   legend("topright", legend = "", title= paste0("r2=",lab), bty="n")
+  # }
 }
 
 # Add an GLOBAL figure axis label across par()

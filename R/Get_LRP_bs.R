@@ -413,8 +413,8 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   #   mutate( SREPha.cSMAX = round( SREPha.cSMAX*Scale, 0 ) )
   
   run_logReg <- FALSE
-  if(run_logReg==FALSE){
-    return(list(bench= select(SGENcalcs, -apar, -bpar)*Scale))
+  if(run_logReg == FALSE){
+    return(list(bench = select(SGENcalcs, -apar, -bpar)*Scale)) ################ Why is this all * Scale at the end?
   }
   #--------------------------------------------------------------------------- #
   # Sum escapements across indicators within inlets ----------------------------

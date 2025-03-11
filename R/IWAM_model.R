@@ -215,10 +215,13 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # Create a df of names and corresponding stock numbers to use in joining
   names <- srdat %>% dplyr::select (Stocknumber, Name) %>% distinct()
   
-  WAbase <- WAbase %>% full_join(names, by="Name") %>% arrange(Stocknumber)
+  WAbase <- WAbase %>% 
+    full_join(names, by="Name") %>% 
+    arrange(Stocknumber)
   
   # rename stream to --> "lifehist
-  lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
+  lifehist <- srdat %>% 
+    dplyr::select(Stocknumber, Name, Stream) %>% 
     group_by(Stocknumber) %>% 
     summarize(lh=max(Stream)) %>% 
     arrange (Stocknumber)
