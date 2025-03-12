@@ -359,18 +359,13 @@ derived_obj <- derived_post(fitstan)
 
     # Follow the code of Get_LRP_bs.R prod == "Parken"
 
-    # 1. SETUP ** (replicated below - DEPRECIATED)
-# Read in data
-# Filter out SMSY into and object per stock and SREP
-# Join above
-# Calculate scale **
-# Select out SE for SREP 
+    # 1. SETUP
 source(here::here("R/helperFunctions.R"))
 bsiters <- 20000
 BS <- TRUE # avoid if you don't want to run bootstraps
 outBench <- list()
 set.seed <- 1
-prod <- c("LifeStageModel") # "LifeStageModel"
+prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
 #bias.cor is also an option - but I don't needed given that these
   # are done on posteriors
 
@@ -382,7 +377,7 @@ prod <- c("LifeStageModel") # "LifeStageModel"
 if (BS == TRUE) {
   for (k in 1:bsiters) {
         # E_tar, SMSY
-    SREP <- derived_obj$deripost_summary$E_tar$Median # Mean or Median?
+    SREP <- derived_obj$deripost_summary$E_tar$Median # or mode?
         # Calculate SE
     # SREP_logSE <- RPs %>% mutate(SE = (log(RPs$SREP) - log(RPs$SREPLL)) / 1.96) # OLD VERSION
     SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96
@@ -460,8 +455,8 @@ if (BS == TRUE) {
     # outBench[[k]] <- out # This doesn't translate into the SGEN.bs statement below
     outBench[k] <- out
   }
-  # beep(sound = 2)
-      # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
+
+        # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
       # 95th percentiles
   SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   
@@ -821,10 +816,10 @@ bcompare
 
 Stks <- unique(srdat$Stocknumber)
 NStks <- length(Stks)
-# par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1)
-par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1))
+par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1)) # To fit all the plots on one grid
 
 Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) 
+  # KSR, Andrew, Lewis, Columbia - just different names - but ORDER is the same
 
 for (i in Stks){
   # Get stocknames and numbers
@@ -850,17 +845,31 @@ for (i in Stks){
   
   # Get alpha and beta parameters
   a <- as.numeric(derived_obj$deripost_summary$logAlpha$Median[derived_obj$deripost_summary$logAlpha$Stock - 1 == i])
-  b <- as.numeric(derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock-1 == i])
+  b <- as.numeric(derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock - 1 == i])
   
-  # a <- pars %>% filter (Stocknumber==i) %>% 
-  #   filter(Param=="logA") %>% 
-  #   summarise(A=exp(Estimate)) %>% 
-  #   as.numeric()
-  # # Divide b by scale
-  # b <- pars %>% filter (Stocknumber==i) %>% 
-  #   filter(Param=="logB") %>% 
-  #   summarise(B=exp(Estimate)/Sc) %>% 
-  #   as.numeric()
+    # ADD IN IWAM ESTIMATES
+      # This will require running the IWAM model function externally - saving
+      # as a global variable and then feeding in here
+      # Do a check if exists for the global object just to avoid errors when
+      # running it anyways.
+  if(exists("iwamobj")) {
+    aiwam <- iwamobj$modelpars |> filter (Stocknumber==i) |>  
+      filter(Param=="logA") %>%
+      summarise(A=exp(Estimate)) %>%
+      as.numeric()
+    Sc <- iwamobj$srdat %>% filter (Stocknumber==i) %>% 
+       dplyr::select(scale) %>% distinct() %>% 
+       as.numeric()
+    biwam <- iwamobj$modelpars %>% filter (Stocknumber==i) %>%
+      filter(Param=="logB") %>%
+      summarise(B=exp(Estimate)/Sc) %>%
+      as.numeric()
+    biwam_se <- iwamobj$modelpars %>%
+      filter(Stocknumber == i, Param == "logB") %>%
+      mutate(B_lower = exp(Estimate - 1.96 * Std..Error) / Sc,
+        B_upper = exp(Estimate + 1.96 * Std..Error) / Sc )
+      # can index by B_lower and B_upper
+  }
   
   # Parken values for skagit
     # These are from Parken et al. 2006 Table 2 (Ocean life-histories)
@@ -868,61 +877,79 @@ for (i in Stks){
   skagit_alpha <- 7.74
   skagit_beta <- 0.0000657
   RR_skagit <- NA
-  SS <- RR <- RR_parken <- NA
+  SS <- RR <- RR_parken <- RRiwam <- NA
   #RR_std <- NA
-  ap <- Parken_ab$Alpha
-  bp <- Parken_ab$Beta
-  # ap <- ParkenCaseStudy$ # Do the case study stocks have alpha and beta estimates?
-  # bp <- ParkenCaseStudy$ # Do the case study stocks have alpha and beta estimates?
+  ap <- Parken_ab$Alpha # vector
+  bp <- Parken_ab$Beta # vector
   
   for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
     if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100) # IF NOT SKAGIT OR KSR
     if (i==22) SS[j] <- j*(max(S$Sp*3)/100) # Skagit
     if (i==7) SS[j] <- j*(500/100) # KSR
     
-    RR[j] <- a * SS[j] * exp(-b * SS[j])
+    RR[j] <- exp(a) * SS[j] * exp(-b * SS[j])
+    
     RR_parken[j] <- ap[i+1] * SS[j] * exp(-bp[i+1] * SS[j])
     
     if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
       # alpha and beta from Table 1 and 2 from Parken et al. 2006
+    
+    RRiwam[j] <- aiwam * SS[j] * exp(-biwam * SS[j])
   }
-  
-  col.use <- "black"
-  lines(x=SS, y=RR, col=col.use) 
-  
-  # For Skagit, add Parken et al. 2006 model curve
-  #if(removeSkagit==FALSE) {
-  if(i==22) lines(x=SS, y=RR_skagit, lty="dashed")# }
-  
-  # For all stocks, added in Parken et al. 2006 model curve
-  lines(x=SS, y=RR_parken, lty="dashed", col="red")
   
   mtext(name, side=3, cex=0.8)
   
-  # Plot SMSY_stream (black for std, red for AR(1),  # *************************
-    # and dashed for Parken et al. 2006)
-  # SMSY <- pars %>% filter (Stocknumber==i) %>% 
-  #   filter(Param=="SMSY") %>% 
-  #   summarise(SMSY = Estimate * Sc) %>% 
-  #   as.numeric()
-  # SMSY_ul <- pars %>% filter (Stocknumber==i) %>% 
-  #   filter(Param=="SMSY") %>% 
-  #   summarise(SMSY_ul = Estimate * Sc + 1.96 * Std..Error * Sc ) %>% 
-  #   as.numeric()
-  # SMSY_ll <- pars %>% filter (Stocknumber==i) %>% 
-  #   filter(Param=="SMSY") %>% 
-  #   summarise(SMSY_ul = Estimate * Sc - 1.96 * Std..Error * Sc ) %>% 
-  #   as.numeric()
+  col.use <- "black"
+  lines(x=SS, y=RR, col='black') 
   
+  # For Skagit, add Parken et al. 2006 model curve
+  #if(removeSkagit==FALSE) {
+  if(i==22) lines(x=SS, y=RR_skagit, lty="dashed") # }
+  
+  # For all stocks, added in Parken et al. 2006 model curve
+  lines(x=SS, y=RR_parken, lty="dashed", col="red")
+
+  # For all stocks, add IWAM model curve
+  lines(x=SS, y=RRiwam, lty="dashed", col="forestgreen")
+  
+  
+  # PLOTTING VERTICAL LINES FOR SMSY, SMAX, OR SREP
+  # Plot SMSY
+  # stock - 1 asstock runs 1:25 not 0:24
   SMSY <- derived_obj$deripost_summary$SMSY_r$Median[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
   SMSY_ul <- derived_obj$deripost_summary$SMSY_r$UQ_95[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
   SMSY_ll <- derived_obj$deripost_summary$SMSY_r$LQ_5[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
+  SMAX <- 1/derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock - 1 == i]
+  SMAX_ul <- 1/derived_obj$deripost_summary$BETA_r$UQ_95[derived_obj$deripost_summary$BETA_r$Stock - 1 == i] # Rev.
+  SMAX_ll <- 1/derived_obj$deripost_summary$BETA_r$LQ_5[derived_obj$deripost_summary$BETA_r$Stock - 1 == i] # Rev.
+  SREP <- derived_obj$deripost_summary$E$Median[derived_obj$deripost_summary$E$Stock - 1 == i]
+  SREP_ul <- derived_obj$deripost_summary$E$UQ_95[derived_obj$deripost_summary$E$Stock - 1 == i]
+  SREP_ll <- derived_obj$deripost_summary$E$LQ_5[derived_obj$deripost_summary$E$Stock - 1 == i]
   
-  abline(v = SMSY, col=col.use, lty='dotted')
+  SMAXiwam <- 1/biwam
+  SMAXiwam_ll <- 1/(biwam_se$B_lower)
+  SMAXiwam_ul <- 1/(biwam_se$B_upper)
   
-  polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), 
-          y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)), 
-          col=grey(0.8, alpha=0.4), border=NA )
+  # abline(v = SMSY, col=col.use, lty='dotted')
+  abline(v = SMAX, col=col.use, lty='dotted')
+  # abline(v = SREP, col=col.use, ly='dotted')
+  
+  # CI' shaded polygons
+  # IWAM SMAX CI
+  polygon(x=c(SMAXiwam_ul, SMAXiwam_ll, SMAXiwam_ll, SMAXiwam_ul),
+        y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)),
+        col=rgb(0,0.4,0, alpha=0.1), border=NA )
+  
+  # polygon(x=c(SMSY_ul, SMSY_ll, SMSY_ll, SMSY_ul), 
+  #         y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)), 
+  #         col=grey(0.8, alpha=0.4), border=NA )
+
+  polygon(x=c(SMAX_ul, SMAX_ll, SMAX_ll, SMAX_ul), 
+        y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)), 
+        col=grey(0.8, alpha=0.4), border=NA )
+  
+  # Can also do one for SREP
+
 
   # if(!is.null(SMSY_std)) {
   #   SMSY_std <- SMSY_std %>% right_join(names) %>% filter(Name==name$Name) # filter(Stocknumber != 22) 
@@ -934,19 +961,19 @@ for (i in Stks){
   
   # Parken Smsy Estimate (vert. line) from Table 1/2 Parken et al. 2006
     # Stocks not ordered the same way as other files - alphabetical instead
-  Parken_smsy <- Parken_ab$Smsy[Parken_ab$Stocknumber == Parken_ab$Stocknumber[i+1]] 
-    # ordered by stocknumber - but starting at 1 instead of 0 (instead of 0:24 as per Stks - 1:25 --> i+1)
-  abline(v = Parken_smsy, col="red", lty='dotted')
+  # Parken_smsy <- Parken_ab$Smsy[Parken_ab$Stocknumber == Parken_ab$Stocknumber[i+1]]
+  # abline(v = Parken_smsy, col="red", lty='dotted')
+  # SMAX VALUES
+  Parken_smax <- 1 / Parken_ab$Beta[Parken_ab$Stocknumber == Parken_ab$Stocknumber[i+1]]
+  abline(v = Parken_smax, col="red", lty='dotted')
+  # SREP VALUES
+  # Parken_srep <- Parken_ab$Srep[Parken_ab$Stocknumber == Parken_ab$Stocknumber[i+1]]
+  # abline(v = Parken_srep, col="red", lty='dotted')
   
-  # Add r2 coefficient values
-  # if(is.data.frame(r2)==TRUE) {
-  #   lab <-  r2 %>% 
-  #     filter(Stocknumber==i) %>% 
-  #     dplyr::select(r2) %>% 
-  #     as.numeric() %>% 
-  #     round(2)
-  #   legend("topright", legend = "", title= paste0("r2=",lab), bty="n")
-  # }
+  # IWAM Estimates
+  IWAM_smax <- 1 / biwam
+  abline(v = IWAM_smax, col="forestgreen", lty='dotted')
+  
 }
 
 # Add an GLOBAL figure axis label across par()
