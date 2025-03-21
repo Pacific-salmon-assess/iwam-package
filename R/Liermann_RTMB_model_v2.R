@@ -9,7 +9,7 @@ library(progress) # progress bar for iterative loops
 library(tmbstan)
 library(tidybayes) # Plotting usage
 library(bayesplot)
-
+library(beepr)
 library(viridis)
 library(latex2exp)
 
@@ -21,8 +21,8 @@ compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 # seems not to run on the first attempt - answers [3] instead of [0]
 
 # Saves for internal runs without the wrapper function
-# WAin <- c("DataIn/Parken_evalstocks.csv")
-WAin <- c("DataIn/WCVIStocks.csv") # For use in comparing StockRecruit relationships
+WAin <- c("DataIn/Parken_evalstocks.csv")
+# WAin <- c("DataIn/WCVIStocks.csv") # For use in comparing StockRecruit relationships
   # Unless you don't want Parken estimates alongside
 # WAin <- c("DataIn/WCVIStocks_NanPunt.csv") # For testing
 
@@ -49,8 +49,13 @@ WAin <- read.csv(here::here(WAin))
     # Due to sampling reasons explained in Parken 2006.
 srdatwna <- srdatwna %>% 
   filter(!Name %in% c("Hoko","Hoh")) # |> 
-  # filter( !(Name == "Skagit")) # |> # Skagit is #22
+  # filter( !(Name == "Skagit")) |> # Skagit is #22
+    # Excluding Skagit will decrease SGEN
   # filter( !(Name == "Chehalis")) # |> # Chehalis is #19
+    # Excluding Chehalis will increase SGEN
+  # Exclusion of BOTH will slightly increase from inclusion, but still less than
+  # exclusion of chehalis.
+  # Both are larger populations.
 
 # Remove years with NAs and renumber.
 srdat <- srdatwna %>% 
@@ -240,42 +245,51 @@ f_srep <- function(par){
     E_line_stream[i] <- exp(logE_line_stream[i])
   }
   
-  ## ADREPORT - internals
+  ## ADREPORT - internal values (synoptic specific/Ricker)
     # ALWAYS THE NUMBER OF SYNOPTIC SETS - RN 25
   # ADREPORT(logRS) # logRS for all 501 data points
-  ADREPORT(logE_re)
-  REPORT(logE_re)
+  alpha <- exp(logAlpha)
   
+  ADREPORT(logE_re)
   ADREPORT(E)
   ADREPORT(logAlpha)
+  ADREPORT(alpha)
   ADREPORT(SMSY_r)
   ADREPORT(BETA_r)
   ADREPORT(tauobs)
   
+  REPORT(logE_re)
   REPORT(E) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logAlpha) # model logAlpha (25)
+  REPORT(alpha)
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(tauobs)
   
-  # ADREPORT - predicted
+  # ADREPORT - predicted values from watershed area model
     # NUMBER OF PREDICTED STOCKS WILL CHANGE
   # Mean estimate of the median (without bias correction)
+  alpha_tar <- exp(logAlpha_tar)
+  
   ADREPORT(E_tar) # target E (Srep) (21)
   ADREPORT(logE_tar) # exp these for the correct confidence intervals
   ADREPORT(logAlpha_tar)
+  ADREPORT(alpha_tar)
+  
   REPORT(E_tar)
   REPORT(logE_tar)
   REPORT(logAlpha_tar)
+  REPORT(alpha_tar)
 
   ADREPORT(BETA)
   ADREPORT(SMSY)
   ADREPORT(SGEN)
-  # Symmetrical - would need to get the confidence interval on the log-scale and then exp()
+      # Symmetrical - would need to get the confidence interval on the log-scale and then exp()
   REPORT(BETA)
   REPORT(SMSY)
   REPORT(SGEN)
   
+  # LINES
   REPORT(E_line_stream) # Imaginary line values for plotting
   ADREPORT(E_line_stream)
   REPORT(E_line_ocean) # Imaginary line values for plotting
@@ -326,7 +340,7 @@ init <- function(){
        logAlphaSD = 1
   )
 }
-  
+
 # SETTING LIMITS
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
@@ -346,7 +360,7 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init,
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan)
 
-# Test and diagnositic plots ####
+# Test and diagnostic plots ####
 # traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
 # pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
 # pairs(fitstan, pars = pairs_pars) # for specific par names from above
@@ -365,7 +379,7 @@ bsiters <- 20000
 BS <- TRUE # avoid if you don't want to run bootstraps
 outBench <- list()
 set.seed <- 1
-prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
+prod <- c("Parken") # "LifeStageModel" or "Parken"
 #bias.cor is also an option - but I don't needed given that these
   # are done on posteriors
 
@@ -414,7 +428,7 @@ if (BS == TRUE) {
         return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
       }
       
-      SMSY <- derived_obj$deripost_summary$SMSY$Median # Mean or Median?
+      SMSY <- derived_obj$deripost_summary$SMSY$Median # Mean, Median, or Mode?
       # RPs_long <- read.csv(here::here(datain))
       # SMSY <- RPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
       # SREP <- RPs_long %>% filter(Param == "SREP") %>% select(Estimate)
@@ -507,8 +521,12 @@ if (BS == TRUE) {
   # This should be identical to the dfout standard of the original IWAM_model.R
   BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
   
-  beep(sound = 2)
+  # beep(sound = 2)
 }
+
+# Save one of each for analysis
+# lsmout <- BS.dfout
+# pout <- BS.dfout
 
 # Saving for plotting ####
   # Re-order Stocks to be in ascending order by logWA
@@ -546,7 +564,7 @@ targetsAll <- cbind(targets2, derived_obj$deripost_summary$E_tar) |>
 #     "tauobs_LQ_5" = LQ_5, "tauobs_UQ_95" = UQ_95, "tauobs_Stocknum" = Stock)
     # tauobs is based on the synoptic sets and will now have different lengths
 
-# Pointwise comparison plot data prep ####
+# Point wise comparison plot data prep ####
 parken <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
 
 parken <- parken |> 
@@ -692,22 +710,28 @@ for(i in 1:length(WAbase$lh)) {
 
     # Step 2. PLOT
 plot(y = dpars$E$Mean, x = WAbase$WA, pch = 20, 
-     col = ifelse(WAbase$Name == "Chehalis", 'red', col.use), 
+     # col = ifelse(WAbase$Name == "Chehalis" | WAbase$Name == "Skagit", 'red', col.use), 
+     col = col.use,
      xlab = expression("Accessible Watershed Area, km"^2), 
      ylab = expression(S[REP]), log = 'xy',
      xlim = c(50,200000) , ylim = c(200,2000000)
   )
 
 points(y =  dpars$E$Mean, x = WAbase$WA, pch = 20, 
-       col = ifelse(WAbase$Name == "Chehalis", 'red', col.use), cex = 1.5)
+       # col = ifelse(WAbase$Name == "Chehalis"| WAbase$Name == "Skagit", 'red', col.use), cex = 1.5)
+       col = col.use, cex = 1.5)
 
 # Target points
 # points(y = dpars$E_tar$Mean, x = WAin$WA, pch = 1, col = 'black')
 
 # Parken points of SYNOPTIC SET
 # Parkentable1
-points(y = Parkentable1$Srep, x = Parkentable1$WA, pch = 1, col = 'black')
+points(y = Parkentable1$Srep, x = Parkentable1$WA, pch = 20, col = 'black')
 
+# Liermann points for TARGET ESTIMATES
+points(y = dpars$E_tar$Median, x = WAin$WA, pch = ifelse(WAin$Stock == "Coldwater"| WAin$Stock == "Deadman", 20, 1), 
+  # col = 'black')
+  col = ifelse(WAin$Stock == "Coldwater"| WAin$Stock == "Deadman", 'red', 'black'))
 
     # Step 3. LINES
 sum_pars <- summary(fitstan)
@@ -772,7 +796,9 @@ lines(x = exp(simWA), y = exp(Preds_Parken), col="forestgreen", lwd = 2, lty = 2
 lines(x = exp(simWA), y = exp(Predso_Parken), col="dodgerblue3", lwd = 2, lty = 2)
 
     # Step 6. Add text to describe model equations
-
+# q: Based on the plot coded above, how can I add text labels to each point to state the name associated with them?
+# a: Use geom_text() to add text labels to the plot.
+# geom_text()
 
 # Bar plot comparison of SYNOPTIC values of SREP - NOT WORKING (length diffs) ####
   # Compare Parken and Liermann estimates of SREP for the SYNOPTIC STOCKS
@@ -817,6 +843,10 @@ bcompare
 Stks <- unique(srdat$Stocknumber)
 NStks <- length(Stks)
 par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1)) # To fit all the plots on one grid
+# par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1, oma=c(0,0,0,0)) # To plot each individual stock
+
+# IWAM - what is the name of your iwam_obj - that will produce errors
+  # if it is not the standard iwam_obj
 
 Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) 
   # KSR, Andrew, Lewis, Columbia - just different names - but ORDER is the same
@@ -844,6 +874,8 @@ for (i in Stks){
     plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,500), ylim=c(0,max(R$Rec) ) )
   
   # Get alpha and beta parameters
+      # NOTE: can substitute $alpha$Mean if you want to use Mean
+      # Median is resistant to monotonic transformations
   a <- as.numeric(derived_obj$deripost_summary$logAlpha$Median[derived_obj$deripost_summary$logAlpha$Stock - 1 == i])
   b <- as.numeric(derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock - 1 == i])
   
@@ -894,7 +926,7 @@ for (i in Stks){
     if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
       # alpha and beta from Table 1 and 2 from Parken et al. 2006
     
-    RRiwam[j] <- aiwam * SS[j] * exp(-biwam * SS[j])
+    if(exists("iwamobj")) RRiwam[j] <- aiwam * SS[j] * exp(-biwam * SS[j])
   }
   
   mtext(name, side=3, cex=0.8)
@@ -910,7 +942,7 @@ for (i in Stks){
   lines(x=SS, y=RR_parken, lty="dashed", col="red")
 
   # For all stocks, add IWAM model curve
-  lines(x=SS, y=RRiwam, lty="dashed", col="forestgreen")
+  if(exists("iwamobj")) lines(x=SS, y=RRiwam, lty="dashed", col="forestgreen")
   
   
   # PLOTTING VERTICAL LINES FOR SMSY, SMAX, OR SREP
@@ -926,9 +958,9 @@ for (i in Stks){
   SREP_ul <- derived_obj$deripost_summary$E$UQ_95[derived_obj$deripost_summary$E$Stock - 1 == i]
   SREP_ll <- derived_obj$deripost_summary$E$LQ_5[derived_obj$deripost_summary$E$Stock - 1 == i]
   
-  SMAXiwam <- 1/biwam
-  SMAXiwam_ll <- 1/(biwam_se$B_lower)
-  SMAXiwam_ul <- 1/(biwam_se$B_upper)
+  if(exists("iwamobj")) SMAXiwam <- 1/biwam
+  if(exists("iwamobj")) SMAXiwam_ll <- 1/(biwam_se$B_lower)
+  if(exists("iwamobj")) SMAXiwam_ul <- 1/(biwam_se$B_upper)
   
   # abline(v = SMSY, col=col.use, lty='dotted')
   abline(v = SMAX, col=col.use, lty='dotted')
@@ -936,7 +968,7 @@ for (i in Stks){
   
   # CI' shaded polygons
   # IWAM SMAX CI
-  polygon(x=c(SMAXiwam_ul, SMAXiwam_ll, SMAXiwam_ll, SMAXiwam_ul),
+  if(exists("iwamobj")) polygon(x=c(SMAXiwam_ul, SMAXiwam_ll, SMAXiwam_ll, SMAXiwam_ul),
         y=c(-10000,-10000,10000+max(R$Rec),10000+max(R$Rec)),
         col=rgb(0,0.4,0, alpha=0.1), border=NA )
   
@@ -971,8 +1003,8 @@ for (i in Stks){
   # abline(v = Parken_srep, col="red", lty='dotted')
   
   # IWAM Estimates
-  IWAM_smax <- 1 / biwam
-  abline(v = IWAM_smax, col="forestgreen", lty='dotted')
+  if(exists("iwamobj")) IWAM_smax <- 1 / biwam
+  if(exists("iwamobj")) abline(v = IWAM_smax, col="forestgreen", lty='dotted')
   
 }
 

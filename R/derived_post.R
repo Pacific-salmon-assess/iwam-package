@@ -3,6 +3,7 @@
 # Library calls
 library(RTMB)
 library(MCMCglmm) # For posterior.mode()
+library(beepr)
 
 # Function start
 derived_post <- function(x) {
@@ -39,6 +40,7 @@ derived_post <- function(x) {
     # Print running timer
     cat(sprintf("\rElapsed time: %s seconds", round(as.numeric(elapsed_time), 2)))
   }
+  
   close(pb)
   # End timing
   end_time <- Sys.time()
@@ -57,6 +59,7 @@ derived_post <- function(x) {
       UQ_95 = numeric(n_cols[k])
     )
   })
+  
   names(dataframes) <- names(matrices)
   
   for (i in 1:n_matrices) {
@@ -71,5 +74,5 @@ derived_post <- function(x) {
   return(list(deripost_summary = dataframes,
               deripost_full = matrices)
   )
-         
+  beep(2)
 }
