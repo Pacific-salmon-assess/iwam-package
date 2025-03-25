@@ -325,6 +325,23 @@ opt <- nlminb(obj$par,
 
 # MCMC ####
 # INIT FUNCTION
+  # Random init start points
+init <- function() {
+  list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
+       bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
+       
+       logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
+       logAlpha0 = rnorm(1,0.6,1), # Contains negatives
+       logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
+
+       tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
+       
+       logESD = runif(1, 0, 1), # rnorm(1,1,1), # Contains negatives
+       logAlphaSD = runif(1, 0, 1) # rnorm(1,1,1) # Contains negatives
+  )
+}
+
+
 init <- function(){
   list(b0 = c(10, 0),
        bWA = c(0, 0),
@@ -352,19 +369,25 @@ upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
 # SAMPLE
-fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init,
+fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init, # init = init function or "random"
                    lower = lower, upper = upper,
                    # consider adapt_delta or max_treedepth
                    chains = 4, open_progress = FALSE, silent = TRUE)
 
-# Acquire outputs of MCMC ####
-derived_obj <- derived_post(fitstan)
-
 # Test and diagnostic plots ####
-# traceplot(fitstan, pars=names(obj$par), inc_warmup=TRUE)
+# mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
+mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
+# names(fitstan) for complete list of parameters from stan object
+
+# traceplot(fitstan, pars = names(obj$par), inc_warmup = TRUE) # Decpreciated
+
 # pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
 # pairs(fitstan, pars = pairs_pars) # for specific par names from above
+
 # fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
+
+# Acquire outputs of MCMC ####
+derived_obj <- derived_post(fitstan)
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
@@ -379,7 +402,7 @@ bsiters <- 20000
 BS <- TRUE # avoid if you don't want to run bootstraps
 outBench <- list()
 set.seed <- 1
-prod <- c("Parken") # "LifeStageModel" or "Parken"
+prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
 #bias.cor is also an option - but I don't needed given that these
   # are done on posteriors
 
@@ -507,9 +530,9 @@ if (BS == TRUE) {
   df3 <- df3 %>% rename(Value=SMSY)
   
   dfout <- add_row(df1, df2)
-  dfout <- add_row(dfout, df3)
+  dfout <- add_row(dfout, df3) # TK: Why was there a breakpoint added here?
   rownames(dfout) <- NULL
-  # now round to 2 signif digits
+    # now rounded to 2 signif digits
   dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% 
     mutate(lwr=signif(lwr,2)) %>% 
     mutate (upr=signif(upr,2))
@@ -518,7 +541,8 @@ if (BS == TRUE) {
         select("Stock", "WA", "lh") %>% 
         mutate(WA = round(WA, 0))
   
-  # This should be identical to the dfout standard of the original IWAM_model.R
+  # This is identical to the dfout standard of the original IWAM_model.R
+    # with the exception of stock order.
   BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
   
   # beep(sound = 2)
@@ -528,7 +552,7 @@ if (BS == TRUE) {
 # lsmout <- BS.dfout
 # pout <- BS.dfout
 
-# Saving for plotting ####
+# Plotting PREP ####
   # Re-order Stocks to be in ascending order by logWA
   # Re-order Stocks to be in order of Ricker variance - which is what term? Is it extracted ???
 
@@ -564,7 +588,6 @@ targetsAll <- cbind(targets2, derived_obj$deripost_summary$E_tar) |>
 #     "tauobs_LQ_5" = LQ_5, "tauobs_UQ_95" = UQ_95, "tauobs_Stocknum" = Stock)
     # tauobs is based on the synoptic sets and will now have different lengths
 
-# Point wise comparison plot data prep ####
 parken <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
 
 parken <- parken |> 
