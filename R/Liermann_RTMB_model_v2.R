@@ -325,7 +325,7 @@ opt <- nlminb(obj$par,
 
 # MCMC ####
 # INIT FUNCTION
-  # Random init start points
+  # Random init start points - this will cause values to change slightly per run
 init <- function() {
   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
@@ -342,21 +342,21 @@ init <- function() {
 }
 
 
-init <- function(){
-  list(b0 = c(10, 0),
-       bWA = c(0, 0),
-       
-       logE_re = numeric(N_Stk),
-       logAlpha0 = 0.6,
-       logAlpha_re = numeric(nrow(dat$WAbase)),
-       # logAlpha = numeric(nrow(dat$WAbase)), # Turn off for non-zeroed parameterization
-       
-       tauobs = 0.01 + numeric(N_Stk),
-       
-       logESD = 1,
-       logAlphaSD = 1
-  )
-}
+# init <- function(){
+#   list(b0 = c(10, 0),
+#        bWA = c(0, 0),
+#        
+#        logE_re = numeric(N_Stk),
+#        logAlpha0 = 0.6,
+#        logAlpha_re = numeric(nrow(dat$WAbase)),
+#        # logAlpha = numeric(nrow(dat$WAbase)), # Turn off for non-zeroed parameterization
+#        
+#        tauobs = 0.01 + numeric(N_Stk),
+#        
+#        logESD = 1,
+#        logAlphaSD = 1
+#   )
+# }
 
 # SETTING LIMITS
 upper <- numeric(length(obj$par)) + Inf

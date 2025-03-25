@@ -963,303 +963,303 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
      
     # **************************************************************************
     if (predict.tar == TRUE) {
-    # Get Predicted SMSY and SREP values for the target stocks and their Prediction Intervals
-    # For single life-history events (stream OR ocean targets)
-    # targetSMSY <- data.frame() 
-    # targetSREP <- data.frame()
-    
-    # For instances of both life histories (stream AND ocean targets)
-    target_SMSY_ocean <- data.frame()
-    target_SREP_ocean <- data.frame()
-    
-    target_SMSY_stream <- data.frame()
-    target_SREP_stream <- data.frame()
-    
-    # Re-write this to detect lh=0 or 1 within lifehist
-    # condition_target <- cbind("ocean","stream") # choose if you want ocean, stream, or both
-    # if (any(lifehist$lh == 0)){
-    #   print("lh is equal to zero.")
-    # }
-    
-    # wasample <- WAin[, c("Stock","WA")]
-    wasample <- WAin %>% 
-      select("Stock", "WA", "lh") %>% 
-      mutate(WA = round(WA, 0))
+      # Get Predicted SMSY and SREP values for the target stocks and their Prediction Intervals
+      # For single life-history events (stream OR ocean targets)
+      # targetSMSY <- data.frame() 
+      # targetSREP <- data.frame()
       
-    
-    if (any(WAin$lh == 1)) {
-      # Step 1
-      target_SMSY_ocean <- all_pars %>% 
-        filter (Param %in% c("target_lnSMSY_ocean")) %>% 
-        add_column(Stock = stocknames_ocean)
-        # with latest dataset -> backcalced:
-        # stocknames has 116 values - of these 116 values, 85 are ocean, and 32 are stream
-        # need to make sure that this difference is understood
-        # consider making a stocknames_ocean and _stream?
-      target_SREP_ocean <- all_pars %>% 
-        filter (Param %in% c("target_lnSREP_ocean")) %>% 
-        add_column(Stock = stocknames_ocean)
-      target_SMSY_pull_ocean <- target_SMSY_ocean %>% 
-        pull(Estimate)
-      target_SREP_pull_ocean <- target_SREP_ocean %>% 
-        pull(Estimate)
-      # Step 2
-      target_SMSY_pi_ocean <- PredInt(x = log(wa_ocean), 
-                                      y = obs_lSMSY_ocean, 
-                                      Predy = target_SMSY_pull_ocean, 
-                                      Newx = data$target_lnWA_ocean)
-      target_SREP_pi_ocean <- PredInt(x = log(wa_ocean), 
-                                      y = obs_SREP_ocean, 
-                                      Predy = target_SREP_pull_ocean, 
-                                      Newx = data$target_lnWA_ocean)
-      # Step 3
-      target_SMSY_ocean <- target_SMSY_ocean %>% 
-        add_column(LL = exp(target_SMSY_pi_ocean$lwr), 
-                   UL = exp(target_SMSY_pi_ocean$upr))
-      target_SREP_ocean <- target_SREP_ocean %>% 
-        add_column(LL = exp(target_SREP_pi_ocean$lwr), 
-                   UL = exp(target_SREP_pi_ocean$upr))
-      # Step 4
-      target_SMSY_ocean <- target_SMSY_ocean %>% 
-        mutate (Estimate = exp(Estimate)) %>% 
-        dplyr::select(-Std..Error, - Param) %>% 
-        add_column(Param = "SMSY")
-      target_SREP_ocean <- target_SREP_ocean %>% 
-        mutate (Estimate = exp(Estimate)) %>% 
-        dplyr::select(-Std..Error, - Param) %>% 
-        add_column(Param = "SREP")
-      # Step 5
-      target_estimates_SMSY_ocean <- target_SMSY_ocean %>% 
-        mutate(Estimate = round(Estimate, 0), 
-               LL = round(LL,0), 
-               UL = round(UL,0))
-      target_estimates_SREP_ocean <- target_SREP_ocean %>% 
-        mutate(Estimate = round(Estimate, 0), 
-               LL = round(LL,0), 
-               UL = round(UL,0))
-    
-      data_out_ocean <- target_estimates_SMSY_ocean %>% 
-        bind_rows(target_estimates_SREP_ocean)
-      # bind watershed area back to these dataout files
-      data_out_ocean <- merge(data_out_ocean, wasample, 
-                              by="Stock", 
-                              all.x=TRUE, sort=FALSE) # makes them alphabetical
+      # For instances of both life histories (stream AND ocean targets)
+      target_SMSY_ocean <- data.frame()
+      target_SREP_ocean <- data.frame()
       
-      }
-    
-    # WARNING
-    length_check_params_ocean <- all_pars %>% 
-      filter (Param %in% c("target_lnSMSY_ocean"))
-    if (length(stocknames_ocean) == length(length_check_params_ocean$Estimate)) { # originally this checked the full stocknames list
-      print("Lengths checked passed - Ocean life histories.")
-    } else {
-      print("WARNING: The output and inputs are not the same length.")
-    }
-    
-    # Does not currently work * no data for stream
-    if (any(WAin$lh == 0)){
-      # Step 1
-      target_SMSY_stream <- all_pars %>% 
-        filter (Param %in% c("target_lnSMSY_stream")) %>%
-        add_column(Stock = stocknames_stream)
-      target_SREP_stream <- all_pars %>% 
-        filter (Param %in% c("target_lnSREP_stream")) %>% 
-        add_column(Stock = stocknames_stream)
-      target_SMSY_pull_stream <- target_SMSY_stream %>% 
-        pull(Estimate)
-      target_SREP_pull_stream <- target_SREP_stream %>% 
-        pull(Estimate)
-      # Step 2
-      target_SMSY_pi_stream <- PredInt(x = log(wa_stream), 
-                                       y = obs_lSMSY_stream, 
-                                       Predy = target_SMSY_pull_stream, 
-                                       Newx = data$target_lnWA_stream)
-      target_SREP_pi_stream <- PredInt(x = log(wa_stream), 
-                                       y = obs_SREP_stream, 
-                                       Predy = target_SREP_pull_stream, 
-                                       Newx = data$target_lnWA_stream)
-      # Step 3
-      target_SMSY_stream <- target_SMSY_stream %>% 
-        add_column(LL = exp(target_SMSY_pi_stream$lwr), 
-                   UL = exp(target_SMSY_pi_stream$upr))
-      target_SREP_stream <- target_SREP_stream %>% 
-        add_column(LL = exp(target_SREP_pi_stream$lwr), 
-                   UL = exp(target_SREP_pi_stream$upr))
-      # Step 4
-      target_SMSY_stream <- target_SMSY_stream %>% 
-        mutate (Estimate = exp(Estimate)) %>% 
-        dplyr::select(-Std..Error, - Param) %>%
-        add_column(Param = "SMSY")
-      target_SREP_stream <- target_SREP_stream %>% 
-        mutate (Estimate = exp(Estimate)) %>% 
-        dplyr::select(-Std..Error, - Param) %>%
-        add_column(Param = "SREP")
-      # Step 5
-      target_estimates_SMSY_stream <- target_SMSY_stream %>% 
-        mutate(Estimate = round(Estimate, 0), 
-               LL = round(LL,0), 
-               UL = round(UL,0))
-      target_estimates_SREP_stream <- target_SREP_stream %>% 
-        mutate(Estimate = round(Estimate, 0), 
-               LL = round(LL,0), 
-               UL = round(UL,0))
-    
-      data_out_stream <- target_estimates_SMSY_stream %>% 
-        bind_rows(target_estimates_SREP_stream)
-      # bind watershed area back to these dataout files
-      data_out_stream <- merge(data_out_stream, wasample, 
-                               by="Stock", all.x=TRUE, sort=FALSE)
+      target_SMSY_stream <- data.frame()
+      target_SREP_stream <- data.frame()
       
-      }
-    
-    # WARNING
-    length_check_params_stream <- all_pars %>% 
-      filter (Param %in% c("target_lnSMSY_stream"))
-    if (length(stocknames_stream) == length(length_check_params_stream$Estimate)) { # originally this checked the full stocknames list
-      print("Lengths checked passed - Stream life histories.")
-    } else {
-      print("WARNING: The output and inputs are not the same length.")
-    }
-    
-        # STEPS
-    # For inclusion into if loops above
-    # Main goal is to allow for stream/ocean AND scenarios
-    # Step 1: Filter out targets into new df and extract a single column estimates
-    # targetSMSY <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames) # OLD # target ocean example
-    # targetSREP <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames) # OLD # target ocean example
-    # targetSMSYpull <- targetSMSY %>% pull(Estimate) # OLD
-    # targetSREPpull <- targetSREP %>% pull(Estimate) # OLD
-    
-    # Step 2: create new intervals object
-    # Use custom function: PredInt() to estimate prediction intervals 
-      # PredInt() defined in helperFunctions.R
-    # targetSMSY_pi <- PredInt(x = log(wa_ocean), y = obs_lSMSY_ocean, Predy = targetSMSYpull, Newx = data$target_lnWA_ocean) # OLD
-    # targetSREP_pi <- PredInt(x = log(wa_ocean), y = obs_SREP_ocean, Predy = targetSREPpull, Newx = data$target_lnWA_ocean) # OLD
-    
-    # Step 3: add a column with intervals to target dataframes (currently only ONE SCENARIO)
-    # exp() bounds
-    # targetSMSY <- targetSMSY %>% add_column(LL = exp(targetSMSY_pi$lwr), UL = exp(targetSMSY_pi$upr)) # OLD
-    # targetSREP <- targetSREP %>% add_column(LL = exp(targetSREP_pi$lwr), UL = exp(targetSREP_pi$upr)) # OLD
-    
-    # Step 4: mutate exp() to estimate 
-    # targetSMSY <- targetSMSY %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
-    #   add_column(Param = "SMSY") # OLD
-    # targetSREP <- targetSREP %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
-    #   add_column(Param = "SREP") # OLD
-    
-    # Step 5: Mutate to round targets and bind together SMSY and SREP
-    # target_estimates_SMSY <- targetSMSY %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0)) # OLD
-    # target_estimates_SREP <- targetSREP %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0)) # OLD
-    
-    
-    # Final combination of SMSY and SREP estimates into final df
-      # if statement for stream or ocean presence
-    if (all(c(0, 1) %in% WAin$lh)) {
-      print("Both life histories are present and will be combined.")
-      data_out_combined <- data_out_ocean %>% bind_rows(data_out_stream)
-      data_out_combined <- distinct(data_out_combined) # This may cause problems
-    } else {
-      print("Only one life history detected.")
-    }
-    
-    # Data Out combinations: now moved upwards into the conditional statements
-    # data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
-    # data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
-    # data_out_combined <- data_out_ocean %>% bind_rows(data_out_stream)
-    
-    # data_out <- target_estimates_SMSY %>% bind_rows(target_estimates_SREP) # OLD
-    
-    # Step 6: Final writing step for outputting targets
-    # Write SMSY and SREP with PIs to file
-    
-      # Two separate if's: for remove, without remove
-        # Within each: for ocean, for stream, for combined
-    
-    # if (any(WAin$lh == 0)) {} # stream
-    # if (any(WAin$lh == 1)) {} # ocean
-  
-    # paste("DataOut/", targetname, "_dataout_target_ocean_noEnh", sep = "")
-    
-  # For NO ENHANCEMENT datasets
-    if (remove.EnhStocks) {
-      if (all(WAin$lh == 0)) { # stream only
-        outname <- paste("DataOut/", targetname, "_dataout_target_stream_noEnh.csv", sep = "")
-        if(remove.EnhStocks) write.csv(data_out_stream, here::here(outname))
-        if(remove.EnhStocks) datain <- c(outname)
-        print("Stream life histories detected and moved forward.")
-        print(paste("DataOut:", outname))
-        
-      }
-      if (all(WAin$lh == 1)) { # ocean only
-        outname <- paste("DataOut/", targetname, "_dataout_target_ocean_noEnh.csv", sep = "")
-        if(remove.EnhStocks) write.csv(data_out_ocean, here::here(outname))
-        if(remove.EnhStocks) datain <- c(outname)
-        print("Ocean life histories detected and moved forward.")
-        print(paste("DataOut:", outname))
-        
-      }
-      if (all(c(0, 1) %in% WAin$lh)) { # stream and ocean 
-        outname <- paste("DataOut/", targetname, "_dataout_target_noEnh.csv", sep = "")
-        if(remove.EnhStocks) write.csv(data_out_combined, here::here(outname))
-        if(remove.EnhStocks) datain <- c(outname)
-        print("Stream and ocean life histories detected, combined, and moved forward.")
-        print(paste("DataOut:", outname))
-        
-      }
-    }
-    
-  # For ENHANCEMENT datasets
-    if (!remove.EnhStocks) {
-      if (all(WAin$lh == 0)) { # stream
-        outname <- paste("DataOut/", targetname, "_dataout_target_stream_wEnh.csv", sep = "")
-        if(!remove.EnhStocks) write.csv(data_out_stream, here::here(outname))
-        if(!remove.EnhStocks) datain <- c(outname)
-        print("Stream life histories detected and moved forward.")
-        print(paste("DataOut:", outname))
-        
-      } 
-      if (all(WAin$lh == 1)) { # ocean
-        outname <- paste("DataOut/", targetname, "_dataout_target_ocean_wEnh.csv", sep = "")
-        if(!remove.EnhStocks) write.csv(data_out_ocean, here::here(outname))
-        if(!remove.EnhStocks) datain <- c(outname)
-        print("Ocean life histories detected and moved forward.")
-        print(paste("DataOut:", outname))
-        
-      }
-      if (all(c(0, 1) %in% WAin$lh)) { # combined
-        outname <- paste("DataOut/", targetname, "_dataout_target_wEnh.csv", sep = "")
-        if(!remove.EnhStocks) write.csv(data_out_combined, here::here(outname))
-        if(!remove.EnhStocks) datain <- c(outname)
-        print("Stream and ocean life histories detected, combined, and moved forward.")
-        print(paste("DataOut:", outname))
-        
-      } 
-    }
-    
-    # if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
-    # if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
-    # if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
-    # if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
-    
-    # if(remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_noEnh.csv"))
-    #if(remove.EnhStocks) datain_stream <- c("DataOut/dataout_target_stream_noEnh.csv")
-    
-    # if(!remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_wEnh.csv"))
-    #if(!remove.EnhStocks) datain_stream <- c("DataOut/dataout_target_stream_wEnh.csv")
-  
-    # if(remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_noEnh.csv"))
-    # if(remove.EnhStocks) datain <- c("DataOut/dataout_target_noEnh.csv")
-    
-    # if(!remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_wEnh.csv"))
-    # if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_wEnh.csv")
-    
-    # ONLY ONE FILE CAN GO FORWARD
-      # STATEMENT MUST BE WRITTEN - SO ONLY ONE OF THE ABOVE EVENTS OCCURS DURING A RUN
+      # Re-write this to detect lh=0 or 1 within lifehist
+      # condition_target <- cbind("ocean","stream") # choose if you want ocean, stream, or both
+      # if (any(lifehist$lh == 0)){
+      #   print("lh is equal to zero.")
+      # }
       
-      # y/n enhancement
-      # ocean only
-      # stream only
-      # combined
+      # wasample <- WAin[, c("Stock","WA")]
+      wasample <- WAin %>% 
+        select("Stock", "WA", "lh") %>% 
+        mutate(WA = round(WA, 0))
+        
+      
+      if (any(WAin$lh == 1)) {
+        # Step 1
+        target_SMSY_ocean <- all_pars %>% 
+          filter (Param %in% c("target_lnSMSY_ocean")) %>% 
+          add_column(Stock = stocknames_ocean)
+          # with latest dataset -> backcalced:
+          # stocknames has 116 values - of these 116 values, 85 are ocean, and 32 are stream
+          # need to make sure that this difference is understood
+          # consider making a stocknames_ocean and _stream?
+        target_SREP_ocean <- all_pars %>% 
+          filter (Param %in% c("target_lnSREP_ocean")) %>% 
+          add_column(Stock = stocknames_ocean)
+        target_SMSY_pull_ocean <- target_SMSY_ocean %>% 
+          pull(Estimate)
+        target_SREP_pull_ocean <- target_SREP_ocean %>% 
+          pull(Estimate)
+        # Step 2
+        target_SMSY_pi_ocean <- PredInt(x = log(wa_ocean), 
+                                        y = obs_lSMSY_ocean, 
+                                        Predy = target_SMSY_pull_ocean, 
+                                        Newx = data$target_lnWA_ocean)
+        target_SREP_pi_ocean <- PredInt(x = log(wa_ocean), 
+                                        y = obs_SREP_ocean, 
+                                        Predy = target_SREP_pull_ocean, 
+                                        Newx = data$target_lnWA_ocean)
+        # Step 3
+        target_SMSY_ocean <- target_SMSY_ocean %>% 
+          add_column(LL = exp(target_SMSY_pi_ocean$lwr), 
+                     UL = exp(target_SMSY_pi_ocean$upr))
+        target_SREP_ocean <- target_SREP_ocean %>% 
+          add_column(LL = exp(target_SREP_pi_ocean$lwr), 
+                     UL = exp(target_SREP_pi_ocean$upr))
+        # Step 4
+        target_SMSY_ocean <- target_SMSY_ocean %>% 
+          mutate (Estimate = exp(Estimate)) %>% 
+          dplyr::select(-Std..Error, - Param) %>% 
+          add_column(Param = "SMSY")
+        target_SREP_ocean <- target_SREP_ocean %>% 
+          mutate (Estimate = exp(Estimate)) %>% 
+          dplyr::select(-Std..Error, - Param) %>% 
+          add_column(Param = "SREP")
+        # Step 5
+        target_estimates_SMSY_ocean <- target_SMSY_ocean %>% 
+          mutate(Estimate = round(Estimate, 0), 
+                 LL = round(LL,0), 
+                 UL = round(UL,0))
+        target_estimates_SREP_ocean <- target_SREP_ocean %>% 
+          mutate(Estimate = round(Estimate, 0), 
+                 LL = round(LL,0), 
+                 UL = round(UL,0))
+      
+        data_out_ocean <- target_estimates_SMSY_ocean %>% 
+          bind_rows(target_estimates_SREP_ocean)
+        # bind watershed area back to these dataout files
+        data_out_ocean <- merge(data_out_ocean, wasample, 
+                                by="Stock", 
+                                all.x=TRUE, sort=FALSE) # makes them alphabetical
+        
+        }
+      
+      # WARNING
+      length_check_params_ocean <- all_pars %>% 
+        filter (Param %in% c("target_lnSMSY_ocean"))
+      if (length(stocknames_ocean) == length(length_check_params_ocean$Estimate)) { # originally this checked the full stocknames list
+        print("Lengths checked passed - Ocean life histories.")
+      } else {
+        print("WARNING: The output and inputs are not the same length.")
+      }
+      
+      # Does not currently work * no data for stream
+      if (any(WAin$lh == 0)){
+        # Step 1
+        target_SMSY_stream <- all_pars %>% 
+          filter (Param %in% c("target_lnSMSY_stream")) %>%
+          add_column(Stock = stocknames_stream)
+        target_SREP_stream <- all_pars %>% 
+          filter (Param %in% c("target_lnSREP_stream")) %>% 
+          add_column(Stock = stocknames_stream)
+        target_SMSY_pull_stream <- target_SMSY_stream %>% 
+          pull(Estimate)
+        target_SREP_pull_stream <- target_SREP_stream %>% 
+          pull(Estimate)
+        # Step 2
+        target_SMSY_pi_stream <- PredInt(x = log(wa_stream), 
+                                         y = obs_lSMSY_stream, 
+                                         Predy = target_SMSY_pull_stream, 
+                                         Newx = data$target_lnWA_stream)
+        target_SREP_pi_stream <- PredInt(x = log(wa_stream), 
+                                         y = obs_SREP_stream, 
+                                         Predy = target_SREP_pull_stream, 
+                                         Newx = data$target_lnWA_stream)
+        # Step 3
+        target_SMSY_stream <- target_SMSY_stream %>% 
+          add_column(LL = exp(target_SMSY_pi_stream$lwr), 
+                     UL = exp(target_SMSY_pi_stream$upr))
+        target_SREP_stream <- target_SREP_stream %>% 
+          add_column(LL = exp(target_SREP_pi_stream$lwr), 
+                     UL = exp(target_SREP_pi_stream$upr))
+        # Step 4
+        target_SMSY_stream <- target_SMSY_stream %>% 
+          mutate (Estimate = exp(Estimate)) %>% 
+          dplyr::select(-Std..Error, - Param) %>%
+          add_column(Param = "SMSY")
+        target_SREP_stream <- target_SREP_stream %>% 
+          mutate (Estimate = exp(Estimate)) %>% 
+          dplyr::select(-Std..Error, - Param) %>%
+          add_column(Param = "SREP")
+        # Step 5
+        target_estimates_SMSY_stream <- target_SMSY_stream %>% 
+          mutate(Estimate = round(Estimate, 0), 
+                 LL = round(LL,0), 
+                 UL = round(UL,0))
+        target_estimates_SREP_stream <- target_SREP_stream %>% 
+          mutate(Estimate = round(Estimate, 0), 
+                 LL = round(LL,0), 
+                 UL = round(UL,0))
+      
+        data_out_stream <- target_estimates_SMSY_stream %>% 
+          bind_rows(target_estimates_SREP_stream)
+        # bind watershed area back to these dataout files
+        data_out_stream <- merge(data_out_stream, wasample, 
+                                 by="Stock", all.x=TRUE, sort=FALSE)
+        
+        }
+      
+      # WARNING
+      length_check_params_stream <- all_pars %>% 
+        filter (Param %in% c("target_lnSMSY_stream"))
+      if (length(stocknames_stream) == length(length_check_params_stream$Estimate)) { # originally this checked the full stocknames list
+        print("Lengths checked passed - Stream life histories.")
+      } else {
+        print("WARNING: The output and inputs are not the same length.")
+      }
+      
+          # STEPS
+      # For inclusion into if loops above
+      # Main goal is to allow for stream/ocean AND scenarios
+      # Step 1: Filter out targets into new df and extract a single column estimates
+      # targetSMSY <- all_pars %>% filter (Param %in% c("target_lnSMSY_ocean")) %>% add_column(Stock = stocknames) # OLD # target ocean example
+      # targetSREP <- all_pars %>% filter (Param %in% c("target_lnSREP_ocean")) %>% add_column(Stock = stocknames) # OLD # target ocean example
+      # targetSMSYpull <- targetSMSY %>% pull(Estimate) # OLD
+      # targetSREPpull <- targetSREP %>% pull(Estimate) # OLD
+      
+      # Step 2: create new intervals object
+      # Use custom function: PredInt() to estimate prediction intervals 
+        # PredInt() defined in helperFunctions.R
+      # targetSMSY_pi <- PredInt(x = log(wa_ocean), y = obs_lSMSY_ocean, Predy = targetSMSYpull, Newx = data$target_lnWA_ocean) # OLD
+      # targetSREP_pi <- PredInt(x = log(wa_ocean), y = obs_SREP_ocean, Predy = targetSREPpull, Newx = data$target_lnWA_ocean) # OLD
+      
+      # Step 3: add a column with intervals to target dataframes (currently only ONE SCENARIO)
+      # exp() bounds
+      # targetSMSY <- targetSMSY %>% add_column(LL = exp(targetSMSY_pi$lwr), UL = exp(targetSMSY_pi$upr)) # OLD
+      # targetSREP <- targetSREP %>% add_column(LL = exp(targetSREP_pi$lwr), UL = exp(targetSREP_pi$upr)) # OLD
+      
+      # Step 4: mutate exp() to estimate 
+      # targetSMSY <- targetSMSY %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+      #   add_column(Param = "SMSY") # OLD
+      # targetSREP <- targetSREP %>% mutate (Estimate = exp(Estimate)) %>% dplyr::select(-Std..Error, - Param) %>% 
+      #   add_column(Param = "SREP") # OLD
+      
+      # Step 5: Mutate to round targets and bind together SMSY and SREP
+      # target_estimates_SMSY <- targetSMSY %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0)) # OLD
+      # target_estimates_SREP <- targetSREP %>% mutate(Estimate = round(Estimate, 0), LL = round(LL,0), UL = round(UL,0)) # OLD
+      
+      
+      # Final combination of SMSY and SREP estimates into final df
+        # if statement for stream or ocean presence
+      if (all(c(0, 1) %in% WAin$lh)) {
+        print("Both life histories are present and will be combined.")
+        data_out_combined <- data_out_ocean %>% bind_rows(data_out_stream)
+        data_out_combined <- distinct(data_out_combined) # This may cause problems
+      } else {
+        print("Only one life history detected.")
+      }
+      
+      # Data Out combinations: now moved upwards into the conditional statements
+      # data_out_ocean <- target_estimates_SMSY_ocean %>% bind_rows(target_estimates_SREP_ocean)
+      # data_out_stream <- target_estimates_SMSY_stream %>% bind_rows(target_estimates_SREP_stream)
+      # data_out_combined <- data_out_ocean %>% bind_rows(data_out_stream)
+      
+      # data_out <- target_estimates_SMSY %>% bind_rows(target_estimates_SREP) # OLD
+      
+      # Step 6: Final writing step for outputting targets
+      # Write SMSY and SREP with PIs to file
+      
+        # Two separate if's: for remove, without remove
+          # Within each: for ocean, for stream, for combined
+      
+      # if (any(WAin$lh == 0)) {} # stream
+      # if (any(WAin$lh == 1)) {} # ocean
+    
+      # paste("DataOut/", targetname, "_dataout_target_ocean_noEnh", sep = "")
+      
+    # For NO ENHANCEMENT datasets
+      if (remove.EnhStocks) {
+        if (all(WAin$lh == 0)) { # stream only
+          outname <- paste("DataOut/", targetname, "_dataout_target_stream_noEnh.csv", sep = "")
+          if(remove.EnhStocks) write.csv(data_out_stream, here::here(outname))
+          if(remove.EnhStocks) datain <- c(outname)
+          print("Stream life histories detected and moved forward.")
+          print(paste("DataOut:", outname))
+          
+        }
+        if (all(WAin$lh == 1)) { # ocean only
+          outname <- paste("DataOut/", targetname, "_dataout_target_ocean_noEnh.csv", sep = "")
+          if(remove.EnhStocks) write.csv(data_out_ocean, here::here(outname))
+          if(remove.EnhStocks) datain <- c(outname)
+          print("Ocean life histories detected and moved forward.")
+          print(paste("DataOut:", outname))
+          
+        }
+        if (all(c(0, 1) %in% WAin$lh)) { # stream and ocean 
+          outname <- paste("DataOut/", targetname, "_dataout_target_noEnh.csv", sep = "")
+          if(remove.EnhStocks) write.csv(data_out_combined, here::here(outname))
+          if(remove.EnhStocks) datain <- c(outname)
+          print("Stream and ocean life histories detected, combined, and moved forward.")
+          print(paste("DataOut:", outname))
+          
+        }
+      }
+      
+    # For ENHANCEMENT datasets
+      if (!remove.EnhStocks) {
+        if (all(WAin$lh == 0)) { # stream
+          outname <- paste("DataOut/", targetname, "_dataout_target_stream_wEnh.csv", sep = "")
+          if(!remove.EnhStocks) write.csv(data_out_stream, here::here(outname))
+          if(!remove.EnhStocks) datain <- c(outname)
+          print("Stream life histories detected and moved forward.")
+          print(paste("DataOut:", outname))
+          
+        } 
+        if (all(WAin$lh == 1)) { # ocean
+          outname <- paste("DataOut/", targetname, "_dataout_target_ocean_wEnh.csv", sep = "")
+          if(!remove.EnhStocks) write.csv(data_out_ocean, here::here(outname))
+          if(!remove.EnhStocks) datain <- c(outname)
+          print("Ocean life histories detected and moved forward.")
+          print(paste("DataOut:", outname))
+          
+        }
+        if (all(c(0, 1) %in% WAin$lh)) { # combined
+          outname <- paste("DataOut/", targetname, "_dataout_target_wEnh.csv", sep = "")
+          if(!remove.EnhStocks) write.csv(data_out_combined, here::here(outname))
+          if(!remove.EnhStocks) datain <- c(outname)
+          print("Stream and ocean life histories detected, combined, and moved forward.")
+          print(paste("DataOut:", outname))
+          
+        } 
+      }
+      
+      # if(remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_noEnh.csv"))
+      # if(remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_noEnh.csv")
+      # if(!remove.EnhStocks) write.csv(data_out_ocean, here::here("DataOut/dataout_target_ocean_wEnh.csv"))
+      # if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_ocean_wEnh.csv")
+      
+      # if(remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_noEnh.csv"))
+      #if(remove.EnhStocks) datain_stream <- c("DataOut/dataout_target_stream_noEnh.csv")
+      
+      # if(!remove.EnhStocks) write.csv(data_out_stream, here::here("DataOut/dataout_target_stream_wEnh.csv"))
+      #if(!remove.EnhStocks) datain_stream <- c("DataOut/dataout_target_stream_wEnh.csv")
+    
+      # if(remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_noEnh.csv"))
+      # if(remove.EnhStocks) datain <- c("DataOut/dataout_target_noEnh.csv")
+      
+      # if(!remove.EnhStocks) write.csv(data_out, here::here("DataOut/dataout_target_wEnh.csv"))
+      # if(!remove.EnhStocks) datain <- c("DataOut/dataout_target_wEnh.csv")
+      
+      # ONLY ONE FILE CAN GO FORWARD
+        # STATEMENT MUST BE WRITTEN - SO ONLY ONE OF THE ABOVE EVENTS OCCURS DURING A RUN
+        
+        # y/n enhancement
+        # ocean only
+        # stream only
+        # combined
     
   } 
     
@@ -1454,7 +1454,8 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   
   if (run.bootstraps == TRUE) {
     return.list <- c(return.list,
-                     list(dfout = dfout))
+                     list(dfout = dfout)) # dfout stock order: Order ocean on top of stream - NOT in the original
+    # order of data entry.
   }
   
   # return(list(opt = opt, 
