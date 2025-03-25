@@ -17,7 +17,7 @@ source(here::here("R/LambertWs.R"))
 source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
 
 # Wrapper Function ####
-compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
+# compiler::enableJIT(0) # Run first without just to see if bug is fixed yet
 # seems not to run on the first attempt - answers [3] instead of [0]
 
 # Saves for internal runs without the wrapper function
@@ -48,8 +48,8 @@ WAin <- read.csv(here::here(WAin))
 # Remove Hoko and Hoh stocks - consider removing SKagit OR Chehalis
     # Due to sampling reasons explained in Parken 2006.
 srdatwna <- srdatwna %>% 
-  filter(!Name %in% c("Hoko","Hoh")) # |> 
-  # filter( !(Name == "Skagit")) |> # Skagit is #22
+  filter(!Name %in% c("Hoko","Hoh")) # |>
+  # ( !(Name == "Skagit")) # |> # Skagit is #22
     # Excluding Skagit will decrease SGEN
   # filter( !(Name == "Chehalis")) # |> # Chehalis is #19
     # Excluding Chehalis will increase SGEN
@@ -74,7 +74,7 @@ names <- srdat %>%
   dplyr::select (Stocknumber, Name, lh) %>% 
   distinct()
 
-# Remove Skagit or Chehalis from WAbase
+# Remove Skagit or Chehalis from WAbase --> Now overriden by line 82
 # WAbase <- WAbase |> 
 #   filter(!(Name == "Skagit"))
   # filter(!(Name == "Chehalis"))
@@ -850,6 +850,11 @@ par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1)) # To fit all the pl
 
 Parken_ab <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) 
   # KSR, Andrew, Lewis, Columbia - just different names - but ORDER is the same
+  # Needs correction for removal of Skagit and Chehalis
+if (!'Skagit' %in% WAbase$Name) Parken_ab <- Parken_ab |> filter( !(Stock == "Skagit")) 
+if (!'Chehalis' %in% WAbase$Name) Parken_ab <- Parken_ab |> filter( !(Stock == "Chehalis")) 
+Parken_ab <- Parken_ab |> 
+  mutate(Stocknumber = as.integer(factor(Stocknumber)) - 1) # Re-order Stocknumber to be ascending
 
 for (i in Stks){
   # Get stocknames and numbers
@@ -866,16 +871,21 @@ for (i in Stks){
       #   dplyr::select(scale) %>% distinct() %>% 
       #   as.numeric()
   
-  if(name != "Skagit" & name != "KSR") 
-    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)), ylim=c(0,max(R$Rec) ) )
+  if(name != "Skagit" & name != "KSR" & name != "Humptulips" & name != "Chehalis") 
+    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)+(max(S$Sp)/3)), ylim=c(0,max(R$Rec) ) )
   if(name == "Skagit") 
-    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)*3), ylim=c(0,max(R$Rec) ) )
+    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)*3+(max(S$Sp)*2)), ylim=c(0,max(R$Rec) ) )
   if(name == "KSR") 
-    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,500), ylim=c(0,max(R$Rec) ) )
+    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,1150), ylim=c(0,max(R$Rec) ) ) # xlim was 500 or 1000
+  if(name == "Humptulips") # Requires extra larger xlim
+    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)+10000), ylim=c(0,max(R$Rec) ) )
+  if(name == "Chehalis") # Requires extra larger xlim
+    plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)+50000), ylim=c(0,max(R$Rec) ) )
+  # TK: Trying to add 1/4 of max range to xlim to allow for larger polygon CI's ****************************************
   
   # Get alpha and beta parameters
       # NOTE: can substitute $alpha$Mean if you want to use Mean
-      # Median is resistant to monotonic transformations
+      # Median is resistant to monotonic transformations e.g. ln, exp, ... cube
   a <- as.numeric(derived_obj$deripost_summary$logAlpha$Median[derived_obj$deripost_summary$logAlpha$Stock - 1 == i])
   b <- as.numeric(derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock - 1 == i])
   
@@ -914,16 +924,21 @@ for (i in Stks){
   ap <- Parken_ab$Alpha # vector
   bp <- Parken_ab$Beta # vector
   
-  for (j in 1:100){ # Creates a step-wise sample line by which to create a line on
-    if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100) # IF NOT SKAGIT OR KSR
-    if (i==22) SS[j] <- j*(max(S$Sp*3)/100) # Skagit
-    if (i==7) SS[j] <- j*(500/100) # KSR
+  for (j in 1:250){ # Creates a step-wise sample line by which to create a line on - extended
+    
+    # Correct for changes in stocknumber
+    if ("Skagit" %in% WAbase$Name) if (i!=22 & i!=7) SS[j] <- j*(max(S$Sp)/100) # IF NOT SKAGIT OR KSR - When Skagit exists
+    if ("Skagit" %in% WAbase$Name) if (i==22) SS[j] <- j*(max(S$Sp*3)/100) # If Skagit exists
+    
+    if(!"Skagit" %in% WAbase$Name) if (i!=7) SS[j] <- j*(max(S$Sp)/100) # If not KSR - When Skagit doesn't exist
+    if (i==7) SS[j] <- j*(500/100) # if KSR - could also add: if ("King Salmon" %in% WAbase$Name) 
+    
     
     RR[j] <- exp(a) * SS[j] * exp(-b * SS[j])
     
     RR_parken[j] <- ap[i+1] * SS[j] * exp(-bp[i+1] * SS[j])
     
-    if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
+    if ("Skagit" %in% WAbase$Name) if(i==22) {RR_skagit[j] <- skagit_alpha * SS[j] * exp(-skagit_beta * SS[j])} # Skagit Line based on
       # alpha and beta from Table 1 and 2 from Parken et al. 2006
     
     if(exists("iwamobj")) RRiwam[j] <- aiwam * SS[j] * exp(-biwam * SS[j])
@@ -936,7 +951,7 @@ for (i in Stks){
   
   # For Skagit, add Parken et al. 2006 model curve
   #if(removeSkagit==FALSE) {
-  if(i==22) lines(x=SS, y=RR_skagit, lty="dashed") # }
+  if ("Skagit" %in% WAbase$Name) if(i==22) lines(x=SS, y=RR_skagit, lty="dashed") # }
   
   # For all stocks, added in Parken et al. 2006 model curve
   lines(x=SS, y=RR_parken, lty="dashed", col="red")
@@ -948,15 +963,15 @@ for (i in Stks){
   # PLOTTING VERTICAL LINES FOR SMSY, SMAX, OR SREP
   # Plot SMSY
   # stock - 1 asstock runs 1:25 not 0:24
-  SMSY <- derived_obj$deripost_summary$SMSY_r$Median[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
-  SMSY_ul <- derived_obj$deripost_summary$SMSY_r$UQ_95[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
-  SMSY_ll <- derived_obj$deripost_summary$SMSY_r$LQ_5[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
+  # SMSY <- derived_obj$deripost_summary$SMSY_r$Median[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
+  # SMSY_ul <- derived_obj$deripost_summary$SMSY_r$UQ_95[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
+  # SMSY_ll <- derived_obj$deripost_summary$SMSY_r$LQ_5[derived_obj$deripost_summary$SMSY_r$Stock - 1 == i]
   SMAX <- 1/derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock - 1 == i]
   SMAX_ul <- 1/derived_obj$deripost_summary$BETA_r$UQ_95[derived_obj$deripost_summary$BETA_r$Stock - 1 == i] # Rev.
   SMAX_ll <- 1/derived_obj$deripost_summary$BETA_r$LQ_5[derived_obj$deripost_summary$BETA_r$Stock - 1 == i] # Rev.
-  SREP <- derived_obj$deripost_summary$E$Median[derived_obj$deripost_summary$E$Stock - 1 == i]
-  SREP_ul <- derived_obj$deripost_summary$E$UQ_95[derived_obj$deripost_summary$E$Stock - 1 == i]
-  SREP_ll <- derived_obj$deripost_summary$E$LQ_5[derived_obj$deripost_summary$E$Stock - 1 == i]
+  # SREP <- derived_obj$deripost_summary$E$Median[derived_obj$deripost_summary$E$Stock - 1 == i]
+  # SREP_ul <- derived_obj$deripost_summary$E$UQ_95[derived_obj$deripost_summary$E$Stock - 1 == i]
+  # SREP_ll <- derived_obj$deripost_summary$E$LQ_5[derived_obj$deripost_summary$E$Stock - 1 == i]
   
   if(exists("iwamobj")) SMAXiwam <- 1/biwam
   if(exists("iwamobj")) SMAXiwam_ll <- 1/(biwam_se$B_lower)
@@ -981,15 +996,6 @@ for (i in Stks){
         col=grey(0.8, alpha=0.4), border=NA )
   
   # Can also do one for SREP
-
-
-  # if(!is.null(SMSY_std)) {
-  #   SMSY_std <- SMSY_std %>% right_join(names) %>% filter(Name==name$Name) # filter(Stocknumber != 22) 
-  #   if(mod=="IWAM_FixedSep"|mod=="IWAM_FixedCombined"|mod=="Ricker_AllMod"){ 
-  #     if(i %in% stksNum_ar) abline(v=SMSY_std$Estimate[which(SMSY_std$Stocknumber==i)]*scale.stock[i+1] , col="black")
-  #     if(i %in% stksNum_surv) abline(v=SMSY_std$Estimate[which(SMSY_std$Stocknumber==i)]*scale.stock[i+1] , col="black")
-  #   }
-  # }
   
   # Parken Smsy Estimate (vert. line) from Table 1/2 Parken et al. 2006
     # Stocks not ordered the same way as other files - alphabetical instead
