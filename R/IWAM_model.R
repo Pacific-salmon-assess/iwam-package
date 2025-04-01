@@ -1322,7 +1322,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
     
       stockNames <- read.csv(here::here(datain)) %>% 
-        filter(Stock != "Cypre") %>% # *********************************************************** CYPRE FLAG
+        # filter(Stock != "Cypre") %>% # **************************** CYPRE FLAG
         pull(Stock)
       stockNames <- unique(stockNames)
       

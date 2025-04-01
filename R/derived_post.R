@@ -9,9 +9,11 @@ library(beepr)
 derived_post <- function(x) {
   post <- as.matrix(x) # Where x is the stan fit object
   
+  # mcmc_dens(post, regex_pars = "b0")
+  
   # MATRIX EXTRACTION of full samples
-  n_rows <- 18000
-  n_cols <- sapply(obj$report(post), function(x) length(x))
+  n_rows <- dim(x)[1] * dim(x)[2] # dim(fitstan) - 4500 post-warmup draws * 4 chains = 18000
+  n_cols <- sapply(obj$report(post), function(x) length(x)) # Number of columns/stocks PER parameter
   n_matrices <- length(n_cols)
   
   matrices <- lapply(seq_len(n_matrices), function(k) {
@@ -26,7 +28,7 @@ derived_post <- function(x) {
   
   # res = NULL
   for (i in seq_len(n_rows)) {  
-    report_i <- obj$report(post[i,])  
+    report_i <- obj$report(post[i,])
     for (k in seq_len(n_matrices)) { 
       matrices[[k]][i, seq_len(n_cols[k])] <- report_i[[k]]
       # This should be correctly adapted for a different number of columns per parameters
@@ -47,6 +49,9 @@ derived_post <- function(x) {
   # Final elapsed time
   total_elapsed_time <- end_time - start_time
   cat("\nTotal time taken:", total_elapsed_time, "\n")
+  
+  # Random effects - per row of the matrix for logE_tar and logAlpha_tar
+    # you would add in their respective rnorms
   
   # DATAFRAME CREATION of summarized derived posteriors
   dataframes <- lapply(seq_len(n_matrices), function(k) {

@@ -101,7 +101,7 @@ Type objective_function<Type>:: operator() ()
   DATA_VECTOR(target_lnWA_stream);
   
   PARAMETER_VECTOR(logA); 
-  PARAMETER_VECTOR(logB); 
+  PARAMETER_VECTOR(logB);
   PARAMETER_VECTOR(logSigma); 
   
   PARAMETER(logMuA_stream);
@@ -370,6 +370,9 @@ Type objective_function<Type>:: operator() ()
   ADREPORT(lnSMSY);
   ADREPORT(lnSREP); 
   
+  // ADREPORT(logA); // logA as a vector from Ricker model - scaled
+  // ADREPORT(logB); // logB as a vector from Ricker model - scaled
+  
   ADREPORT(pred_lnSMSY_stream_CI); // synoptic "predicted" lnSMSY along a line
   ADREPORT(pred_lnSMSY_ocean_CI);
   ADREPORT(pred_lnSREP_stream_CI);
@@ -381,6 +384,7 @@ Type objective_function<Type>:: operator() ()
   ADREPORT(target_lnSREP_stream);
   
   REPORT(nLL); // Removed _std
+  
   return ans;
 }
 

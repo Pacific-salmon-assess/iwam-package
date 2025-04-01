@@ -22,6 +22,10 @@ source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
 
 # Saves for internal runs without the wrapper function
 WAin <- c("DataIn/Parken_evalstocks.csv")
+# For re-evaluation of synoptic sets
+    # Run model until setting up data section
+    # Then over-write WAin <- WAbase
+    # And rename logWAshifted to logWAshifted_t
 # WAin <- c("DataIn/WCVIStocks.csv") # For use in comparing StockRecruit relationships
   # Unless you don't want Parken estimates alongside
 # WAin <- c("DataIn/WCVIStocks_NanPunt.csv") # For testing
@@ -136,7 +140,8 @@ f_srep <- function(par){
   
   S = srdat$Sp
   type = lifehist$lh # + 1
-  type_tar = WAin$lh # used to be lh_new --> now changed "lh to lh_old"
+  # type_tar = WAin$lh # used to be lh_new --> now changed "lh to lh_old"
+  type_tar = as.numeric(WAin$lh) - 1
   
   E <- numeric(N_Stk)
   logE_pred <- numeric(N_Stk)
@@ -203,15 +208,23 @@ f_srep <- function(par){
   for (i in 1:N_Pred){
     # Posterior of the mean NOT the posterior predicted mean
         # Are you trying to predict onto a new site vs.
-        # Predict the mean sitesq
+        # Predict the mean sites
     
       # Are you included the uncertainty of the random effect or not?
     
     # nll <- nll - sum(dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE))
     # dnorm(hj_pred[i], 0, sd = logAlphaSD, log  = TRUE) 
     # logAlpha_tar[i] <- logAlpha0 + hj_pred[i]
-    
+      
+    # Conditional Mean: Credible intervals - conditional mean 
+        # - assuming random effect is zero
+        # Conditioning on site effect that has value zero:
+        # Mean is an EXPECTED stock.
     logAlpha_tar[i] <- logAlpha0
+    
+    # Marginal mean - add random effect from rnorm of logE_re
+        # Integrate out random effect: the mean for ANY site.
+    # nll <- nll - sum(dnorm(logAlpha_tar[i], logAlpha0, sd = logAlphaSD, log = TRUE))
     
     # dnorm(logAlpha_tar[i], logAlpha0, sd = logAlphaSD, log = TRUE)
     
@@ -225,8 +238,12 @@ f_srep <- function(par){
     
     ## logE_tar[i] <- b0[type[i]] + bWA[type[i]]*WAin$logWAshifted_t[i]
     # logE_tar[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i])*WAin$logWAshifted_t[i]
+    # Conditional mean of logE_tar
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
+      # + ...
     E_tar[i] <- exp(logE_tar[i])
+    
+    # Marginal mean of logE_tar
 
     # Predict BETA
     BETA[i] <- logAlpha_tar[i]/E_tar[i]
@@ -295,6 +312,9 @@ f_srep <- function(par){
   REPORT(E_line_ocean) # Imaginary line values for plotting
   ADREPORT(E_line_ocean)
   
+  REPORT(logAlphaSD)
+  REPORT(logESD)
+  
   nll
 }
 
@@ -336,11 +356,10 @@ init <- function() {
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
-       logESD = runif(1, 0, 1), # rnorm(1,1,1), # Contains negatives
-       logAlphaSD = runif(1, 0, 1) # rnorm(1,1,1) # Contains negatives
+       logESD = runif(1, 0.01, 3), # rnorm(1,1,1), # Contains negatives 
+       logAlphaSD = runif(1, 0.01, 3) # rnorm(1,1,1) # Contains negatives
   )
 }
-
 
 # init <- function(){
 #   list(b0 = c(10, 0),
@@ -373,6 +392,7 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init, # init = init fu
                    lower = lower, upper = upper,
                    # consider adapt_delta or max_treedepth
                    chains = 4, open_progress = FALSE, silent = TRUE)
+  # Can I run it in parallel?
 
 # Test and diagnostic plots ####
 # mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
@@ -388,6 +408,7 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan)
+  # Add random effects to each iteration of posterior chain
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
@@ -406,10 +427,6 @@ prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
 #bias.cor is also an option - but I don't needed given that these
   # are done on posteriors
 
-    # 1. LifeStageModel METHOD
-# USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
-
-    # 2. PARKEN METHOD
 # Function
 if (BS == TRUE) {
   for (k in 1:bsiters) {
@@ -420,6 +437,8 @@ if (BS == TRUE) {
     SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96
     SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96
     
+    # 1. LifeStageModel METHOD
+      # USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
     if (prod == "LifeStageModel") {
       Mean.Ric.A <- 1
       Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, 0))
@@ -440,6 +459,7 @@ if (BS == TRUE) {
       SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
     }
     
+    # 2. PARKEN METHOD
     if (prod == "Parken"){
       est_loga <- function(SMSY, SREP, shortloga=FALSE){
         loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
@@ -452,9 +472,6 @@ if (BS == TRUE) {
       }
       
       SMSY <- derived_obj$deripost_summary$SMSY$Median # Mean, Median, or Mode?
-      # RPs_long <- read.csv(here::here(datain))
-      # SMSY <- RPs_long %>% filter(Param == "SMSY") %>% select(Estimate) 
-      # SREP <- RPs_long %>% filter(Param == "SREP") %>% select(Estimate)
       
       # purrr the est_loga function for logA
       lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
@@ -467,6 +484,7 @@ if (BS == TRUE) {
       # beta_e <- loga_e/SREP_e
       
       # Bias correction could go here - see earlier versions  
+      
       sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
       if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
       
@@ -488,12 +506,10 @@ if (BS == TRUE) {
     #   )
     
     out <- list(bench = select(SGENcalcs, -apar, -bpar))
-    
-    # outBench[[k]] <- out # This doesn't translate into the SGEN.bs statement below
     outBench[k] <- out
   }
 
-        # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
+  # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
       # 95th percentiles
   SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   
@@ -1042,5 +1058,57 @@ for (i in Stks){
   # y = Recruitment
 mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
 mtext("Recruitment", side = 2, line  = 1, outer = TRUE, cex = 1.3, las = 0)
+
+# HEATMAP of alpha and beta parameter values on SMSY and SREP ####
+library(ggplot2)
+library(reshape2)
+library(pracma)  # For Lambert W function
+
+# Define the range for a.par and b.par
+a_par_values <- seq(1, 10, length.out = 20)
+b_par_values_new <- seq(0.00001, 0.002, length.out = 20)
+
+# Create an empty matrix to store SMSY values
+SMSY_matrix_new <- matrix(0, nrow = length(a_par_values), ncol = length(b_par_values_new))
+SREP_matrix_new <- matrix(0, nrow = length(a_par_values), ncol = length(b_par_values_new))
+
+# Compute SMSY values
+for (i in seq_along(a_par_values)) {
+  for (j in seq_along(b_par_values_new)) {
+    a_par <- a_par_values[i]
+    b_par <- b_par_values_new[j]
+    
+    W0_term <- gsl::lambert_W0(exp(1 - log(a_par)))
+    SMSY_matrix_new[i, j] <- (1 - W0_term) / b_par
+    SREP_matrix_new[i, j] <- log(a_par) / b_par
+  }
+}
+
+# Convert matrix to data frame for ggplot
+df <- expand.grid(a_par = a_par_values, b_par = b_par_values_new)
+df$SMSY <- as.vector(SMSY_matrix_new)
+
+df2 <- expand.grid(a_par = a_par_values, b_par = b_par_values_new)
+df2$SREP <- as.vector(SREP_matrix_new)
+
+# Create heatmap
+ggplot(df, aes(x = b_par, y = a_par, fill = SMSY)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(title = "Heatmap of SMSY values with Adjusted b.par Range",
+       x = "b.par values (0.00001 to 0.002)",
+       y = "a.par values",
+       fill = "SMSY") +
+  theme_minimal()
+
+ggplot(df2, aes(x = b_par, y = a_par, fill = SREP)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(title = "Heatmap of SREP values with Adjusted b.par Range",
+       x = "b.par values (0.00001 to 0.002)",
+       y = "a.par values",
+       fill = "SREP") +
+  theme_minimal()
+
 
 # END ###
