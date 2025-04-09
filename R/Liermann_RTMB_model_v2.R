@@ -270,6 +270,7 @@ f_srep <- function(par){
   ADREPORT(logE_re)
   ADREPORT(E)
   ADREPORT(logAlpha)
+  ADREPORT(logAlpha_re) # random effect parameter for resampling
   ADREPORT(alpha)
   ADREPORT(SMSY_r)
   ADREPORT(BETA_r)
@@ -278,6 +279,7 @@ f_srep <- function(par){
   REPORT(logE_re)
   REPORT(E) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logAlpha) # model logAlpha (25)
+  REPORT(logAlpha_re) # random effect parameter for resampling
   REPORT(alpha)
   REPORT(SMSY_r)
   REPORT(BETA_r)
@@ -408,7 +410,34 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan)
-  # Add random effects to each iteration of posterior chain
+  # TOR: Add random effects to each iteration of posterior chain
+
+# 2 new objects:
+  # derived_obj$deripost_summary$logAlpha_tar_re
+  # derived_obj$deripost_summary$logE_tar_re
+# These can be used to calculate NEW values for BETA, SMSY, and SGEN
+
+# Compare derived_obj$deripost_summary$logE_tar_re and derived_obj$deripost_summary$logE_tar
+etardev <- data.frame(re = derived_obj$deripost_summary$logE_tar_adj,
+                      tar = derived_obj$deripost_summary$logE_tar,
+                      dev = derived_obj$deripost_summary$logE_tar$Median - derived_obj$deripost_summary$logE_tar_adj$Median,
+                      og_re = derived_obj$deripost_summary$logE_re$Median,
+                      name = WAin$Name)
+ggplot(etardev, aes(x = name, y = dev)) +
+  geom_hline(yintercept = 0, color = "gray") +
+  geom_point(size = 4, color = "darkred") +
+  # geom_point(aes(y = og_re), size = 4, color = "steelblue", shape = 17) + # logE_re$Median
+  labs(y = "Deviation in predicted E", x = "Stock Name") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# SR Analysis using NEW random effects ####
+
+# The point of this section is to calculate NEW benchmark estimates of E
+# using a new SR model with random effects.
+# This is following the posterior prediction section of the Liermann paper.
+
+# ...
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
@@ -568,7 +597,7 @@ if (BS == TRUE) {
 # lsmout <- BS.dfout
 # pout <- BS.dfout
 
-# Plotting PREP ####
+# Prepare plotting datasets ####
   # Re-order Stocks to be in ascending order by logWA
   # Re-order Stocks to be in order of Ricker variance - which is what term? Is it extracted ???
 
@@ -612,6 +641,38 @@ parken <- parken |>
 
 cols <- viridis(8, alpha=0.9, option = "mako", direction = -1)
 
+# Testing deviations in predictions ####
+
+smsy_deviation <- derived_obj$deripost_summary$SMSY_r$Median - derived_obj$deripost_summary$SMSY$Median
+smax_deviation <- (1/derived_obj$deripost_summary$BETA_r$Median) - (1/derived_obj$deripost_summary$BETA$Median)
+testdf <- data.frame(name = WAin$Name, smsy_deviation = smsy_deviation, smax_deviation = smax_deviation)
+
+# Plot of deviations in SMSY
+ggplot(testdf, aes(x = name, y = smsy_deviation)) +
+  geom_hline(yintercept = 0, color = "gray") +
+  geom_point(size = 4, color = "darkred") +
+  labs(y = "Deviation in SMSY", x = "Name") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(testdf, aes(x = name, y = smax_deviation)) +
+  geom_hline(yintercept = 0, color = "gray") +
+  geom_point(size = 4, color = "darkred") +
+  labs(y = "Deviation in SMAX", x = "Name") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# As a regression plot
+smax_r <- (1/derived_obj$deripost_summary$BETA_r$Median)
+smax <- (1/derived_obj$deripost_summary$BETA$Median)
+testdf2 <- data.frame(smax_r = smax_r, smax = smax)
+
+ggplot(data = testdf2, aes(x = smax_r, y = smax)) +
+  geom_point() + 
+  labs(y = "Ricker Smax", x = "Predicted Smax") + 
+  theme_classic() + 
+  geom_abline(intercept = 0, slope = 1, color = "gray")
+  
 # ORIGINAL ####
 ggplot() +
   
@@ -1066,7 +1127,7 @@ library(pracma)  # For Lambert W function
 
 # Define the range for a.par and b.par
 a_par_values <- seq(1, 10, length.out = 20)
-b_par_values_new <- seq(0.00001, 0.002, length.out = 20)
+b_par_values_new <- seq(0.001, 0.002, length.out = 20)
 
 # Create an empty matrix to store SMSY values
 SMSY_matrix_new <- matrix(0, nrow = length(a_par_values), ncol = length(b_par_values_new))
@@ -1099,6 +1160,10 @@ ggplot(df, aes(x = b_par, y = a_par, fill = SMSY)) +
        x = "b.par values (0.00001 to 0.002)",
        y = "a.par values",
        fill = "SMSY") +
+  theme_minimal()
+
+ggplot(df, aes(x = b_par, y = a_par)) +
+  geom_line() +
   theme_minimal()
 
 ggplot(df2, aes(x = b_par, y = a_par, fill = SREP)) +

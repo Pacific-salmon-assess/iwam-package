@@ -52,16 +52,45 @@ derived_post <- function(x) {
   
   # Random effects - per row of the matrix for logE_tar and logAlpha_tar
     # you would add in their respective rnorms
+#   > names(matrices)
+#  [1] "logE_re"       "E"             "logAlpha"      "alpha"         "SMSY_r"       
+#  [6] "BETA_r"        "tauobs"        "E_tar"         "logE_tar"      "logAlpha_tar" 
+# [11] "alpha_tar"     "BETA"          "SMSY"          "SGEN"          "E_line_stream"
+# [16] "E_line_ocean"  "logAlphaSD"    "logESD"  
+  # so logAlpha_tar exists, and logE_tar exists HOWEVER _re object's don't exist
+  # they come from the following distributions:
+    # logAlpha_tar <- dnorm(logAlpha_re, mean = 0, sd = logAlphaSD, log = TRUE)
+    # logE_tar <- dnorm(logE_re, mean = 0, sd = logESD, log = TRUE)
+  # matrices$logE_re <- dnorm(...) # ? is this necessary?
+  
+  matrices$logE_tar_adj <- matrices$logE_tar + apply(matrices$logE_re, 2, FUN = function(x)rnorm(length(x), 0, sd = matrices$logESD))
+    # this rnorm term is about ^-1 smaller than mean(logE_re)
+    # is this correct?
+  matrices$logAlpha_tar_adj <- matrices$logAlpha_tar + apply(matrices$logAlpha_re, 2, FUN = function(x)rnorm(length(x), 0, sd = matrices$logAlphaSD))
+  
+  # Now we have logE and logAlpha for our targets
+    # These need to be transformed - and ALSO need to re-calculate 
+    # BETA, SMSY, and SGEN with these new values
+    # Would this be done on EVERY iteration for EACH chain?
+  # e.g. 
+  matrices$E_tar_adj <- exp(matrices$logE_tar_adj) # for transformed E
+  matrices$BETA_adj <- matrices$logAlpha_tar_adj / matrices$E_tar_adj
+  matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_adj
+  matrices$SGEN_adj <- -1/ matrices$BETA_adj * LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
+
+  # Re-calculate lengths for added parameters
+  n_matrices <- length(matrices)
+  n_cols <- sapply(matrices, function(x) dim(x)) # Now with 2 dimensions
   
   # DATAFRAME CREATION of summarized derived posteriors
   dataframes <- lapply(seq_len(n_matrices), function(k) {
     data.frame(
-      Stock = character(n_cols[k]),
-      Mean = numeric(n_cols[k]),
-      Median = numeric(n_cols[k]),
-      PosteriorMode = numeric(n_cols[k]), # New addition of posterior Mode
-      LQ_5 = numeric(n_cols[k]),
-      UQ_95 = numeric(n_cols[k])
+      Stock = character(n_cols[2,k]),
+      Mean = numeric(n_cols[2,k]),
+      Median = numeric(n_cols[2,k]),
+      PosteriorMode = numeric(n_cols[2,k]), # New addition of posterior Mode
+      LQ_5 = numeric(n_cols[2,k]),
+      UQ_95 = numeric(n_cols[2,k])
     )
   })
   
