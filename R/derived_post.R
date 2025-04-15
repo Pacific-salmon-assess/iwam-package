@@ -63,11 +63,9 @@ derived_post <- function(x) {
     # logE_tar <- dnorm(logE_re, mean = 0, sd = logESD, log = TRUE)
   # matrices$logE_re <- dnorm(...) # ? is this necessary?
   
-  matrices$logE_tar_adj <- matrices$logE_tar + apply(matrices$logE_re, 2, FUN = function(x)rnorm(length(x), 0, sd = matrices$logESD))
-    # this rnorm term is about ^-1 smaller than mean(logE_re)
-    # is this correct?
-  matrices$logAlpha_tar_adj <- matrices$logAlpha_tar + apply(matrices$logAlpha_re, 2, FUN = function(x)rnorm(length(x), 0, sd = matrices$logAlphaSD))
-  
+  matrices$logE_tar_adj <- apply(matrices$logE_tar, 2, FUN = function(x)rnorm(length(x), x, sd = matrices$logESD))
+  matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, FUN = function(x)rnorm(length(x), x, sd = matrices$logAlphaSD))
+
   # Now we have logE and logAlpha for our targets
     # These need to be transformed - and ALSO need to re-calculate 
     # BETA, SMSY, and SGEN with these new values
@@ -76,7 +74,8 @@ derived_post <- function(x) {
   matrices$E_tar_adj <- exp(matrices$logE_tar_adj) # for transformed E
   matrices$BETA_adj <- matrices$logAlpha_tar_adj / matrices$E_tar_adj
   matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_adj
-  matrices$SGEN_adj <- -1/ matrices$BETA_adj * LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
+  matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
+    LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
 
   # Re-calculate lengths for added parameters
   n_matrices <- length(matrices)
@@ -100,7 +99,8 @@ derived_post <- function(x) {
     dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
     dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
     dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
-    dataframes[[i]]$PosteriorMode <- apply(matrices[[i]], 2, function(col) {posterior.mode(as.mcmc(col))}) # New addition of posterior Mode
+    dataframes[[i]]$PosteriorMode <- apply(matrices[[i]], 2, function(col) {posterior.mode(as.mcmc(col))}) 
+      # New addition of posterior Mode
     dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
     dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
   }

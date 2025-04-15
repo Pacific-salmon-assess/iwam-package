@@ -22,10 +22,13 @@ source(here::here("R/derived_post.R")) # ~ 4 minutes total run time
 
 # Saves for internal runs without the wrapper function
 WAin <- c("DataIn/Parken_evalstocks.csv")
-# For re-evaluation of synoptic sets
+
+# For re-evaluation of synoptic sets e.g. WAbase
     # Run model until setting up data section
     # Then over-write WAin <- WAbase
     # And rename logWAshifted to logWAshifted_t
+    # And make sure to change type_tar to fit the expected 0:1 indexing
+
 # WAin <- c("DataIn/WCVIStocks.csv") # For use in comparing StockRecruit relationships
   # Unless you don't want Parken estimates alongside
 # WAin <- c("DataIn/WCVIStocks_NanPunt.csv") # For testing
@@ -141,7 +144,8 @@ f_srep <- function(par){
   S = srdat$Sp
   type = lifehist$lh # + 1
   # type_tar = WAin$lh # used to be lh_new --> now changed "lh to lh_old"
-  type_tar = as.numeric(WAin$lh) - 1
+  type_tar = as.numeric(WAin$lh) # - 1 * This was used when predicting ON the 
+    # synoptic dataset - which would produce 1:2 instead of 0:1
   
   E <- numeric(N_Stk)
   logE_pred <- numeric(N_Stk)
@@ -240,11 +244,8 @@ f_srep <- function(par){
     # logE_tar[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i])*WAin$logWAshifted_t[i]
     # Conditional mean of logE_tar
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
-      # + ...
     E_tar[i] <- exp(logE_tar[i])
     
-    # Marginal mean of logE_tar
-
     # Predict BETA
     BETA[i] <- logAlpha_tar[i]/E_tar[i]
     # Predict SMSY
@@ -366,14 +367,14 @@ init <- function() {
 # init <- function(){
 #   list(b0 = c(10, 0),
 #        bWA = c(0, 0),
-#        
+# 
 #        logE_re = numeric(N_Stk),
 #        logAlpha0 = 0.6,
 #        logAlpha_re = numeric(nrow(dat$WAbase)),
 #        # logAlpha = numeric(nrow(dat$WAbase)), # Turn off for non-zeroed parameterization
-#        
+# 
 #        tauobs = 0.01 + numeric(N_Stk),
-#        
+# 
 #        logESD = 1,
 #        logAlphaSD = 1
 #   )
@@ -390,16 +391,27 @@ upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
 # SAMPLE
-fitstan <- tmbstan(obj, iter = 5000, warmup = 500, init = init, # init = init function or "random"
+# cores <- parallel::detectCores() - 1 # Parallel 
+# options(mc.cores = cores) # Parallel
+fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
+                   # warmup = 500
                    lower = lower, upper = upper,
                    # consider adapt_delta or max_treedepth
-                   chains = 4, open_progress = FALSE, silent = TRUE)
+                   chains = 4, # or chains = cores for parallel
+                   open_progress = FALSE, silent = TRUE)
+
+# turning off inits
+# fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, # init = init, # init = init function or "random"
+#                    lower = lower, upper = upper,
+#                    chains = 4, # or chains = cores for parallel
+#                    open_progress = FALSE, silent = TRUE)
   # Can I run it in parallel?
 
 # Test and diagnostic plots ####
 # mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
 mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 # names(fitstan) for complete list of parameters from stan object
+# bayesplot::mcmc_acf(fitstan, regex_pars = "b0") # ACF plot for b0
 
 # traceplot(fitstan, pars = names(obj$par), inc_warmup = TRUE) # Decpreciated
 
@@ -410,8 +422,11 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan)
-  # TOR: Add random effects to each iteration of posterior chain
+  # ERROR: Error in matrices$logE_tar + apply(matrices$logE_re, 2, FUN = function(x) rnorm(length(x),  : 
+  # non-conformable arrays
 
+
+# Compare Deviation of Marginal and Conditional Means ####
 # 2 new objects:
   # derived_obj$deripost_summary$logAlpha_tar_re
   # derived_obj$deripost_summary$logE_tar_re
@@ -430,14 +445,6 @@ ggplot(etardev, aes(x = name, y = dev)) +
   labs(y = "Deviation in predicted E", x = "Stock Name") +
   theme_minimal() + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-# SR Analysis using NEW random effects ####
-
-# The point of this section is to calculate NEW benchmark estimates of E
-# using a new SR model with random effects.
-# This is following the posterior prediction section of the Liermann paper.
-
-# ...
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
@@ -598,17 +605,15 @@ if (BS == TRUE) {
 # pout <- BS.dfout
 
 # Prepare plotting datasets ####
-  # Re-order Stocks to be in ascending order by logWA
-  # Re-order Stocks to be in order of Ricker variance - which is what term? Is it extracted ???
-
 # Parken Table 1 and 2
 Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
 ParkenCaseStudy <- read.csv(here::here("DataIn/Parken_evalstocks.csv")) # Case study stocks
 
 dpars <- derived_obj$deripost_summary
 
-targets <- WAin |> 
-  rename("Stock_name" = Stock)
+targets <- WAin |>
+  rename("Stock_name" = Stock) # Either Stock or Name
+  # rename("Stock_name" = Name)
 
   # Do I have to do this every time? This method seems slow and inefficient
 # SMSY Estimate for TARGET STOCKS
@@ -621,21 +626,26 @@ targets2 <- cbind(targets1, derived_obj$deripost_summary$SGEN) |>
   rename("SGEN_mean" = Mean, "SGEN_median" = Median,
     "SGEN_LQ_5" = LQ_5, "SGEN_UQ_95" = UQ_95, "SGEN_Stocknum" = Stock,
     "SGEN_Mode" = PosteriorMode)
+# Marginal Mean for SREP (E)
+targets3 <- cbind(targets2, derived_obj$deripost_summary$E_tar_adj) |> 
+  rename("E_tar_adj_mean" = Mean, "E_tar_adj_median" = Median,
+    "E_tar_adj_LQ_5" = LQ_5, "E_tar_adj_UQ_95" = UQ_95, "E_tar_adj_Stocknum" = Stock,
+    "E_tar_adj_Mode" = PosteriorMode)
 # SREP ESTIMATE FOR TARGET STOCKS
-targetsAll <- cbind(targets2, derived_obj$deripost_summary$E_tar) |> 
+targetsAll <- cbind(targets3, derived_obj$deripost_summary$E_tar) |> 
   rename("E_tar_mean" = Mean, "E_tar_median" = Median,
     "E_tar_LQ_5" = LQ_5, "E_tar_UQ_95" = UQ_95, "E_tar_Stocknum" = Stock,
     "E_tar_Mode" = PosteriorMode)
-
 # Ricker sigma for SYNOPTIC STOCKS
+  # Re-order Stocks to be in order of Ricker variance - which is what term? Is it extracted ???
 # targets3 <- cbind(targets, derived_obj$deripost_summary$tauobs) |> 
 #   rename("tauobs_mean" = Mean, "tauobs_median" = Median,
 #     "tauobs_LQ_5" = LQ_5, "tauobs_UQ_95" = UQ_95, "tauobs_Stocknum" = Stock)
     # tauobs is based on the synoptic sets and will now have different lengths
 
-parken <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
+# parken <- read.csv(here::here("DataIn/Parken_evalstocks.csv"))
 
-parken <- parken |> 
+parken <- ParkenCaseStudy |> 
   rename("SMSYp" = SMSY, "SMSYp_5" = SMSY_5, "SMSYp_95" = SMSY_95) |> 
   rename("SREPp" = SREP, "SREPp_5" = SREP_5, "SREPp_95" = SREP_95)
 
@@ -688,7 +698,7 @@ ggplot() +
   
   # Add in LIERMANN from Liermann_RTMB_model.R as a global object
   geom_errorbar(data = targetsAll, aes(x = Stock_name,
-                                     y = E_tar_mean,
+                                     y = E_tar_median,
                                      ymax = E_tar_UQ_95, 
                                      ymin = E_tar_LQ_5,
                                  color = "Liermann MCMC",
@@ -696,7 +706,7 @@ ggplot() +
                 position = position_nudge(+0.2)) +
   geom_point(data = targetsAll,
              position = position_nudge(+0.2),
-             aes(x = Stock_name, y = E_tar_mean, color = "Liermann MCMC")) +
+             aes(x = Stock_name, y = E_tar_median, color = "Liermann MCMC")) +
   
   theme_classic() +
   scale_y_continuous(transform = "log", 
@@ -715,29 +725,34 @@ ggplot() +
 # ORDERED BY LOG WA ####
 ggplot() +
   
-  # Re-written as the Parken model is included in WAin - bound to rtmb MLE version
   geom_errorbar(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SREPp, ymax = SREPp_95, ymin = SREPp_5,
                                        color = "Parken",
                                        width=.1),
-                # position = position_nudge(-0.4)
-    ) +
+  ) +
   geom_point(data = parken,
-             # position = position_nudge(-0.4),
              aes(x = fct_reorder(Stock, log(WA)), y = SREPp, color = "Parken")) +
   
-  # Add in LIERMANN from Liermann_RTMB_model.R as a global object
   geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, logWA),
                                      y = E_tar_mean,
                                      ymax = E_tar_UQ_95, 
                                      ymin = E_tar_LQ_5,
-                                 color = "Liermann MCMC",
+                                 color = "Liermann MCMC Cond.",
+                                 width=.1),
+                position = position_nudge(+0.1)) +
+  geom_point(data = targetsAll,
+             position = position_nudge(+0.1),
+             aes(x = fct_reorder(Stock_name, logWA), y = E_tar_mean, color = "Liermann MCMC Cond.")) +
+  
+  geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, logWA),
+                                     y = E_tar_adj_mean,
+                                     ymax = E_tar_adj_UQ_95, 
+                                     ymin = E_tar_adj_LQ_5,
+                                 color = "Liermann MCMC Marg.",
                                  width=.1),
                 position = position_nudge(+0.2)) +
   geom_point(data = targetsAll,
              position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, logWA), y = E_tar_mean, color = "Liermann MCMC")) +
-               # shape = factor(lh_new))) + 
-  # scale_shape_manual(values = c(1, 16)) + 
+             aes(x = fct_reorder(Stock_name, logWA), y = E_tar_adj_mean, color = "Liermann MCMC Marg.")) +
   
   theme_classic() +
   scale_y_continuous(transform = "log", 
@@ -748,10 +763,12 @@ ggplot() +
   scale_color_manual(name='Model',
                      breaks=c('Parken',
                               # 'RTMB MLE',
-                              'Liermann MCMC'),
+                              'Liermann MCMC Cond.',
+                              'Liermann MCMC Marg.'),
                      values=c('Parken' = "black",
                               # 'RTMB MLE' = "orange",
-                              'Liermann MCMC' = "skyblue"))
+                              'Liermann MCMC Cond.' = "skyblue",
+                              'Liermann MCMC Marg.' = "darkblue"))
 
 # ORDERED BY RICKER VARIANCE - NOT WORKING (length diffs) ####
 # First re-order targetsAll - and then match the order of Parken stock?
@@ -769,7 +786,7 @@ ggplot() +
   
   # Add in LIERMANN from Liermann_RTMB_model.R as a global object
   geom_errorbar(data = full, aes(x = fct_reorder(Stock_name, tauobs_mean),
-                                 y = E_tar_mean,
+                                 y = E_tar_median,
                                  ymax = E_tar_UQ_95, 
                                  ymin = E_tar_LQ_5,
                                  color = "Liermann MCMC",
@@ -827,6 +844,7 @@ points(y =  dpars$E$Mean, x = WAbase$WA, pch = 20,
 # Parken points of SYNOPTIC SET
 # Parkentable1
 points(y = Parkentable1$Srep, x = Parkentable1$WA, pch = 20, col = 'black')
+# Shown here because they have changed slighly in WA between model versions?
 
 # Liermann points for TARGET ESTIMATES
 points(y = dpars$E_tar$Median, x = WAin$WA, pch = ifelse(WAin$Stock == "Coldwater"| WAin$Stock == "Deadman", 20, 1), 
