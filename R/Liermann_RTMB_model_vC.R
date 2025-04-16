@@ -1,4 +1,4 @@
-# IWAMsrep RTMB Model with MCMC Sampling ####
+# Liermann Srep (E) RTMB Model with MCMC Sampling ####
 
 # Libaries ####
 library(RTMB)
@@ -90,15 +90,15 @@ dat <- list(srdat = srdat,
             logRS = log(srdat$Rec) - log(srdat$Sp))
 
 # External vectors
-N_Stk <- max(srdat$Stocknumber + 1) # 25
+N_Stk <- max(srdat$Stocknumber + 1)
 
 # Parameters/Initial values
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
-            logE_re = numeric(N_Stk),
+            logE_re = numeric(N_Stk), # Zeroes
             logAlpha0 = 0.6,
-            logAlpha_re = numeric(nrow(dat$WAbase)),
-            tauobs = 0.01 + numeric(N_Stk),
+            logAlpha_re = numeric(nrow(dat$WAbase)), # Zeroes
+            tauobs = 0.01 + numeric(N_Stk), # Constrained positive
             logESD = 1,
             logAlphaSD = 1
 )
@@ -106,9 +106,9 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
 f_srep <- function(par){
   getAll(dat, par)
   
-  N_Stk = max(srdat$Stocknumber + 1)
-  stk = srdat$Stocknumber + 1
-  N_Obs = nrow(srdat)
+  N_Stk = max(srdat$Stocknumber + 1) # number of stocks
+  stk = srdat$Stocknumber + 1 # vector of stocknumbers
+  N_Obs = nrow(srdat) # number of observations
   N_Pred = nrow(WAin) # number of predicted watershed areas
   
   S = srdat$Sp
@@ -125,7 +125,7 @@ f_srep <- function(par){
   
   logAlpha_tar <- numeric(N_Pred)
   
-  # Imaginary line vectors
+  # Simulated line vectors
   line <- length(lineWA)
   logE_line_stream <- numeric(line)
   E_line_stream <- numeric(line)
@@ -136,8 +136,8 @@ f_srep <- function(par){
   nll <- 0
   
   nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE)) # Prior
-  nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) # Prior - OG 0
-  nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior - OG 10
+  nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) # Prior
+  nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior
   nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) # Prior
   
   nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Prior
@@ -174,7 +174,8 @@ f_srep <- function(par){
   SMSY = numeric(nrow(WAin))
   SGEN = numeric(nrow(WAin))
 
-  for (i in 1:N_Pred){ # Conditional posterior predictions
+  # Conditional posterior predictions
+  for (i in 1:N_Pred){
     logAlpha_tar[i] <- logAlpha0
   
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
@@ -188,7 +189,8 @@ f_srep <- function(par){
     SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logAlpha_tar[i])))
   }
   
-  for (i in 1:line){ # Create predictions on an imaginary line
+  # Create predictions on an simulated line
+  for (i in 1:line){
     logE_line_ocean[i] <- b0[1] + b0[2] + (bWA[1] + bWA[2])*lineWA[i]
     E_line_ocean[i] <- exp(logE_line_ocean[i])
     
@@ -197,7 +199,6 @@ f_srep <- function(par){
   }
   
   ## ADREPORT - internal values (synoptic specific/Ricker)
-    # ALWAYS THE NUMBER OF SYNOPTIC SETS - RN 25
   # ADREPORT(logRS) # logRS for all 501 data points
   alpha <- exp(logAlpha)
   
@@ -221,8 +222,7 @@ f_srep <- function(par){
   REPORT(tauobs)
   
   # ADREPORT - predicted values from watershed area model
-    # NUMBER OF PREDICTED STOCKS WILL CHANGE
-  # Mean estimate of the median (without bias correction)
+    # Mean estimate of the median (without bias correction)
   alpha_tar <- exp(logAlpha_tar)
   
   ADREPORT(E_tar) # target E (Srep) (21)
@@ -242,7 +242,7 @@ f_srep <- function(par){
   REPORT(SMSY)
   REPORT(SGEN)
   
-  # Imaginary line values for plotting
+  # Simulated line values for plotting
   REPORT(E_line_stream) 
   ADREPORT(E_line_stream)
   REPORT(E_line_ocean) 
@@ -260,7 +260,7 @@ obj <- RTMB::MakeADFun(f_srep,
                        random = c("logAlpha_re", "logE_re"),
                        silent=TRUE)
 
-# Limits
+# Set Upper and Lower Limits
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
@@ -279,6 +279,9 @@ opt <- nlminb(obj$par,
 
 # MCMC ####
 # INIT FUNCTION - can also just run sampler as default random
+  # Tor: Given issues with parallelization - consider that negative init
+  # values may be causing issues. For example obj$fn/obj$gr can't be 
+  # manually evaluted below zero.
 init <- function() {
   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
@@ -289,28 +292,40 @@ init <- function() {
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
-       logESD = runif(1, 0.01, 3), # Contains negatives 
-       logAlphaSD = runif(1, 0.01, 3) # Contains negatives
+       logESD = runif(1, 0.01, 3), # Positive
+       logAlphaSD = runif(1, 0.01, 3) # Positive
   )
 }
 
-# SETTING upper and lower LIMITS for sampler
-upper <- numeric(length(obj$par)) + Inf
-lower <- numeric(length(obj$par)) + -Inf
+init2 <- function() {
+  list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
+       bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
+       
+       logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
+       logAlpha0 = rnorm(1,0.6,1), # Contains negatives
+       logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
 
-lower[names(obj$par) == "tauobs"] <- 0
-upper[names(obj$par) == "logESD"] <- 100
-lower[names(obj$par) == "logESD"] <- 0
-upper[names(obj$par) == "logAlphaSD"] <- 100
-lower[names(obj$par) == "logAlphaSD"] <- 0
+       tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
+       
+       logESD = runif(1, 0.01, 3), # Positive
+       logAlphaSD = runif(1, 0.01, 3) # Positive
+  )
+}
+
+# SETTING upper and lower LIMITS for sampler - see limits above
 
 # SAMPLE MCMC
   # Can consider in parallel - Kasper's github example doesn't currently work
+# cores <- parallel::detectCores() - 2
+# cores <- 1
+# options(mc.cores = cores)
+
 fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
-                   # warmup = 500
                    lower = lower, upper = upper,
-                   chains = 4,
-                   open_progress = FALSE, silent = TRUE)
+                   chains = 4, open_progress = FALSE, silent = TRUE)
+
+  # tmbstan operates by default with NUTS MCMC sampler
+  # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
@@ -331,6 +346,14 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init f
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan)
+
+# PRIOR PUSHFORWARD AND PREDICTIVE CHECKS ####
+
+    # This section has to be filled ...
+
+# POSTERIOR PREDICTIVE CHECKS ####
+
+    # This section has to be filled ...
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
