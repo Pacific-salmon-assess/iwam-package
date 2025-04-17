@@ -7,6 +7,7 @@ library(dplyr)
 library(tidyverse)
 library(progress)
 library(tmbstan)
+library(TMB)
 library(tidybayes)
 library(bayesplot)
 library(beepr)
@@ -297,20 +298,20 @@ init <- function() {
   )
 }
 
-init2 <- function() {
-  list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
-       bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
-       
-       logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
-       logAlpha0 = rnorm(1,0.6,1), # Contains negatives
-       logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
-
-       tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
-       
-       logESD = runif(1, 0.01, 3), # Positive
-       logAlphaSD = runif(1, 0.01, 3) # Positive
-  )
-}
+# init2 <- function() {
+#   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
+#        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
+#        
+#        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
+#        logAlpha0 = rnorm(1,0.6,1), # Contains negatives
+#        logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
+# 
+#        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
+#        
+#        logESD = runif(1, 0.01, 3), # Positive
+#        logAlphaSD = runif(1, 0.01, 3) # Positive
+#   )
+# }
 
 # SETTING upper and lower LIMITS for sampler - see limits above
 
@@ -331,8 +332,8 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init f
 # names(fitstan) for complete list of parameters from stan object
 
   # TRACES
-# mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
-# mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
+mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
+mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 
   # PAIRS
 # pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
