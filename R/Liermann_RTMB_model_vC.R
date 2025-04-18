@@ -93,7 +93,13 @@ dat <- list(srdat = srdat,
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
 
+# NEW: alpha0 prior for LH specific dists. - ON/OFF - NOT WORKING
+lhdiston <- F # Set true to run
+# rm(logAlpha02)
+# Just search for logAlpha02 and comment out per run
+
 # Parameters/Initial values
+
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
             logE_re = numeric(N_Stk), # Zeroes
@@ -103,6 +109,10 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             logESD = 1,
             logAlphaSD = 1
 )
+
+if (lhdiston) {
+  par$logAlpha02 <- 0
+}
 
 f_srep <- function(par){
   getAll(dat, par)
@@ -141,7 +151,8 @@ f_srep <- function(par){
   nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior
   nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) # Prior
   
-  nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Prior
+  nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
+  if(lhdiston) nll <- nll - sum(dnorm(logAlpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
@@ -149,8 +160,9 @@ f_srep <- function(par){
     logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]
     E[i] <- exp(logE[i])
     
-    nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE)
-    logAlpha[i] <- logAlpha0 + logAlpha_re[i] 
+    nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
+    logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
@@ -178,6 +190,7 @@ f_srep <- function(par){
   # Conditional posterior predictions
   for (i in 1:N_Pred){
     logAlpha_tar[i] <- logAlpha0
+    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] # NEW: alpha0 prior for LH specific dists.
   
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
     E_tar[i] <- exp(logE_tar[i])
@@ -284,11 +297,12 @@ opt <- nlminb(obj$par,
   # values may be causing issues. For example obj$fn/obj$gr can't be 
   # manually evaluted below zero.
 init <- function() {
-  list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
-       bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
+  listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
+       bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
        
        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
-       logAlpha0 = rnorm(1,0.6,1), # Contains negatives
+       logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
+       # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
        logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
@@ -296,6 +310,12 @@ init <- function() {
        logESD = runif(1, 0.01, 3), # Positive
        logAlphaSD = runif(1, 0.01, 3) # Positive
   )
+  
+  if (lhdiston) {
+    listinit$logAlpha02 <- rnorm(1, 0, 1) # NEW: alpha0 prior for LH specific dists.
+  }
+  
+  return(listinit)
 }
 
 # init2 <- function() {
@@ -321,7 +341,7 @@ init <- function() {
 # cores <- 1
 # options(mc.cores = cores)
 
-fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
+fitstan2 <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
                    lower = lower, upper = upper,
                    chains = 4, open_progress = FALSE, silent = TRUE)
 
@@ -345,7 +365,7 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
   # RHAT
 # fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
 
-# Acquire outputs of MCMC ####
+# Acquire outderputs of MCMC ####
 derived_obj <- derived_post(fitstan)
 
 # PRIOR PUSHFORWARD AND PREDICTIVE CHECKS ####
