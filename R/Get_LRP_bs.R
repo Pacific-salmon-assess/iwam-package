@@ -86,11 +86,13 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # if (!remove.EnhStocks) RPs_long <- read.csv("DataOut/WCVI_SMSY_wEnh_wBC.csv")
   
   # Remove Cypre as it's not a core indicator (Diana McHugh, 22 Oct 2020)
-  stock_SMSY <- RPs_long %>% filter(Stock != "Cypre") %>%  # ************************************** CYPRE FLAG
+  stock_SMSY <- RPs_long %>% 
+    filter(Stock != "Cypre") %>%  # ************************************** CYPRE FLAG
     filter (Param == "SMSY") %>% 
     rename(SMSY=Estimate, SMSYLL=LL, SMSYUL=UL) %>% 
     dplyr::select (-Param, -X) #, -CU)
-  stock_SREP <- RPs_long %>% filter(Stock != "Cypre") %>% # *************************************** CYPRE FLAG
+  stock_SREP <- RPs_long %>% 
+    filter(Stock != "Cypre") %>% # *************************************** CYPRE FLAG
     filter (Param == "SREP") %>% 
     rename(SREP=Estimate, SREPLL=LL, SREPUL=UL) %>% 
     dplyr::select (-Param, -X)
@@ -148,10 +150,12 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   # DEFAULT
   # prod <-  "LifeStageModel"
   if(prod == "LifeStageModel"){
+    # CURRENTLY EXCLUDING CYPRE
+    
     # print(paste("Productivity Assumption running: LifeStageModel"))
     Mean.Ric.A <- 1 # Derived from life-history model (Luedke pers.comm.) and 
     # WCVI CK run reconstruction SR analysis (Dobson pers. comm.)
-    Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, 0))
+    Ric.A <- exp(rnorm(length(Scale), Mean.Ric.A, 0)) # This just produces 1's
     
     # When incorporating uncertainty in Ricker A:
     Sig.Ric.A <- 0.51 #0.255 #0.51 for a wider plausible bound
@@ -311,6 +315,8 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     if(!remove.EnhStocks) RPs_long <- read.csv(here::here(datain))
     # }
     
+    # CONSIDER Exclusion of "Cypre" as this is done in other assumptions
+    
     # TK: I think ExtInd is FALSE for these runs
     # if(ExtInd) {
     #   WCVIStocks <- read.csv("DataIn/WCVIStocks_ExtInd.csv") %>% 
@@ -414,8 +420,13 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   
   run_logReg <- FALSE
   if(run_logReg == FALSE){
-    return(list(bench = select(SGENcalcs, -apar, -bpar)*Scale)) ################ Why is this all * Scale at the end?
+    return(list(bench = select(SGENcalcs, -apar, -bpar)*Scale, RPs = RPs)) ################ Why is this all * Scale at the end?
   }
+  # SGENcalcs is the unrounded values
+  # RPs is the organized values
+  # BOTH REQUIRE re-calculation into quantiles at the end
+  # THIS SECTION IS REDUNDANT and should be reduced
+  
   #--------------------------------------------------------------------------- #
   # Sum escapements across indicators within inlets ----------------------------
   #--------------------------------------------------------------------------- #

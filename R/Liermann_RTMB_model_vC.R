@@ -10,7 +10,7 @@ library(tmbstan)
 library(TMB)
 library(tidybayes)
 library(bayesplot)
-library(beepr)
+library(beepr) # Sounds
 library(viridis)
 library(latex2exp)
 
@@ -19,8 +19,8 @@ source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 
 # Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv")
-# WAin <- c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- c("DataIn/WCVIStocks.csv")
 
 # For re-evaluation of synoptic sets e.g. WAbase
     # Run model until setting up data section
@@ -57,7 +57,7 @@ srdat <- srdatwna %>%
   mutate(yr_num = 0:(n()-1)) %>%
   ungroup() %>%
   arrange(Stocknumber) %>%
-  mutate(lh = factor(ifelse(Stream == 0, "stream", "ocean"), 
+  mutate(lh = factor(ifelse(Stream == 0, "stream", "ocean"), # Stream = 0, Ocean  = 1
     levels = c("stream", "ocean"))) |> 
   mutate(Stocknumber = as.integer(factor(Stocknumber)) - 1)  # Re-numbering uniquely
 
@@ -92,9 +92,10 @@ dat <- list(srdat = srdat,
 
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
+N_Obs <- nrow(srdat)
 
-# NEW: alpha0 prior for LH specific dists. - ON/OFF - NOT WORKING
-lhdiston <- F # Set true to run
+# NEW: alpha0 prior for LH specific dists. - ON/OFF
+lhdiston <- T # Set true to run
 # rm(logAlpha02)
 # Just search for logAlpha02 and comment out per run
 
@@ -102,6 +103,7 @@ lhdiston <- F # Set true to run
 
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
+            # logRS_pred = numeric(nrow(srdat)), # Zeroes - testing as a parameter
             logE_re = numeric(N_Stk), # Zeroes
             logAlpha0 = 0.6,
             logAlpha_re = numeric(nrow(dat$WAbase)), # Zeroes
@@ -114,8 +116,32 @@ if (lhdiston) {
   par$logAlpha02 <- 0
 }
 
+# Random parameter starts for prior simulation
+# par <- function() {
+#   # Can also add par <- to sequence above - see prior testing
+#   listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
+#        bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
+#        
+#        # logRS_pred = rnorm(N_Obs, 0, 1),
+#        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
+#        logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
+#        # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
+#        logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
+# 
+#        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
+#        
+#        logESD = runif(1, 0.01, 3), # Positive
+#        logAlphaSD = runif(1, 0.01, 3) # Positive
+#   )
+#   return(listinit)
+# }
+# par <- par()
+
 f_srep <- function(par){
   getAll(dat, par)
+  
+  # logRS <- OBS(logRS) # Mark response for one-step-ahead residual calculation
+    # Not currently used - with oneStepPredict()
   
   N_Stk = max(srdat$Stocknumber + 1) # number of stocks
   stk = srdat$Stocknumber + 1 # vector of stocknumbers
@@ -130,6 +156,9 @@ f_srep <- function(par){
   logE_pred <- numeric(N_Stk)
   logE <- numeric(N_Stk)
   logAlpha <- numeric(N_Stk)
+  
+  # Why is logRS_pred not a parameter or vector input here?
+  logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
   
   E_tar <- numeric(N_Pred)
   logE_tar <- numeric(N_Pred)
@@ -161,16 +190,19 @@ f_srep <- function(par){
     E[i] <- exp(logE[i])
     
     nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
-    logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    
     if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
-
+    logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
   ## First level of hierarchy - Ricker model:
+      # Where is logRS_pred coming from - and why is it not saved anywhere?
+      # Added it into vector list in order to REPORT()
   for (i in 1:N_Obs){
-    logRS_pred <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
-    nll <- nll - dnorm(logRS[i], logRS_pred, sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
+    logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
+    nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
   }
   
   ## Calculate SMSY for Synoptic set - for plotting
@@ -189,9 +221,9 @@ f_srep <- function(par){
 
   # Conditional posterior predictions
   for (i in 1:N_Pred){
-    logAlpha_tar[i] <- logAlpha0
     if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] # NEW: alpha0 prior for LH specific dists.
-  
+    logAlpha_tar[i] <- logAlpha0
+
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
     E_tar[i] <- exp(logE_tar[i])
     
@@ -215,6 +247,13 @@ f_srep <- function(par){
   ## ADREPORT - internal values (synoptic specific/Ricker)
   # ADREPORT(logRS) # logRS for all 501 data points
   alpha <- exp(logAlpha)
+  
+  REPORT(b0) # Testing simulate()
+  REPORT(bWA) # Testing simulate()
+  
+  # ADREPORT(logRS_pred)
+  # REPORT(logRS_pred)
+  REPORT(logRS_pred)
   
   ADREPORT(logE_re)
   ADREPORT(E)
@@ -274,6 +313,30 @@ obj <- RTMB::MakeADFun(f_srep,
                        random = c("logAlpha_re", "logE_re"),
                        silent=TRUE)
 
+# Prior testing ####
+    # - Pass random prior values to obj$par - then simulate new observations
+    # - Requires changing par each time and running function and obj
+    # - Need to write a par function that matches priors?
+
+# priorlogRS <- obj$simulate()$logRS_pred
+  # What is the difference between logRS_pred and logRS as an OBS() object?
+
+# priorsim <- obj$simulate()
+
+# Tor:
+  # If you re-run function and MakeADFUN after creating random pars
+  # e.g. par <- init() - drawn from random init starts for MCMC below
+  # When you run obj$simulate() - you will have randomly generated parameters.
+# par(mfrow = c(1,3))
+# plot(priorsim$logRS_pred)
+# plot(priorsim$logRS_pred, ylim = c(-4, 4))
+# plot(dat$logRS, ylim = c(-4, 4))
+# Add a line to add points() instead of re-creating the plot to see multiple sims
+
+# obj$par = new thing
+# obj$simulate(obj$par) a bunch of times
+
+# LIMITS ####
 # Set Upper and Lower Limits
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
@@ -283,13 +346,35 @@ lower[names(obj$par) == "logESD"] <- 0
 upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
-opt <- nlminb(obj$par, 
-              obj$fn, 
-              obj$gr, 
-              control = list(eval.max = 1e5, iter.max = 1e5, trace = 0),
-              lower = lower,
-              upper = upper
-)
+# nlminb - MLE ####
+# opt <- nlminb(obj$par,
+#               obj$fn,
+#               obj$gr,
+#               control = list(eval.max = 1e5, iter.max = 1e5, trace = 0),
+#               lower = lower,
+#               upper = upper
+# )
+
+# PRIOR PUSHFORWARD AND PREDICTIVE CHECKS ####
+
+# TOR: SEE ABOVE LIMITS FOR OTHER PRIOR PREDICTION SECTION *********************
+
+  # PUSHFORWARD: simulate only the expectation from the priors
+  # PREDICTIVE: simulate observations from the priors
+
+    # This section has to be filled ...
+
+    # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
+
+  # Tor: For prior testing - would you have to work on the tmb obj$?
+  # e.g. obj$simulate()
+  # Does tmbstan() change the obj? Or does it just create the fitstan object?
+
+# default method
+# y_rep <- example_yrep_draws() # vs. example_y_data() for y (or fitstan) ?
+  # y needs to be a vector (observed)
+  # y_rep needs to be a vector (generated)
+# pp_check(fitstan, fun = ppc_dens_overlay) # histogram of observed vs. predicted
 
 # MCMC ####
 # INIT FUNCTION - can also just run sampler as default random
@@ -297,9 +382,11 @@ opt <- nlminb(obj$par,
   # values may be causing issues. For example obj$fn/obj$gr can't be 
   # manually evaluted below zero.
 init <- function() {
+  # Can also add par <- to sequence above - see prior testing
   listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
        bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
        
+       # logRS_pred = rnorm(N_Obs, 0, 1),
        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
        logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
        # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
@@ -341,21 +428,25 @@ init <- function() {
 # cores <- 1
 # options(mc.cores = cores)
 
-fitstan2 <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
+fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
                    lower = lower, upper = upper,
-                   chains = 4, open_progress = FALSE, silent = TRUE)
+                   chains = 4, open_progress = FALSE, silent = TRUE); beep(2)
 
   # tmbstan operates by default with NUTS MCMC sampler
   # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
+par(mfrow = c(1,1))
+# Acquire outderputs of MCMC ####
+derived_obj <- derived_post(fitstan); beep(2)
+
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
 
-  # TRACES
+  # TRACE PLOTS
 mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
 mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 
-  # PAIRS
+  # PAIRS PLOTS
 # pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
 # pairs(fitstan, pars = pairs_pars) # for specific par names from above
 
@@ -365,16 +456,32 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
   # RHAT
 # fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
 
-# Acquire outderputs of MCMC ####
-derived_obj <- derived_post(fitstan)
-
-# PRIOR PUSHFORWARD AND PREDICTIVE CHECKS ####
-
-    # This section has to be filled ...
+  # LOO/WAIC etc.
+# Need a log-likelihood matrix to do this - would have to add a generated
+  # quantity in the model to achieve this. Not generated otherwise.
 
 # POSTERIOR PREDICTIVE CHECKS ####
 
     # This section has to be filled ...
+
+# RESIDUALS? ####
+
+  # Plot generated logRS vs. logRS from data?
+# plot(exp(dat$logRS), exp(derived_obj$deripost_summary$logRS_pred$Median))
+plot(dat$logRS, derived_obj$deripost_summary$logRS_pred$Median)
+
+  # OR plot observed vs. generated logRS by stock? Can you see a difference?
+compRS <- cbind(dat$srdat, logRS = dat$logRS)
+compRS <- cbind(compRS, genMedianlogRS = derived_obj$deripost_summary$logRS_pred$Median)
+
+par(mfrow=c(1,3))
+plot(compRS$logRS, ylab = "logRS", ylim = c(-4, 4))
+plot(compRS$genMedianlogRS, ylab = "genMedianlogRS", ylim = c(-4, 4))
+plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) # Coming from original tmb obj$ no sampling, no nlminb
+
+# Tor: this would make it seem like the model is not working great in terms
+  # of generating observations from the Ricker model. It is more restricted
+  # than the observed data.
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
@@ -382,21 +489,38 @@ derived_obj <- derived_post(fitstan)
     # Liermann model.
 
     # 1. SETUP
-BS <- FALSE # default for FALSE
-bsiters <- 20000
+BS <- TRUE # default for FALSE
+bsiters <- 250000 # New with Brown et al. CSAS runs
 outBench <- list()
+outAlpha <- list()
 set.seed <- 1
 prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
 # bias.cor <- FALSE
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
+# library(doParallel)
+# library(doRNG)
+# cl <- makeCluster(detectCores() - 1)
+# registerDoParallel(cl)
+# registerDoRNG(seed = 1)
+
 # Function
 if (BS == TRUE) {
+  # results <- foreach(k = 1:bsiters, .packages = c("dplyr", "purrr")) %dopar% {
   for (k in 1:bsiters) {
-    SREP <- derived_obj$deripost_summary$E_tar$Median
+    
+    # Should this use the conditional or marginal estimate of SREP?
+    
+    SREP <- derived_obj$deripost_summary$E_tar_adj$Median
 
-    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96
-    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96
+    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar_adj$LQ_5)) / 1.96
+    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar_adj$LQ_5) / 1.96
+    
+    # Steps not included in this bootstrapping function
+      # - Removing Stocks: Cypre
+      # - Scaling: not in Liermann at all
+      # - Bias correction: not in Liermann at all
+      # - Creation of the RPs dataframe
     
     # 1. LifeStageModel METHOD
       # Could USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
@@ -413,8 +537,8 @@ if (BS == TRUE) {
       #   if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
       #     SREP_logSE$SE))
       # } else {
-        sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
-        if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
+      sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
+      if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
       # }
   
       SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
@@ -427,12 +551,14 @@ if (BS == TRUE) {
                        objective = calc_loga, # Try to fix with a Scheurel version of LW if possible
                        SMSY= SMSY, 
                        SREP=SREP)$par
-        if(shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
+        if (shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
         beta <- loga/SREP
         return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
       }
       
-      SMSY <- derived_obj$deripost_summary$SMSY$Median # Mean, Median, or Mode?
+      # Again: conditional or marginal estimates?
+      
+      SMSY <- derived_obj$deripost_summary$SMSY_adj$Median # Mean, Median, or Mode?
       
       # purrr the est_loga function for logA
       lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
@@ -455,11 +581,30 @@ if (BS == TRUE) {
       # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), sREP_e, Sgen.fn2) # Explicit
     }
     
-    # Previous bind location
+    # Previous bind location for RPs
     
     out <- list(bench = select(SGENcalcs, -apar, -bpar))
-    outBench[k] <- out
-  }
+    outBench[[k]] <- out$bench
+    
+    if (prod == "Parken") outA <- list(alpha = exp(median(lnalpha_Parkin$loga)))
+    if (prod == "LifeStageModel") outA <- list(alpha = Ric.A)
+    if (prod == "Parken") outAlpha <- outA
+    if (prod == "LifeStageModel") outAlpha[[k]] <- outA
+    
+    # result <- list(
+    #   bench = select(SGENcalcs, -apar, -bpar),
+    #   alpha = if (prod == "Parken") exp(median(lnalpha_Parkin$loga)) else Ric.A
+    # )
+    # return(result)
+    
+  } # ; stopCluster(cl)
+  
+  # outBench <- lapply(results, function(x) x$bench)
+  # if (prod == "Parken") {
+  #   outAlpha <- lapply(results, function(x) x$alpha)
+  # } else if (prod == "LifeStageModel") {
+  #   outAlpha <- lapply(results, function(x) x$alpha)
+  # }
 
   # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
       # 95th percentiles
@@ -487,8 +632,16 @@ if (BS == TRUE) {
                           lwr=apply(SREP.bs, 1, quantile, 0.025),
                           upr=apply(SREP.bs, 1, quantile, 0.975) )
   
+  if (prod == "LifeStageModel") {
+    APAR.bs <- select(as.data.frame(outAlpha), starts_with("alpha"))
+    rownames(APAR.bs) <- stockNames
+    APAR.boot <- data.frame(APAR= apply(APAR.bs, 1, quantile, 0.5), 
+                            lwr=apply(APAR.bs, 1, quantile, 0.025),
+                            upr=apply(APAR.bs, 1, quantile, 0.975) )
+  }
+  
   boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
-               SREP.boot=SREP.boot)
+                SREP.boot=SREP.boot, APAR.boot=APAR.boot)
   
   df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
   df1 <- df1 %>% rename(Value=SGEN)
@@ -496,9 +649,14 @@ if (BS == TRUE) {
   df2 <- df2 %>% rename(Value=SREP)
   df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
   df3 <- df3 %>% rename(Value=SMSY)
+  if (prod == "LifeStageModel") {
+    df4 <- data.frame(boot[["APAR.boot"]], Stock=rownames(boot[["APAR.boot"]]), RP="APAR")
+    df4 <- df4 %>% rename(Value=APAR)
+  }
   
   dfout <- add_row(df1, df2)
   dfout <- add_row(dfout, df3)
+  if (prod == "LifeStageModel") dfout <- add_row(dfout, df4)
   rownames(dfout) <- NULL
   dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits
     mutate(lwr=signif(lwr,2)) %>% 
@@ -509,7 +667,11 @@ if (BS == TRUE) {
         mutate(WA = round(WA, 0))
   
   BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
-}
+  if (prod == "Parken") alphaout <- outAlpha$alpha
+}; beep(2)
+
+BS.dfout.LSM <- BS.dfout
+# BS.dfout.parken <- BS.dfout
 
 # Save one of each for analysis
 # lsmout <- BS.dfout

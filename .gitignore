@@ -397,3 +397,12 @@ DataOut/glb_getLRP-BootstrappedRPs.csv
 DataOut/glb_dataout_target_wEnh.csv
 R/IWAMfunctionrun.r
 DataOut/target_dataout_target_wEnh.csv
+DataOut/est_dataout_target_ocean_wEnh.csv
+DataOut/est_getLRP-BootstrappedRPs.csv
+DataOut/lsm250k_dataout_target_ocean_wEnh.csv
+DataOut/lsm250k_getLRP-BootstrappedRPs.csv
+DataOut/p250k_dataout_target_ocean_wEnh.csv
+DataOut/p250k_getLRP-BootstrappedRPs.csv
+DataOut/pars_est_ricinvgamma_0.1_wagamma_1_IWAM_Liermann
+DataOut/pars_lsm250k_ricinvgamma_0.1_wagamma_1_IWAM_Liermann
+DataOut/pars_p250k_ricinvgamma_0.1_wagamma_1_IWAM_Liermann

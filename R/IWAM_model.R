@@ -520,7 +520,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   lower <- unlist(obj$par)
   lower[1:length(lower)]<- -Inf
   
-  # TK: I noted that current watershed_area_model repository there is the following
+  # TK: I noted that current watershed_area_model repository there is the following *****************************
     # additional code:
   # upper[names(upper) == "logDeltaSigma"] <- log(1.39) # See KFrun.R, "SDlSMSYParken"
   # upper[names(upper) == "logNuSigma"] <- log(1.38)# See KFrun.R, "SDlSREPParken"
@@ -1286,6 +1286,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       # nBS <- 10 # number trials for bootstrapping (original 20000), for testing use 10
       nBS <- bs_nBS
       outBench <- list()
+      outRPs <- list()
       
       # foreach(k = 1:nBS) %dofuture% {
       #   out <- Get.LRP.bs(datain = datain, # "DataOut/FUNCTIONTEST_dataout_target_ocean_noEnh.csv"
@@ -1296,6 +1297,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       #                     run_logReg = FALSE) 
       #   outBench[[k]] <- out$bench
       # }
+      
       print(paste("Bootstrapping assumption:", prod, "w/ bias correction =", bias.cor))
       for (k in 1:nBS) {
         # datain must match the above Step 6 for writing output target estimates
@@ -1307,6 +1309,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
                           LOO = NA,
                           run_logReg = FALSE)
         outBench[[k]] <- out$bench
+        outRPs[[k]] <- out$RPs # To save a.par's from sgen solver
       }
         # Get.LRP.bs has WCVIstocks cooked in
         # need to set it so there is an input dataset
@@ -1316,20 +1319,28 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       # running.mean <- cumsum(LRP.bs$fit) / seq_along(LRP.bs$fit) 
       # plot(running.mean)
       
-      
       # Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
       # 95th percentiles
       SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
-    
-      stockNames <- read.csv(here::here(datain)) %>% 
-        # filter(Stock != "Cypre") %>% # **************************** CYPRE FLAG
-        pull(Stock)
-      stockNames <- unique(stockNames)
       
+      # if (prod == "LifeStageModel") {
+      stockNames <- read.csv(here::here(datain)) %>% 
+      filter(Stock != "Cypre") |>  # **************************** CYPRE FLAG
+      # Cypre is currently excluded in "LifeStageModel" assumption
+      # Cypre is included in "Parken" assumption
+      # Above statement turns on and off depending on alpha assumption for inclusion
+      # filter(Param == "SMSY") |> # This line is in watershed-area-model repo - unsure why
+      pull(Stock)
+      
+      stockNames <- unique(stockNames)
+
       rownames(SGEN.bs) <- stockNames
       SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
                               lwr=apply(SGEN.bs, 1, quantile, 0.025),
                               upr=apply(SGEN.bs, 1, quantile, 0.975) )
+          # TOR: If you run quantiles on outRPs, you will get technically same
+          # estimates. RPs have already been rounded.
+          # They are maintained and saved here because of a.par
       
       SMSY.bs <- select(as.data.frame(outBench), starts_with("SMSY"))
       rownames(SMSY.bs) <- stockNames
@@ -1343,8 +1354,15 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
                               lwr=apply(SREP.bs, 1, quantile, 0.025),
                               upr=apply(SREP.bs, 1, quantile, 0.975) )
       
+      # Add a.par into benchmark estimate outputs
+      APAR.bs <- select(as.data.frame(outRPs), starts_with("a.par"))
+      rownames(APAR.bs) <- stockNames
+      APAR.boot <- data.frame(APAR= apply(APAR.bs, 1, quantile, 0.5), 
+                              lwr=apply(APAR.bs, 1, quantile, 0.025),
+                              upr=apply(APAR.bs, 1, quantile, 0.975) )
+      
       boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
-                   SREP.boot=SREP.boot)
+                   SREP.boot=SREP.boot, APAR.boot=APAR.boot)
       
       df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
       df1 <- df1 %>% rename(Value=SGEN)
@@ -1352,9 +1370,12 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       df2 <- df2 %>% rename(Value=SREP)
       df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
       df3 <- df3 %>% rename(Value=SMSY)
+      df4 <- data.frame(boot[["APAR.boot"]], Stock=rownames(boot[["APAR.boot"]]), RP="APAR")
+      df4 <- df4 %>% rename(Value=APAR)
       
       dfout <- add_row(df1, df2)
       dfout <- add_row(dfout, df3)
+      dfout <- add_row(dfout, df4)
       rownames(dfout) <- NULL
       # now round to 2 signif digits
       dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% 
