@@ -494,7 +494,7 @@ bsiters <- 250000 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 set.seed <- 1
-prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
+prod <- c("Parken") # "LifeStageModel" or "Parken"
 # bias.cor <- FALSE
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
@@ -670,7 +670,7 @@ if (BS == TRUE) {
   if (prod == "Parken") alphaout <- outAlpha$alpha
 }; beep(2)
 
-BS.dfout.LSM <- BS.dfout
+# BS.dfout.LSM <- BS.dfout
 # BS.dfout.parken <- BS.dfout
 
 # Save one of each for analysis
