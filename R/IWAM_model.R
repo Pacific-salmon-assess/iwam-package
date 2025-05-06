@@ -334,7 +334,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   if (exists("Inlet", where = WAin)){
 # Make sure that this runs if BLANK
   InletlnWA <- data.frame(WAin) %>% # Complete set
-    # filter(Stock != "Cypre") %>% 
+    filter(Stock != "Cypre") %>% # 
     group_by(Inlet) %>%
     summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
@@ -342,7 +342,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   
   # IF no Enh column - don't run
   InletlnWAnoEnh <- data.frame(WAin) %>% # Just keep the rows without enhancement
-    # filter(Stock != "Cypre") %>% 
+    filter(Stock != "Cypre") %>%
     filter(Enh==0) %>%
     group_by(Inlet) %>% 
     summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
@@ -357,14 +357,14 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     
     # Add in LH specifications? ***********************************************
   CUlnWA <- data.frame(WAin) %>% 
-    # filter(Stock != "Cypre") %>% 
+    filter(Stock != "Cypre") %>%
     group_by(CU) %>%
     summarize(CUlnWA = log(sum(WA)), lh = mean(lh)) # %>% 
     # add the unique LH value for each CU back into the new df
   
   # IF Enh column is blank just creates a table with no data
   CUlnWAnoEnh <- data.frame(WAin) %>% 
-    # filter(Stock != "Cypre") %>% 
+    filter(Stock != "Cypre") %>%
     filter(Enh==0) %>%
     group_by(CU) %>% 
     summarize(CUlnWA = log(sum(WA)), lh = mean(lh))

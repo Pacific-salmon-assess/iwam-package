@@ -55,11 +55,11 @@ PredInt <- function(x, y, Newx=x, Predy){
 #   sumYErr <- sum( (y-mean(y))^2 )
 #   sumXYErr <- sum( (y - mean(y)) * (x - mean(x)) ) ^2
 #   STEYX <- sqrt( (1/(length(x)-2)) * (sumYErr - sumXYErr/sumXErr) )
-#   
+# 
 #   # SE of the prediction from http://www.real-statistics.com/regression/confidence-and-prediction-intervals/
-#   SE.pred <- STEYX * sqrt( (1 + 1/length(x) + ((Newx - mean(x))^2)/sumXErr) ) 
+#   SE.pred <- STEYX * sqrt( (1 + 1/length(x) + ((Newx - mean(x))^2)/sumXErr) )
 #   t.crit <- qt(0.975,df=length(x)-2) #95% intervals
-#   
+# 
 #   upr <- Predy + SE.pred*t.crit
 #   lwr <- Predy - SE.pred*t.crit
 #   PI <- list()
