@@ -81,8 +81,40 @@ source(here::here("R/Get_LRP_bs.R"))
 # WAin <- c("DataIn/Backcalc_targetstocks.csv")
   # added CU, Inlet (only some stocks), and Enh (only some stocks)
 
-#### New Wrapper function ------------------------------------------------------
+#### Inputs just as they are for internal running: ####
 
+WAinraw = "DataIn/WCVIStocks.csv" # insert Watershed areas file location within the base repository
+targetname = "target" # target name for naming different target groupings
+remove.EnhStocks = FALSE # was originally TRUE as default
+predict.syn = TRUE # Run creation of intervals for synoptic set
+predict.tar = TRUE # Run prediction of estimates/intervals for target set
+# Both TRUE by default. If you are for example just running the FixedEffects model
+# and do not want targets - turn predict.tar = FALSE.
+run.bootstraps = TRUE # to turn on or off the bootstrap function added at the end
+bias.cor = TRUE
+random = TRUE # Turn random = "logA" on by default - Turn off for the fixed effect model
+bs_seed = 1 # seed for bootstrapping
+bs_nBS = 10 # trials for bootstrapping
+plot = F # whether or not to create plots stored in DataOut/
+est.table = FALSE # store kable tables as per wcvi_workedexample.RMD
+# Norm, InvGamma, Cauchy, Gamma alt
+static_nusigma = c(-0.412) # Static nu sigma value
+  # Default -0.412
+SigRicPrior = c(F, T, F, F) # Default invgamma
+SigDeltaPrior = c(F, T, F, F, F) # Default invgamma
+# Tau_dist, Tau_D_dist
+TauDist = c(0.1, 1) # DEPRECIATED Defaults for penalty terms for gamma
+TauPrior = c(7.5, 0.1, 3, 1, 0.75) # New Default for added penalty controls for
+  # dgamma shape and scale
+  # Order: Ric_sigshape, Ric_sigscale, WA_sigshape, WA_sigscale
+  # Remembering that scale is 1/X
+  # Defaults: Ricker: shape = 7.5, scale = 1/10 = 0.1, penalty on sigma
+  # Defaults: WA: shape = 3, scale = 1, where the penalty sits on precision
+  # Alts: WA: shape = 0.75, where the penalty sits on variance [5]
+mod = "IWAM_Liermann" # TMB Model used
+prod = "LifeStageModel" # Productivity assumption used for bootstrapping
+
+#### New Wrapper function ------------------------------------------------------
 # Defaults changed to be most basic run
 IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed areas file location within the base repository
                       targetname = "target", # target name for naming different target groupings
@@ -219,7 +251,6 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     full_join(names, by="Name") %>% 
     arrange(Stocknumber)
   
-  # rename stream to --> "lifehist
   lifehist <- srdat %>% 
     dplyr::select(Stocknumber, Name, Stream) %>% 
     group_by(Stocknumber) %>% 

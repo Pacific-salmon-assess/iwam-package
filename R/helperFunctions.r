@@ -284,8 +284,6 @@ ggplot.corr <- function(data, lag.max = 10, ci = 0.95, title="") {
  
 }
 
-
-
 # Functions to estimate inferred log(a) from SMSY and SREP from IWAM or Parken et al
 calc_loga <- function(loga, SMSY, SREP){
   # 1 - log( gsl::lambert_Wm1(1 - SMSY * loga / SREP)) - loga
@@ -296,9 +294,9 @@ calc_loga <- function(loga, SMSY, SREP){
   # (1 - gsl::lambert_W0(exp(1 - loga ))) / (loga/SREP) - SMSY # TK attempt
   
   # PROOF FOR NEW EXPLICIT LW Solve
-  # srep <- 1000
+  # SREP <- 1000
   # logalpha <- 2
-  # Smsy <- (1-gsl::lambert_W0(exp(1-logalpha)))/(logalpha/srep)
+  # SMSY <- (1-gsl::lambert_W0(exp(1-logalpha)))/(logalpha/SREP)
   # lalpha <- SREP*(SMSY*gsl::lambert_W0(-exp(1-SREP/SMSY)*(SREP-SMSY)/SMSY) + SREP - SMSY)/(SMSY*(SREP-SMSY))
   
   # NEW 
@@ -311,8 +309,8 @@ est_loga <- function(SMSY, SREP, shortloga=FALSE){
   
   loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
                  objective = calc_loga, 
-                 SMSY= SMSY, 
-                 SREP=SREP)$par
+                 SMSY = SMSY, 
+                 SREP = SREP)$par
   if(shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
   beta <- loga/SREP
   return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )

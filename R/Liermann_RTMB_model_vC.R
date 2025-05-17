@@ -192,8 +192,8 @@ f_srep <- function(par){
     nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
     
     if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
-    logAlpha[i] <- logAlpha0 + logAlpha_re[i]
-    
+    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
@@ -222,7 +222,7 @@ f_srep <- function(par){
   # Conditional posterior predictions
   for (i in 1:N_Pred){
     if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] # NEW: alpha0 prior for LH specific dists.
-    logAlpha_tar[i] <- logAlpha0
+    else logAlpha_tar[i] <- logAlpha0
 
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
     E_tar[i] <- exp(logE_tar[i])
@@ -405,6 +405,28 @@ init <- function() {
   return(listinit)
 }
 
+initfixed <- function() {
+    listinitfixed <- list(
+       b0 = c(10, 0), # Contains negatives
+       bWA = c(0, 0), # Contains negatives
+       
+       logE_re = numeric(N_Stk), # Contains negatives
+       logAlpha0 = 0.6, # Contains negatives
+       logAlpha_re = numeric(nrow(dat$WAbase)), # Contains negatives
+
+       tauobs = 0.01 + numeric(N_Stk), # Uniform to REMAIN positive
+       
+       logESD = 1, # Positive
+       logAlphaSD = 1 # Positive
+  )
+  
+  if (lhdiston) {
+    listinitfixed$logAlpha02 <- 0 # NEW: alpha0 prior for LH specific dists.
+  }
+  
+  return(listinitfixed)
+}
+
 # init2 <- function() {
 #   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
 #        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
@@ -428,7 +450,9 @@ init <- function() {
 # cores <- 1
 # options(mc.cores = cores)
 
-fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init function or "random"
+# Typically 5000 and 1000
+set.seed(1)
+fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = initfixed, # init = init function or "random" or initfixed for fixed points
                    lower = lower, upper = upper,
                    chains = 4, open_progress = FALSE, silent = TRUE); beep(2)
 
@@ -438,6 +462,16 @@ fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = init, # init = init f
 par(mfrow = c(1,1))
 # Acquire outderputs of MCMC ####
 derived_obj <- derived_post(fitstan); beep(2)
+
+derived_obj$deripost_summary$SGEN_adj[15,]
+derived_obj$deripost_summary$E_tar_adj[15,]
+exp(derived_obj$deripost_summary$logAlpha_tar_adj$Median)
+# How different are they per run?
+
+
+
+# add stocknames
+dstocks <- WAin$Stock
 
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
@@ -493,7 +527,9 @@ BS <- TRUE # default for FALSE
 bsiters <- 250000 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
-set.seed <- 1
+# set.seed <- 1
+set.seed(1)
+conditional <- T # Default T for conditional - FALSE for Marginal medians
 prod <- c("Parken") # "LifeStageModel" or "Parken"
 # bias.cor <- FALSE
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
@@ -510,14 +546,21 @@ if (BS == TRUE) {
   for (k in 1:bsiters) {
     
     # Should this use the conditional or marginal estimate of SREP?
-    
-    SREP <- derived_obj$deripost_summary$E_tar_adj$Median
-
-    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar_adj$LQ_5)) / 1.96
-    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar_adj$LQ_5) / 1.96
-    
+    if (conditional == T) {
+    SREP <- derived_obj$deripost_summary$E_tar_adj$Median # Conditional
+    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar_adj$LQ_5)) / 1.96 # Conditional
+    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar_adj$LQ_5) / 1.96 # Conditional
+    } else {
+    SREP <- derived_obj$deripost_summary$E_tar$Median # Marginal
+    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96 # Marginal
+    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96 # Marginal
+    }
+  
     # Steps not included in this bootstrapping function
-      # - Removing Stocks: Cypre
+      # - Removing Stocks: Cypre (LIFESTAGEMODEL ONLY)
+        # - Cypre is Stock # 6
+        # - Could remove the 6th row per SREP and SMSY since the Stock column
+        # isn't used for anything
       # - Scaling: not in Liermann at all
       # - Bias correction: not in Liermann at all
       # - Creation of the RPs dataframe
@@ -556,20 +599,25 @@ if (BS == TRUE) {
         return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
       }
       
-      # Again: conditional or marginal estimates?
-      
-      SMSY <- derived_obj$deripost_summary$SMSY_adj$Median # Mean, Median, or Mode?
+      # Again: conditional or marginal estimates? 
+      # Mean, Median, or Mode?
+      if (conditional == T) SMSY <- derived_obj$deripost_summary$SMSY_adj$Median # Conditional
+      else SMSY <- derived_obj$deripost_summary$SMSY$Median # Maringla
       
       # purrr the est_loga function for logA
       lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
                                          est_loga)
+        # Would this change if SMSY and SREP are calculated with Median vs. Mean? - Yes
+        # Median should be used as it would be closer to the MLE estimate.
+        # Other consideration would be NOT sampling, but just running nlminb and then 
+          # bootstrapping.
       
       # Or do explicit method
-      # SREP_e <- SREP
-      # SMSY_e <- SMSY
-      # loga_e <- SREP_e * (SMSY_e * gsl::lambert_W0(-exp(1-SREP_e / SMSY_e) * (SREP_e-SMSY_e) / SMSY_e) +
-      #   SREP_e - SMSY_e) / (SMSY_e * (SREP_e-SMSY_e))
-      # beta_e <- loga_e/SREP_e
+      SREP_e <- SREP
+      SMSY_e <- SMSY
+      loga_e <- SREP_e * (SMSY_e * gsl::lambert_W0(-exp(1-SREP_e / SMSY_e) * (SREP_e-SMSY_e) / SMSY_e) +
+        SREP_e - SMSY_e) / (SMSY_e * (SREP_e-SMSY_e))
+      beta_e <- loga_e/SREP_e
       
       # Bias correction location 
       
@@ -578,13 +626,16 @@ if (BS == TRUE) {
       
       # Do SGEN calcs with new variables
       SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2)
-      # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), sREP_e, Sgen.fn2) # Explicit
+      SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), SREP_e, Sgen.fn2) # Explicit
     }
     
     # Previous bind location for RPs
     
     out <- list(bench = select(SGENcalcs, -apar, -bpar))
     outBench[[k]] <- out$bench
+    
+    # oute <- list(bench = select(SGENcalcs_e, -apar, -bpar))
+    # outBenche[[k]] <- oute$bench
     
     if (prod == "Parken") outA <- list(alpha = exp(median(lnalpha_Parkin$loga)))
     if (prod == "LifeStageModel") outA <- list(alpha = Ric.A)
@@ -597,13 +648,13 @@ if (BS == TRUE) {
     # )
     # return(result)
     
-  } # ; stopCluster(cl)
+  } ; beep(2) # ; stopCluster(cl)
   
   # outBench <- lapply(results, function(x) x$bench)
   # if (prod == "Parken") {
   #   outAlpha <- lapply(results, function(x) x$alpha)
   # } else if (prod == "LifeStageModel") {
-  #   outAlpha <- lapply(results, function(x) x$alpha)
+  #   outAlpha <- unique(lapply(results, function(x) x$alpha)) # Should only be one
   # }
 
   # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
@@ -635,13 +686,14 @@ if (BS == TRUE) {
   if (prod == "LifeStageModel") {
     APAR.bs <- select(as.data.frame(outAlpha), starts_with("alpha"))
     rownames(APAR.bs) <- stockNames
-    APAR.boot <- data.frame(APAR= apply(APAR.bs, 1, quantile, 0.5), 
-                            lwr=apply(APAR.bs, 1, quantile, 0.025),
-                            upr=apply(APAR.bs, 1, quantile, 0.975) )
+    APAR.boot <- data.frame(APAR = apply(APAR.bs, 1, quantile, 0.5), 
+                            lwr = apply(APAR.bs, 1, quantile, 0.025),
+                            upr = apply(APAR.bs, 1, quantile, 0.975) )
   }
   
   boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
-                SREP.boot=SREP.boot, APAR.boot=APAR.boot)
+                SREP.boot=SREP.boot) # , APAR.boot=APAR.boot)
+  if (prod == "LifeStageModel") boot$APAR.boot <- APAR.boot
   
   df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
   df1 <- df1 %>% rename(Value=SGEN)
@@ -658,9 +710,10 @@ if (BS == TRUE) {
   dfout <- add_row(dfout, df3)
   if (prod == "LifeStageModel") dfout <- add_row(dfout, df4)
   rownames(dfout) <- NULL
-  dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits
-    mutate(lwr=signif(lwr,2)) %>% 
-    mutate (upr=signif(upr,2))
+  
+  # dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits
+  #   mutate(lwr=signif(lwr,2)) %>% 
+  #   mutate (upr=signif(upr,2))
   
   wasample <- WAin %>% 
         select("Stock", "WA", "lh") %>% 
@@ -670,6 +723,8 @@ if (BS == TRUE) {
   if (prod == "Parken") alphaout <- outAlpha$alpha
 }; beep(2)
 
+# BS.dfout.short <- BS.dfout
+# alphaout.short <- alphaout
 # BS.dfout.LSM <- BS.dfout
 # BS.dfout.parken <- BS.dfout
 

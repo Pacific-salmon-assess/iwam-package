@@ -116,7 +116,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
   digits <- count.dig(stock_SMSY$SMSY)
   
   # Scale <- 10^(digits) # Not the same as what is used for the IWAM model?
-  Scale <- 10^(digits-1) # IWAM USES: 10^(maxdigits-1)
+  Scale <- 10^(digits - 1) # IWAM USES: 10^(maxdigits-1)
   # Scale <- 10^(digits) # LATEST version of Watershed-Area-Model uses 10^(digits) ************************************************************
   
   #SREP_SE <- RPs %>% mutate(SE = ((RPs$SREP) - (RPs$SREPLL)) / 1.96) **********
