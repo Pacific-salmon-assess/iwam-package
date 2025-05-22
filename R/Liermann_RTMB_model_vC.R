@@ -450,28 +450,38 @@ initfixed <- function() {
 # cores <- 1
 # options(mc.cores = cores)
 
-# Typically 5000 and 1000
-set.seed(1)
-fitstan <- tmbstan(obj, iter = 5000, warmup = 1000, init = initfixed, # init = init function or "random" or initfixed for fixed points
+# Seeding
+# set.seed(1) # This is now set at header of code
+# rm(.Random.seed, envir=globalenv())
+
+# The set.seed precedes this in order to have fixed runs with initfixed
+set.seed(1) ; fitstan <- tmbstan(obj, iter = 10000, warmup = 5000, # default iter/2 for warmup - Typically 5000 and 1000
+                   init = init, # init = init function or "random" or initfixed for fixed points
+                   seed = 1, # set seed or leave out for random - now set at 1 above
+                      # but not technically within sampling - unsure if each chain takes seed                  
+                   # control = list(adapt_delta = 0.99, max_treedepth = 15),
                    lower = lower, upper = upper,
                    chains = 4, open_progress = FALSE, silent = TRUE); beep(2)
-
   # tmbstan operates by default with NUTS MCMC sampler
   # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
-par(mfrow = c(1,1))
+# stan MAP?
+  # do mle via optimize - would just be using tmb obj and nlminb as above
+
 # Acquire outderputs of MCMC ####
 derived_obj <- derived_post(fitstan); beep(2)
 
-derived_obj$deripost_summary$SGEN_adj[15,]
-derived_obj$deripost_summary$E_tar_adj[15,]
-exp(derived_obj$deripost_summary$logAlpha_tar_adj$Median)
 # How different are they per run?
+# stan_6 <- fitstan
+# dobj_6 <- derived_obj
+# derived_obj$deripost_summary$SGEN_adj[15,]
+# derived_obj$deripost_summary$E_tar_adj[15,]
+# exp(derived_obj$deripost_summary$logAlpha_tar_adj$Median)
 
-
-
-# add stocknames
-dstocks <- WAin$Stock
+# add stocknames - could add them in to each object of derived_obj
+Stocknames <- WAin$Stock
+Srep_example <- cbind(derived_obj$deripost_summary$E_tar_adj, Stocknames) |> 
+  Srep_example[c(1, 7, 2, 3, 4, 5, 6)]
 
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
@@ -528,9 +538,9 @@ bsiters <- 250000 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 # set.seed <- 1
-set.seed(1)
+# set.seed(1) # Now set at header of code
 conditional <- T # Default T for conditional - FALSE for Marginal medians
-prod <- c("Parken") # "LifeStageModel" or "Parken"
+prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
 # bias.cor <- FALSE
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
@@ -541,7 +551,11 @@ prod <- c("Parken") # "LifeStageModel" or "Parken"
 # registerDoRNG(seed = 1)
 
 # Function
-if (BS == TRUE) {
+set.seed(1) ; if (BS == TRUE) {
+  
+  pb <- txtProgressBar(min = 1, max = bsiters, style = 3, title = "Bootstrap")
+  start_time <- Sys.time()
+  
   # results <- foreach(k = 1:bsiters, .packages = c("dplyr", "purrr")) %dopar% {
   for (k in 1:bsiters) {
     
@@ -629,6 +643,13 @@ if (BS == TRUE) {
       SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), SREP_e, Sgen.fn2) # Explicit
     }
     
+    setTxtProgressBar(pb, k)
+    # Calculate and display elapsed time dynamically
+    current_time <- Sys.time()
+    elapsed_time <- difftime(current_time, start_time, units = "secs")
+    # Print running timer
+    cat(sprintf("\rElapsed time: %s seconds", round(as.numeric(elapsed_time), 2)))
+    
     # Previous bind location for RPs
     
     out <- list(bench = select(SGENcalcs, -apar, -bpar))
@@ -648,7 +669,14 @@ if (BS == TRUE) {
     # )
     # return(result)
     
-  } ; beep(2) # ; stopCluster(cl)
+  } # ; stopCluster(cl)
+  
+  close(pb)
+  # End timing
+  end_time <- Sys.time()
+  # Final elapsed time
+  total_elapsed_time <- end_time - start_time
+  cat("\nTotal time taken:", total_elapsed_time, "\n")
   
   # outBench <- lapply(results, function(x) x$bench)
   # if (prod == "Parken") {
@@ -722,15 +750,9 @@ if (BS == TRUE) {
   BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
   if (prod == "Parken") alphaout <- outAlpha$alpha
 }; beep(2)
-
-# BS.dfout.short <- BS.dfout
-# alphaout.short <- alphaout
 # BS.dfout.LSM <- BS.dfout
 # BS.dfout.parken <- BS.dfout
 
-# Save one of each for analysis
-# lsmout <- BS.dfout
-# pout <- BS.dfout
 
 # Prepare/load datasets for plotting ####
 Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
