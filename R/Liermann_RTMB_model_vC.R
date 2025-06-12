@@ -19,8 +19,8 @@ source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 
 # Raw data read-in ####
-# WAin <- c("DataIn/Parken_evalstocks.csv")
-WAin <- c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv")
+# WAin <- c("DataIn/WCVIStocks.csv")
 
 # For re-evaluation of synoptic sets e.g. WAbase
     # Run model until setting up data section
@@ -100,7 +100,6 @@ lhdiston <- T # Set true to run
 # Just search for logAlpha02 and comment out per run
 
 # Parameters/Initial values
-
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
             # logRS_pred = numeric(nrow(srdat)), # Zeroes - testing as a parameter
@@ -115,27 +114,6 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
 if (lhdiston) {
   par$logAlpha02 <- 0
 }
-
-# Random parameter starts for prior simulation
-# par <- function() {
-#   # Can also add par <- to sequence above - see prior testing
-#   listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
-#        bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
-#        
-#        # logRS_pred = rnorm(N_Obs, 0, 1),
-#        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
-#        logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
-#        # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
-#        logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
-# 
-#        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
-#        
-#        logESD = runif(1, 0.01, 3), # Positive
-#        logAlphaSD = runif(1, 0.01, 3) # Positive
-#   )
-#   return(listinit)
-# }
-# par <- par()
 
 f_srep <- function(par){
   getAll(dat, par)
@@ -321,7 +299,7 @@ obj <- RTMB::MakeADFun(f_srep,
 # priorlogRS <- obj$simulate()$logRS_pred
   # What is the difference between logRS_pred and logRS as an OBS() object?
 
-# priorsim <- obj$simulate()
+priorsim <- obj$simulate()
 
 # Tor:
   # If you re-run function and MakeADFUN after creating random pars
@@ -335,6 +313,54 @@ obj <- RTMB::MakeADFun(f_srep,
 
 # obj$par = new thing
 # obj$simulate(obj$par) a bunch of times
+
+# for example:
+psimalpha <- vector("list", 100)
+psimlogRS_pred <- vector("list", 100)
+psimlogAlpha_re <- vector("list", 100)
+
+for (i in 1:100){
+  # Random parameter creation: Random parameter starts for prior simulation
+  parp <- function() {
+  # Can also add par <- to sequence above - see prior testing
+  listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
+       bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
+
+       # logRS_pred = rnorm(N_Obs, 0, 1),
+       logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
+       logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
+       logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
+       logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
+
+       tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
+
+       logESD = runif(1, 0.01, 3), # Positive
+       logAlphaSD = runif(1, 0.01, 3) # Positive
+    )
+    return(listinit)
+  }
+  parp <- parp()
+  
+  # enter parp into model function with MakeADFun
+  objpp <- RTMB::MakeADFun(f_srep,
+                       parp,
+                       random = c("logAlpha_re", "logE_re"),
+                       silent=TRUE)
+  
+  # simulate from prior
+  psimalpha[[i]] <- objpp$simulate()$alpha
+  psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re
+  psimlogRS_pred[[i]] <- objpp$simulate()$logRS_pred
+}
+
+ppsimalpha <- unlist(psimalpha)
+ppsimlogRS <- unlist(psimlogRS_pred)
+hist(ppsimalpha, breaks = 10000, xlim = c(0, 15))
+plot(ppsimlogRS, ylim = c(-4, 4))
+
+# Plotting logRS by simulated logRS
+plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
+for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
 
 # LIMITS ####
 # Set Upper and Lower Limits
@@ -534,7 +560,7 @@ plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) # Coming from original tm
 
     # 1. SETUP
 BS <- TRUE # default for FALSE
-bsiters <- 250000 # New with Brown et al. CSAS runs
+bsiters <- 20000 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 # set.seed <- 1

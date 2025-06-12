@@ -365,7 +365,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   if (exists("Inlet", where = WAin)){
 # Make sure that this runs if BLANK
   InletlnWA <- data.frame(WAin) %>% # Complete set
-    filter(Stock != "Cypre") %>% # 
+    filter(Stock != "Cypre") %>% #
     group_by(Inlet) %>%
     summarize(InletlnWA = log(sum(WA)), lh = mean(lh)) %>% 
     filter(Inlet != "San Juan") %>%
