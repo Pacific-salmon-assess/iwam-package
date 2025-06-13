@@ -315,16 +315,16 @@ priorsim <- obj$simulate()
 # obj$simulate(obj$par) a bunch of times
 
 # for example:
-psimalpha <- vector("list", 100)
-psimlogRS_pred <- vector("list", 100)
-psimlogAlpha_re <- vector("list", 100)
+psimalpha <- vector("list", 1000)
+psimlogRS_pred <- vector("list", 1000)
+psimlogAlpha_re <- vector("list", 1000)
 
-for (i in 1:100){
+for (i in 1:1000){
   # Random parameter creation: Random parameter starts for prior simulation
   parp <- function() {
   # Can also add par <- to sequence above - see prior testing
   listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
-       bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
+       bWA = c(rnorm(1, 0, 1), rnorm(1, 0 , 1)), # Contains negatives
 
        # logRS_pred = rnorm(N_Obs, 0, 1),
        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
@@ -337,8 +337,22 @@ for (i in 1:100){
        logESD = runif(1, 0.01, 3), # Positive
        logAlphaSD = runif(1, 0.01, 3) # Positive
     )
-    return(listinit)
+  
+  listinit2 <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
+    bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
+    logESD = runif(1, 0, 100),
+    logAlphaSD = runif(1, 0, 100),
+    
+    logE_re = rnorm(N_Stk, 0, logESD),
+    logAlpha0 = rnorm(1, 0.6, 0.45),
+    logAlpha02 = rnorm(1, 0, 31.6),
+    logAlpha_re = rnorm(nrow(dat$WAbase), 0, logAlphaSD),
+    
+    tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
+    )
+    return(listinit) # Can change between two versions - listinit2 is a direct representation of the priors
   }
+  
   parp <- parp()
   
   # enter parp into model function with MakeADFun
@@ -355,7 +369,7 @@ for (i in 1:100){
 
 ppsimalpha <- unlist(psimalpha)
 ppsimlogRS <- unlist(psimlogRS_pred)
-hist(ppsimalpha, breaks = 10000, xlim = c(0, 15))
+hist(ppsimalpha, breaks = 100000, xlim = c(0, 100)) # In the event of large outliers (see outputs from listinit)
 plot(ppsimlogRS, ylim = c(-4, 4))
 
 # Plotting logRS by simulated logRS
