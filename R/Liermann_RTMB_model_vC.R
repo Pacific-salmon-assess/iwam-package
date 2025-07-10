@@ -42,10 +42,10 @@ WAin <- read.csv(here::here(WAin))
 
 # Data setup ####
 # Remove Hoko and Hoh stocks - consider removing SKagit OR Chehalis
-    # Due to sampling reasons explained in Parken 2006.
+# Due to sampling reasons explained in Parken 2006.
 srdatwna <- srdatwna %>% 
   filter(!Name %in% c("Hoko","Hoh")) # |>
-  # ( !(Name == "Skagit")) # |> # Skagit is #22
+  # (!(Name == "Skagit")) # |> # Skagit is #22
   # filter( !(Name == "Chehalis")) # |> # Chehalis is #19
 
 # Remove years with NAs and renumber.
@@ -113,7 +113,6 @@ if (lhdiston) {
   par$logAlpha02 <- 0
 }
 
-
 f_srep <- function(par){
   getAll(dat, par)
 
@@ -136,7 +135,7 @@ f_srep <- function(par){
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
-  # logRS_sim <- numeric(N_Obs) # Posterior predictive simulated vector
+  # logRS_sim <- numeric(N_Obs) # Posterior predictive simulated vector?
   
   E_tar <- numeric(N_Pred)
   logE_tar <- numeric(N_Pred)
@@ -150,8 +149,7 @@ f_srep <- function(par){
   logE_line_ocean <- numeric(line)
   E_line_ocean <- numeric(line)
   
-  # Begin negative log-likelihood
-  nll <- 0
+  nll <- 0 # Begin negative log-likelihood
   
   nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE)) # Prior
   nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) # Prior
@@ -176,8 +174,6 @@ f_srep <- function(par){
   }
 
   ## First level of hierarchy - Ricker model:
-      # Where is logRS_pred coming from - and why is it not saved anywhere?
-      # Added it into vector list in order to REPORT()
   for (i in 1:N_Obs){
     logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # DATA FLAG
     # nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) # DATA FLAG
@@ -238,7 +234,6 @@ f_srep <- function(par){
   REPORT(bWA) # Testing simulate()
   
   # ADREPORT(logRS_pred)
-  # REPORT(logRS_pred)
   REPORT(logRS_pred)
   # REPORT(logRS_sim) # Is logRS_pred as a REPORT the same as logRS_sim? (Question for Sean/Paul)
   
@@ -321,10 +316,6 @@ obj <- RTMB::MakeADFun(f_srep,
 # plot(dat$logRS, ylim = c(-4, 4))
 # Add a line to add points() instead of re-creating the plot to see multiple sims
 
-# obj$par = new thing
-# obj$simulate(obj$par) a bunch of times
-
-# for example:
 psimalpha <- vector("list", 100)
 psimlogRS_pred <- vector("list", 100)
 psimlogAlpha_re <- vector("list", 100)
@@ -411,7 +402,7 @@ hist(ppsimalpha, breaks = 100, freq = TRUE, xlim = c(0, 100)) # In the event of 
 hist(unlist(psimlogAlpha_re))
 plot(ppsimlogRS, ylim = c(-100, 100))
 
-# Plotting logRS by simulated logRS
+# Plotting logRS by simulated logRS (INCOMPLETE)
 plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
 for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
 
@@ -420,22 +411,15 @@ for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1)
   # PUSHFORWARD: simulate only the expectation from the priors
   # PREDICTIVE: simulate observations from the priors
 
-    # This section has to be filled ...
+  # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
 
-    # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
-
-  # Tor: For prior testing - would you have to work on the tmb obj$?
-  # e.g. obj$simulate()
-  # Does tmbstan() change the obj? Or does it just create the fitstan object?
-
-# default method
+# default method for stan objects - won't work oob with tmbstan unfort.
 # y_rep <- example_yrep_draws() # vs. example_y_data() for y (or fitstan) ?
   # y needs to be a vector (observed)
   # y_rep needs to be a vector (generated)
 # pp_check(fitstan, fun = ppc_dens_overlay) # histogram of observed vs. predicted
 
-# LIMITS ####
-# Set Upper and Lower Limits
+# LIMITS Set Upper and Lower Limits ####
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
@@ -445,6 +429,8 @@ upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
 # nlminb - MLE ####
+# stan MAP: do mle via optimize - would just be using tmb obj and nlminb:
+
 # opt <- nlminb(obj$par,
 #               obj$fn,
 #               obj$gr,
@@ -458,6 +444,8 @@ lower[names(obj$par) == "logAlphaSD"] <- 0
   # Tor: Given issues with parallelization - consider that negative init
   # values may be causing issues. For example obj$fn/obj$gr can't be 
   # manually evaluted below zero.
+
+# RANDOM INIT - MATCHING PRIORS
 init <- function() {
   # Can also add par <- to sequence above - see prior testing
   listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
@@ -482,28 +470,30 @@ init <- function() {
   return(listinit)
 }
 
-initfixed <- function() {
-    listinitfixed <- list(
-       b0 = c(10, 0), # Contains negatives
-       bWA = c(0, 0), # Contains negatives
-       
-       logE_re = numeric(N_Stk), # Contains negatives
-       logAlpha0 = 0.6, # Contains negatives
-       logAlpha_re = numeric(nrow(dat$WAbase)), # Contains negatives
+# FIXED POINTS INIT
+# initfixed <- function() {
+#     listinitfixed <- list(
+#        b0 = c(10, 0), # Contains negatives
+#        bWA = c(0, 0), # Contains negatives
+#        
+#        logE_re = numeric(N_Stk), # Contains negatives
+#        logAlpha0 = 0.6, # Contains negatives
+#        logAlpha_re = numeric(nrow(dat$WAbase)), # Contains negatives
+# 
+#        tauobs = 0.01 + numeric(N_Stk), # Uniform to REMAIN positive
+#        
+#        logESD = 1, # Positive
+#        logAlphaSD = 1 # Positive
+#   )
+#   
+#   if (lhdiston) {
+#     listinitfixed$logAlpha02 <- 0 # NEW: alpha0 prior for LH specific dists.
+#   }
+#   
+#   return(listinitfixed)
+# }
 
-       tauobs = 0.01 + numeric(N_Stk), # Uniform to REMAIN positive
-       
-       logESD = 1, # Positive
-       logAlphaSD = 1 # Positive
-  )
-  
-  if (lhdiston) {
-    listinitfixed$logAlpha02 <- 0 # NEW: alpha0 prior for LH specific dists.
-  }
-  
-  return(listinitfixed)
-}
-
+# ALTERNATIVE RANDOM INIT
 # init2 <- function() {
 #   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
 #        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
@@ -518,8 +508,6 @@ initfixed <- function() {
 #        logAlphaSD = runif(1, 0.01, 3) # Positive
 #   )
 # }
-
-# SETTING upper and lower LIMITS for sampler - see limits above
 
 # SAMPLE MCMC
   # Can consider in parallel - Kasper's github example doesn't currently work
@@ -541,9 +529,6 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 2000, warmup = 1000, # default iter
                    chains = 4, open_progress = FALSE, silent = TRUE); beep(2)
   # tmbstan operates by default with NUTS MCMC sampler
   # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
-
-# stan MAP?
-  # do mle via optimize - would just be using tmb obj and nlminb as above
 
 # Acquire outderputs of MCMC ####
 derived_obj <- derived_post(fitstan); beep(2)
@@ -580,11 +565,11 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
 
 # RESIDUALS? ####
 
-  # Plot generated logRS vs. logRS from data?
+# Plot generated logRS vs. logRS from data?
 # plot(exp(dat$logRS), exp(derived_obj$deripost_summary$logRS_pred$Median))
 plot(dat$logRS, derived_obj$deripost_summary$logRS_pred$Median)
 
-  # OR plot observed vs. generated logRS by stock? Can you see a difference?
+# OR plot observed vs. generated logRS by stock? Can you see a difference?
 compRS <- cbind(dat$srdat, logRS = dat$logRS)
 compRS <- cbind(compRS, genMedianlogRS = derived_obj$deripost_summary$logRS_pred$Median)
 
