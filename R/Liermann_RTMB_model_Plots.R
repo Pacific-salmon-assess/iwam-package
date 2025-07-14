@@ -27,6 +27,11 @@ save(my_object, file = "my_object.RData")
 # In script_B.R
 load("my_object.RData")
 
+# add stocknames - could add them in to each object of derived_obj?
+# Stocknames <- WAin$Stock
+# Srep_example <- cbind(derived_obj$deripost_summary$E_tar_adj, Stocknames) |> 
+#   Srep_example[c(1, 7, 2, 3, 4, 5, 6)]
+
 # Prepare/load datasets for plotting ####
 Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
 ParkenCaseStudy <- read.csv(here::here("DataIn/Parken_evalstocks.csv")) # Case study stocks

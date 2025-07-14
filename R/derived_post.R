@@ -77,6 +77,10 @@ derived_post <- function(x) {
   matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
     LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
 
+  # # Prior predictions and posterior predictions - adding in observation error
+  # matrices$logRS_pred_obs <- apply(matrices$logRS_pred, 2, FUN = function(x) rnorm(length(x), x, sd = sqrt(1/matrices$tauobs)))
+  # # sqrt(1/tauobs[stk[i]])
+  
   # Re-calculate lengths for added parameters
   n_matrices <- length(matrices)
   n_cols <- sapply(matrices, function(x) dim(x)) # Now with 2 dimensions

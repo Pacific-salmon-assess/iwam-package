@@ -1,5 +1,7 @@
 # Liermann Srep (E) RTMB Model with MCMC Sampling ####
 
+
+
 # Libaries ####
 library(RTMB)
 library(ggplot2)
@@ -17,6 +19,8 @@ library(latex2exp)
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
+
+
 
 # Raw data read-in ####
 WAin <- c("DataIn/Parken_evalstocks.csv")
@@ -71,7 +75,7 @@ WAbase <- WAbase %>%
   mutate(logWA = log(WA)) |> 
   filter(!is.na(Stocknumber))
 
-## Shift log WA for the mean - base - makes estimation easier
+# Shift log WA for the mean - base - makes estimation easier
 mean_logWA <- mean(WAbase$logWA)
 WAbase$logWAshifted <- WAbase$logWA - mean_logWA
 
@@ -81,6 +85,8 @@ WAin$logWAshifted_t <- WAin$logWA - mean_logWA
 lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>% 
   group_by(Stocknumber) %>% 
   summarize(lh=max(Stream))
+
+
 
 ## RTMB dat and par setup ####
 # Dat
@@ -94,6 +100,7 @@ dat <- list(srdat = srdat,
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
 N_Obs <- nrow(srdat)
+stk = srdat$Stocknumber + 1
 
 # NEW: alpha0 prior for LH specific dists. - ON/OFF
 lhdiston <- T # Set true to run
@@ -185,6 +192,14 @@ f_srep <- function(par){
     
     # posterior predictive check
     # logRS_sim[i] <- rnorm(1, logRS_pred[i], sd = sqrt(1/tauobs[stk[i]])) # Simulated logRS for posterior predictive check
+      # do I need an rnorm or a simulate?
+      # I think I could either:
+      # rnorm for both parameters as the mean?
+      # or simulate() and then rnorm?
+    
+    # outside of RTMB:
+    # create an rnorm with mean logRS_pred, sd = sqrt(1/tauobs) etc.
+    
   }
   
   ## Calculate SMSY for Synoptic set - for plotting
@@ -226,8 +241,10 @@ f_srep <- function(par){
     E_line_stream[i] <- exp(logE_line_stream[i])
   }
   
+  # QUESTION: Do you need both ADREPORT and REPORT per variable?
+    # Does ADREPORT cover REPORT too?
+  
   ## ADREPORT - internal values (synoptic specific/Ricker)
-  # ADREPORT(logRS) # logRS for all 501 data points
   alpha <- exp(logAlpha)
   
   REPORT(b0) # Testing simulate()
@@ -237,14 +254,14 @@ f_srep <- function(par){
   REPORT(logRS_pred)
   # REPORT(logRS_sim) # Is logRS_pred as a REPORT the same as logRS_sim? (Question for Sean/Paul)
   
-  ADREPORT(logE_re)
-  ADREPORT(E)
-  ADREPORT(logAlpha)
-  ADREPORT(logAlpha_re) # random effect parameter for resampling
-  ADREPORT(alpha)
-  ADREPORT(SMSY_r)
-  ADREPORT(BETA_r)
-  ADREPORT(tauobs)
+  # ADREPORT(logE_re)
+  # ADREPORT(E)
+  # ADREPORT(logAlpha)
+  # ADREPORT(logAlpha_re) # random effect parameter for resampling
+  # ADREPORT(alpha)
+  # ADREPORT(SMSY_r)
+  # ADREPORT(BETA_r)
+  # ADREPORT(tauobs)
   
   # REPORT(logRS) # logRS for all 501 data points
   REPORT(logE_re)
@@ -254,25 +271,25 @@ f_srep <- function(par){
   REPORT(alpha)
   REPORT(SMSY_r)
   REPORT(BETA_r)
-  REPORT(tauobs)
+  REPORT(tauobs) # Necessary to add back in observation error?
   
   # ADREPORT - predicted values from watershed area model
     # Mean estimate of the median (without bias correction)
   alpha_tar <- exp(logAlpha_tar)
   
-  ADREPORT(E_tar) # target E (Srep) (21)
-  ADREPORT(logE_tar) # exp these for the correct confidence intervals
-  ADREPORT(logAlpha_tar)
-  ADREPORT(alpha_tar)
+  # ADREPORT(E_tar) # target E (Srep) (21)
+  # ADREPORT(logE_tar) # exp these for the correct confidence intervals
+  # ADREPORT(logAlpha_tar)
+  # ADREPORT(alpha_tar)
   
   REPORT(E_tar)
   REPORT(logE_tar)
   REPORT(logAlpha_tar)
   REPORT(alpha_tar)
 
-  ADREPORT(BETA)
-  ADREPORT(SMSY)
-  ADREPORT(SGEN)
+  # ADREPORT(BETA)
+  # ADREPORT(SMSY)
+  # ADREPORT(SGEN)
   
   REPORT(BETA)
   REPORT(SMSY)
@@ -280,9 +297,9 @@ f_srep <- function(par){
   
   # Simulated line values for plotting
   REPORT(E_line_stream) 
-  ADREPORT(E_line_stream)
+  # ADREPORT(E_line_stream)
   REPORT(E_line_ocean) 
-  ADREPORT(E_line_ocean)
+  # ADREPORT(E_line_ocean)
   
   REPORT(logAlphaSD)
   REPORT(logESD)
@@ -290,59 +307,67 @@ f_srep <- function(par){
   nll # output of negative log-likelihood
 }
 
+
+
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_srep,
                        par,
                        random = c("logAlpha_re", "logE_re"),
                        silent=TRUE)
 
-# Prior testing ####
-    # - Pass random prior values to obj$par - then simulate new observations
-    # - Requires changing par each time and running function and obj
-    # - Need to write a par function that matches priors?
+
+
+# Prior testing thoughts ####
+
+# PUSHFORWARD: simulate only the expectation from the priors.
+# simulations of expectations --- whatever is going into the mean part of the data likelihood
+# e.g. values of expected log(R/S). You can never ‘observe’ these in reality
+
+# PREDICTIVE: simulate observations from the priors. 
+# e.g. simulating log(R/S) 
+# compare these against your data if you want. The point is, 
+# it’s the same type of thing as your data that you can observe.
+# whatever is going into the left side of the data likelihood line (at least with Stan tilde syntax)
+
+# Sean: It’s not in reference to what parameter is being simulated or predicted. 
+# It’s about whether you’re taking draws from the expected value distribution 
+# (given only the priors) or whether you’re taking draws from the expected value 
+# distribution and adding on observation error too.
+
+# Approaches:
+    # 1. Exclude data from tmbstan sampling:
+        # Create a logical exclusion/inclusion term in data
+        # For PP - exclude nll term of observations e.g. logRS
+        # run tmbstan() - will most likely fail horribly
+        # Extract parameter distributions from chains (*PPF*)
+        # ... (PP)
+    # 2. Random generation of RTMB model:
+        # Randomly sample parameters starts
+        # MakeADFun
+        # obj$simulate() - random generation of all likelihoods?
+        # loop above niters and save them
+        # This produces a distribution of expected values given only the priors (*PPF*)
+        # To calculate prior predictive: add observation error to the simulated value of logRS_pred
+        # by drawing an rnorm of the simulated value of logRS_pred (mu) and tauobs (sd)
+        # OR rnorm drawn values (without a simulate())?
+        # ** This final step is the same in both cases.
 
 # priorlogRS <- obj$simulate()$logRS_pred
-  # What is the difference between logRS_pred and logRS as an OBS() object?
 
-# priorsim <- obj$simulate()
+# What is the difference between logRS_pred and logRS as an OBS() object?
 
-# Tor:
-  # If you re-run function and MakeADFUN after creating random pars
-  # e.g. par <- init() - drawn from random init starts for MCMC below
-  # When you run obj$simulate() - you will have randomly generated parameters.
-# par(mfrow = c(1,3))
-# plot(priorsim$logRS_pred)
-# plot(priorsim$logRS_pred, ylim = c(-4, 4))
-# plot(dat$logRS, ylim = c(-4, 4))
-# Add a line to add points() instead of re-creating the plot to see multiple sims
+# APPROACH: Random Generation ####
+    # Create however many vectors of parameters you wish to test/investigate
+psimalpha <- vector("list", 1000) # Vector start
+psimlogRS_pred <- vector("list", 1000) # Vector start
+psimlogAlpha_re <- vector("list", 1000) # Vector start
 
-psimalpha <- vector("list", 100)
-psimlogRS_pred <- vector("list", 100)
-psimlogAlpha_re <- vector("list", 100)
-
-for (i in 1:100){
+for (i in 1:1000){
   # Random parameter creation: Random parameter starts for prior simulation
   parp <- function() {
-    
-  # Can also add par <- to sequence above - see prior testing
-  # listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
-  #      bWA = c(rnorm(1, 0, 1), rnorm(1, 0 , 1)), # Contains negatives
-  # 
-  #      # logRS_pred = rnorm(N_Obs, 0, 1),
-  #      logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
-  #      logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
-  #      logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
-  #      logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
-  # 
-  #      tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
-  # 
-  #      logESD = runif(1, 0.01, 3), # Positive
-  #      logAlphaSD = runif(1, 0.01, 3) # Positive
-  #   )
-  
+  # Random parameter starts for prior simulation
   logESD <- runif(1, 0, 100)
   logAlphaSD <- runif(1, 0, 100)
-
   listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
     bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
     logESD = logESD, # This isn't being saved internally
@@ -356,35 +381,36 @@ for (i in 1:100){
     tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
     )
   
-  # logESDalt <- runif(1, 0, 20)
-  # logAlphaSDalt <- runif(1, 0, 20)
-  # listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
-  #   bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
-  #   logESD = logESDalt, # This isn't being saved internally
-  #   logAlphaSD = logAlphaSDalt, # This isn't being saved internally
-  #   
-  #   logE_re = rnorm(N_Stk, 0, sd = logESD),
-  #   logAlpha0 = rnorm(1, 0, sd = 0.71),
-  #   logAlpha02 = rnorm(1, 0, sd = 31.6),
-  #   logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlphaSD),
-  #   
-  #   tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
-  #   )
+  # Alternative priors from Liermann et al. 2010 - comment on/off for now
+  logESDalt <- runif(1, 0, 20)
+  logAlphaSDalt <- runif(1, 0, 20)
+  listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
+    bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
+    logESD = logESDalt, # This isn't being saved internally
+    logAlphaSD = logAlphaSDalt, # This isn't being saved internally
+
+    logE_re = rnorm(N_Stk, 0, sd = logESD),
+    logAlpha0 = rnorm(1, 0, sd = 0.71),
+    logAlpha02 = rnorm(1, 0, sd = 31.6),
+    logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlphaSD),
+
+    tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
+    )
   
-    return(listinitprior) # Can change between two versions - listinitprior is a direct representation of the priors
+    return(listinitprior) # listinitprior or listinitialternate
   }
   
   parpar <- parp()
   
-  # enter parp into model function with MakeADFun
+  # enter parpar into model function with MakeADFun
   objpp <- RTMB::MakeADFun(f_srep,
                        parpar,
                        random = c("logAlpha_re", "logE_re"),
                        silent=TRUE)
   
-  # simulate from prior
+  # simulate for each desired term
   psimalpha[[i]] <- objpp$simulate()$alpha
-  psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re # why logAlpha_re? 
+  psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re # why logAlpha_re? - if I want to do PP?
   # ... other derived parameters?
     # psimlogAlpha0[[i]] <- objpp$simulate()$logAlpha0 - doesn't exist - not derived
     # $E ?
@@ -394,11 +420,13 @@ for (i in 1:100){
   # add in observation error?
       # look at how I did it for derived_post.R?
   
-}; beepr(2)
+}
 
-ppsimalpha <- unlist(psimalpha)
+# Plot distributions for PRIOR PUSHFORWARD
+ppsimalpha <- unlist(psimalpha) 
 ppsimlogRS <- unlist(psimlogRS_pred)
-hist(ppsimalpha, breaks = 100, freq = TRUE, xlim = c(0, 100)) # In the event of large outliers (see outputs from listinit)
+
+hist(ppsimalpha, breaks = 100, freq = TRUE, xlim = c(0, 100)) # Graphical hiccups
 hist(unlist(psimlogAlpha_re))
 plot(ppsimlogRS, ylim = c(-100, 100))
 
@@ -406,20 +434,15 @@ plot(ppsimlogRS, ylim = c(-100, 100))
 plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
 for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
 
-# TOR: SEE ABOVE LIMITS FOR OTHER PRIOR PREDICTION SECTION *********************
+# Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
 
-  # PUSHFORWARD: simulate only the expectation from the priors
-  # PREDICTIVE: simulate observations from the priors
+# Plot distributions for PRIOR PREDICTIVE
+# First: add in observation error to logRS_pred
+# ...
 
-  # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
 
-# default method for stan objects - won't work oob with tmbstan unfort.
-# y_rep <- example_yrep_draws() # vs. example_y_data() for y (or fitstan) ?
-  # y needs to be a vector (observed)
-  # y_rep needs to be a vector (generated)
-# pp_check(fitstan, fun = ppc_dens_overlay) # histogram of observed vs. predicted
 
-# LIMITS Set Upper and Lower Limits ####
+# LIMITS: Set Upper and Lower Limits ####
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
@@ -427,6 +450,8 @@ upper[names(obj$par) == "logESD"] <- 100
 lower[names(obj$par) == "logESD"] <- 0
 upper[names(obj$par) == "logAlphaSD"] <- 100
 lower[names(obj$par) == "logAlphaSD"] <- 0
+
+
 
 # nlminb - MLE ####
 # stan MAP: do mle via optimize - would just be using tmb obj and nlminb:
@@ -438,6 +463,8 @@ lower[names(obj$par) == "logAlphaSD"] <- 0
 #               lower = lower,
 #               upper = upper
 # )
+
+
 
 # MCMC ####
 # INIT FUNCTION - can also just run sampler as default random
@@ -493,7 +520,7 @@ init <- function() {
 #   return(listinitfixed)
 # }
 
-# ALTERNATIVE RANDOM INIT
+# PREVIOUS RANDOM INIT (DEPRECIATED)
 # init2 <- function() {
 #   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
 #        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
@@ -509,41 +536,32 @@ init <- function() {
 #   )
 # }
 
-# SAMPLE MCMC
+# SAMPLE MCMC ####
   # Can consider in parallel - Kasper's github example doesn't currently work
 # cores <- parallel::detectCores() - 2
 # cores <- 1
 # options(mc.cores = cores)
 
 # Seeding
-# set.seed(1) # This is now set at header of code
 # rm(.Random.seed, envir=globalenv())
 
-# The set.seed precedes this in order to have fixed runs with initfixed
-set.seed(1) ; fitstan <- tmbstan(obj, iter = 2000, warmup = 1000, # default iter/2 for warmup - Typically 5000 and 1000
+# The set.seed precedes this in order to have fixed "identical" runs with initfixed
+set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter/2 for warmup - Typically 5000 and 1000
                    init = init, # init = init function or "random" or initfixed for fixed points
                    seed = 1, # set seed or leave out for random - now set at 1 above
                       # but not technically within sampling - unsure if each chain takes seed                  
                    # control = list(adapt_delta = 0.99, max_treedepth = 15),
                    lower = lower, upper = upper,
                    chains = 4, open_progress = FALSE, silent = TRUE); beep(2)
-  # tmbstan operates by default with NUTS MCMC sampler
-  # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
-
-# Acquire outderputs of MCMC ####
-derived_obj <- derived_post(fitstan); beep(2)
-
-# add stocknames - could add them in to each object of derived_obj?
-# Stocknames <- WAin$Stock
-# Srep_example <- cbind(derived_obj$deripost_summary$E_tar_adj, Stocknames) |> 
-#   Srep_example[c(1, 7, 2, 3, 4, 5, 6)]
+# tmbstan operates by default with NUTS MCMC sampler
+# See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
 
   # TRACE PLOTS
-mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
-mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
+# mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
+# mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 
   # PAIRS PLOTS
 # pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
@@ -559,9 +577,38 @@ mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter tracep
 # Need a log-likelihood matrix to do this - would have to add a generated
   # quantity in the model to achieve this. Not generated otherwise.
 
-# POSTERIOR PREDICTIVE CHECKS ####
 
-    # This section has to be filled ...
+
+# Acquire outputs of MCMC ####
+derived_obj <- derived_post(fitstan); beep(2)
+# add stocknames - see extra code from _Plots.R
+
+
+
+# APPROACH - Prior prediction with data exclusion ####
+# Make sure dat$prioronly <- 1 to not include data in the nll
+# Run all the way down to derived_obj
+
+# Pushforward tests:
+
+# Predictive tests:
+
+
+
+# POSTERIOR PREDICTIVE CHECKS ####
+# Run full model with dat$prioronly <- 0 for data included in nll
+# Run dervied_post() to extract posterior from chains
+# Randomly sample for logRS
+# Compare logRS with logRS_pred (including observation error)
+# e.g. rnorm(1, derived_obj$deripost_summary$logRS_pred$Median, 
+           # sd  = sqrt(1/derived_obj$deripost_summary$tauobs$Median))
+
+pp_logRS <- c()
+for (i in stk){
+  pp_logRS[i] <- rnorm(1, derived_obj$deripost_summary$logRS_pred$Median[i],
+                  sd = sqrt(1/derived_obj$deripost_summary$tauobs$Median[stk[i]]))
+}
+
 
 # RESIDUALS? ####
 
@@ -573,10 +620,17 @@ plot(dat$logRS, derived_obj$deripost_summary$logRS_pred$Median)
 compRS <- cbind(dat$srdat, logRS = dat$logRS)
 compRS <- cbind(compRS, genMedianlogRS = derived_obj$deripost_summary$logRS_pred$Median)
 
-par(mfrow=c(1,3))
-plot(compRS$logRS, ylab = "logRS", ylim = c(-4, 4))
-plot(compRS$genMedianlogRS, ylab = "genMedianlogRS", ylim = c(-4, 4))
-plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) # Coming from original tmb obj$ no sampling, no nlminb
+par(mfrow=c(1,2))
+plot(compRS$logRS, ylab = "logRS", ylim = c(-10, 10))
+plot(compRS$genMedianlogRS, ylab = "genMedianlogRS", ylim = c(-10, 10))
+points(
+  x = rep(1:501, each = 4000),
+  y = as.vector(t(derived_obj$deripost_full$logRS_pred)),
+  col = rgb(0, 0, 0, alpha = 0.02),  # transparent black
+  pch = 16,
+  cex = 0.3
+)
+# plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) # Coming from original tmb obj$ no sampling, no nlminb
 
 # Tor: this would make it seem like the model is not working great in terms
   # of generating observations from the Ricker model. It is more restricted
