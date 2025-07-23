@@ -95,7 +95,7 @@ dat <- list(srdat = srdat,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), max(WAbase$logWAshifted), 0.1), # Not added to likelihood
             logRS = log(srdat$Rec) - log(srdat$Sp),
-            prioronly = 1) # 0 - run with data, 1 - prior prediction mode?
+            prioronly = 0) # 0 - run with data, 1 - prior prediction mode?
 
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
@@ -173,6 +173,7 @@ f_srep <- function(par){
     E[i] <- exp(logE[i])
     
     nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
+    # half sdnormal? half t? half cauchy?
     
     if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
     else logAlpha[i] <- logAlpha0 + logAlpha_re[i]
@@ -190,6 +191,8 @@ f_srep <- function(par){
     } # If prioronly is 0, then likelihood is calculated
     # If prioronly is 1, then likelihood is not calculated
     
+    # prior pushforward - turn it back into the curve that is expected based on the priors
+    
     # posterior predictive check
     # logRS_sim[i] <- rnorm(1, logRS_pred[i], sd = sqrt(1/tauobs[stk[i]])) # Simulated logRS for posterior predictive check
       # do I need an rnorm or a simulate?
@@ -199,7 +202,6 @@ f_srep <- function(par){
     
     # outside of RTMB:
     # create an rnorm with mean logRS_pred, sd = sqrt(1/tauobs) etc.
-    
   }
   
   ## Calculate SMSY for Synoptic set - for plotting
@@ -356,13 +358,20 @@ obj <- RTMB::MakeADFun(f_srep,
 
 # What is the difference between logRS_pred and logRS as an OBS() object?
 
+# Alternative approach from Sean ####
+# rnorms for each of alpha prior
+# a function that takes in parameters (Vectored) and creates a logRS, etc., 
+# and then pipe through vector - recreating what REPORT() does
+# this can then be done for all forms of prior/posterior prediction
+# just avoids all the behind the scene work of the RTMB framework
+
 # APPROACH: Random Generation ####
     # Create however many vectors of parameters you wish to test/investigate
 psimalpha <- vector("list", 1000) # Vector start
 psimlogRS_pred <- vector("list", 1000) # Vector start
 psimlogAlpha_re <- vector("list", 1000) # Vector start
 
-for (i in 1:1000){
+for (i in 1:100){
   # Random parameter creation: Random parameter starts for prior simulation
   parp <- function() {
   # Random parameter starts for prior simulation
@@ -426,7 +435,7 @@ for (i in 1:1000){
 ppsimalpha <- unlist(psimalpha) 
 ppsimlogRS <- unlist(psimlogRS_pred)
 
-hist(ppsimalpha, breaks = 100, freq = TRUE, xlim = c(0, 100)) # Graphical hiccups
+hist(ppsimalpha, breaks = 100, freq = TRUE) # Graphical hiccups
 hist(unlist(psimlogAlpha_re))
 plot(ppsimlogRS, ylim = c(-100, 100))
 
@@ -591,7 +600,18 @@ derived_obj <- derived_post(fitstan); beep(2)
 
 # Pushforward tests:
 
-# Predictive tests:
+# Predictive tests: *EXACTLY THE SAME AS BELOW FOR POSTERIOR*
+musim <- derived_obj$deripost_full$logRS_pred
+sigmasim <- derived_obj$deripost_full$tauobs
+simout <- matrix(NA, nrow = 10, ncol = 501)
+draws <- sample(1:10000, 10)
+for (i in seq_along(draws)) {
+  row <- draws[i]
+  # Vectorized rnorm over 501 obs using that row
+  means <- musim[row, ]                   # length 501
+  sds   <- sigmasim[row, stk]             # length 501 — select right SD for each obs
+  simout[i, ] <- rnorm(501, mean = means, sd = sqrt(1/sds))
+}
 
 
 
@@ -603,10 +623,38 @@ derived_obj <- derived_post(fitstan); beep(2)
 # e.g. rnorm(1, derived_obj$deripost_summary$logRS_pred$Median, 
            # sd  = sqrt(1/derived_obj$deripost_summary$tauobs$Median))
 
-pp_logRS <- c()
+# each sample independent draw AND per observation
+  # 501 observations x 4000 times (matrix)
+
+# pp_logRS <- c()
+# for (i in stk){
+#   pp_logRS[i] <- rnorm(1, derived_obj$deripost_summary$logRS_pred$Median[i], # per sample
+#                   sd = sqrt(1/derived_obj$deripost_summary$tauobs$Median[stk[i]])) # sqrt(1/tau[i])
+# }
+# hist(pp_logRS)
+
+# create matrix of [10, 501] for 10 draws from 10000 iters
 for (i in stk){
-  pp_logRS[i] <- rnorm(1, derived_obj$deripost_summary$logRS_pred$Median[i],
-                  sd = sqrt(1/derived_obj$deripost_summary$tauobs$Median[stk[i]]))
+  ppsim[i] <- rnorm(1, derived_obj$deripost_full$logRS_pred[],
+                    sd = sqrt(1/derived_obj$deripost_full$tauobs[stk[i]]))
+}
+
+# other method from derived_post
+  # unsure how to work this around indexing per stock for tau
+# matrices$logE_tar_adj <- apply(matrices$logE_tar, 2, FUN = function(x)rnorm(length(x), x, sd = matrices$logESD))
+# matrixsim <- apply(derived_obj$deripost_full$logRS_pred, 2, FUN = function(x)rnorm(length(x), x, sd = sqrt(1/derived_obj$deripost_full$tauobs)))
+
+# one method
+musim <- derived_obj$deripost_full$logRS_pred
+sigmasim <- derived_obj$deripost_full$tauobs
+simout <- matrix(NA, nrow = 10, ncol = 501)
+draws <- sample(1:10000, 10)
+for (i in seq_along(draws)) {
+  row <- draws[i]
+  # Vectorized rnorm over 501 obs using that row
+  means <- musim[row, ]                   # length 501
+  sds   <- sigmasim[row, stk]             # length 501 — select right SD for each obs
+  simout[i, ] <- rnorm(501, mean = means, sd = sqrt(1/sds))
 }
 
 
