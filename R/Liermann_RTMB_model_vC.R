@@ -1,7 +1,4 @@
 # Liermann Srep (E) RTMB Model with MCMC Sampling ####
-
-
-
 # Libaries ####
 library(RTMB)
 library(ggplot2)
@@ -9,12 +6,12 @@ library(dplyr)
 library(tidyverse)
 library(progress)
 library(tmbstan)
-library(TMB)
-library(tidybayes)
-library(bayesplot)
+# library(TMB)
+# library(tidybayes)
+# library(bayesplot)
 library(beepr) # Sounds
 library(viridis)
-library(latex2exp)
+# library(latex2exp)
 
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
@@ -95,7 +92,7 @@ dat <- list(srdat = srdat,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), max(WAbase$logWAshifted), 0.1), # Not added to likelihood
             logRS = log(srdat$Rec) - log(srdat$Sp),
-            prioronly = 0) # 0 - run with data, 1 - prior prediction mode?
+            prioronly = 1) # 0 - run with data, 1 - prior prediction mode?
 
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
@@ -172,11 +169,17 @@ f_srep <- function(par){
     logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i] # DATA FLAG
     E[i] <- exp(logE[i])
     
-    nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
+    # nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
+    nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE) # Non-centered
     # half sdnormal? half t? half cauchy?
     
-    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
-    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    # Original partial non-centering
+    # if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
+    # else logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+    
+    # Non-centered with scaling of mean by logAlphaSD
+    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlphaSD
+    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlphaSD
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
@@ -269,7 +272,10 @@ f_srep <- function(par){
   REPORT(logE_re)
   REPORT(E) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logAlpha) # model logAlpha (25)
+  REPORT(logAlpha0)
+  REPORT(logAlpha02)
   REPORT(logAlpha_re) # random effect parameter for resampling
+  REPORT(logAlphaSD)
   REPORT(alpha)
   REPORT(SMSY_r)
   REPORT(BETA_r)
@@ -359,95 +365,98 @@ obj <- RTMB::MakeADFun(f_srep,
 # What is the difference between logRS_pred and logRS as an OBS() object?
 
 # Alternative approach from Sean ####
-# rnorms for each of alpha prior
-# a function that takes in parameters (Vectored) and creates a logRS, etc., 
-# and then pipe through vector - recreating what REPORT() does
-# this can then be done for all forms of prior/posterior prediction
-# just avoids all the behind the scene work of the RTMB framework
+  # rnorms for each of alpha prior
+  # a function that takes in parameters (Vectored) and creates a logRS, etc., 
+  # and then pipe through vector - recreating what REPORT() does
+  # this can then be done for all forms of prior/posterior prediction
+  # just avoids all the behind the scene work of the RTMB framework
 
-# APPROACH: Random Generation ####
-    # Create however many vectors of parameters you wish to test/investigate
-psimalpha <- vector("list", 1000) # Vector start
-psimlogRS_pred <- vector("list", 1000) # Vector start
-psimlogAlpha_re <- vector("list", 1000) # Vector start
-
-for (i in 1:100){
-  # Random parameter creation: Random parameter starts for prior simulation
-  parp <- function() {
-  # Random parameter starts for prior simulation
-  logESD <- runif(1, 0, 100)
-  logAlphaSD <- runif(1, 0, 100)
-  listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
-    bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
-    logESD = logESD, # This isn't being saved internally
-    logAlphaSD = logAlphaSD, # This isn't being saved internally
-    
-    logE_re = rnorm(N_Stk, 0, logESD),
-    logAlpha0 = rnorm(1, 0.6, 0.45),
-    logAlpha02 = rnorm(1, 0, 31.6),
-    logAlpha_re = rnorm(nrow(dat$WAbase), 0, logAlphaSD),
-    
-    tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
-    )
+# PRIOR PUSHFORWARD APPROACH: Random Generation ####
+randomgenmethod <- F # Turn on or off for now
+if(randomgenmethod == T){
+  # Create however many vectors of parameters you wish to test/investigate
+  geniters <- 1000
+  psimalpha <- vector("list", geniters) # Vector start
+  psimlogRS_pred <- vector("list", geniters) # Vector start
+  psimlogAlpha_re <- vector("list", geniters) # Vector start
   
-  # Alternative priors from Liermann et al. 2010 - comment on/off for now
-  logESDalt <- runif(1, 0, 20)
-  logAlphaSDalt <- runif(1, 0, 20)
-  listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
-    bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
-    logESD = logESDalt, # This isn't being saved internally
-    logAlphaSD = logAlphaSDalt, # This isn't being saved internally
-
-    logE_re = rnorm(N_Stk, 0, sd = logESD),
-    logAlpha0 = rnorm(1, 0, sd = 0.71),
-    logAlpha02 = rnorm(1, 0, sd = 31.6),
-    logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlphaSD),
-
-    tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
-    )
-  
-    return(listinitprior) # listinitprior or listinitialternate
+  for (i in 1:geniters){
+    # Random parameter creation: Random parameter starts for prior simulation
+    parp <- function() {
+      # Random parameter starts for prior simulation
+      logESD <- runif(1, 0, 100)
+      logAlphaSD <- runif(1, 0, 100)
+      listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
+        bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
+        logESD = logESD, # This isn't being saved internally
+        logAlphaSD = logAlphaSD, # This isn't being saved internally
+        
+        logE_re = rnorm(N_Stk, 0, logESD),
+        logAlpha0 = rnorm(1, 0.6, 0.45),
+        logAlpha02 = rnorm(1, 0, 31.6),
+        logAlpha_re = rnorm(nrow(dat$WAbase), 0, logAlphaSD),
+        
+        tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
+        )
+      
+      # Alternative priors from Liermann et al. 2010 - comment on/off for now
+      logESDalt <- runif(1, 0, 20)
+      logAlphaSDalt <- runif(1, 0, 20)
+      listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
+        bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
+        logESD = logESDalt, # This isn't being saved internally
+        logAlphaSD = logAlphaSDalt, # This isn't being saved internally
+    
+        logE_re = rnorm(N_Stk, 0, sd = logESD),
+        logAlpha0 = rnorm(1, 0, sd = 0.71),
+        logAlpha02 = rnorm(1, 0, sd = 31.6),
+        logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlphaSD),
+    
+        tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
+        )
+      
+      return(listinitprior) # listinitprior or listinitialternate
+    }
+    parpar <- parp()
+    
+    # enter parpar into model function with MakeADFun
+    objpp <- RTMB::MakeADFun(f_srep,
+                         parpar,
+                         random = c("logAlpha_re", "logE_re"),
+                         silent=TRUE)
+    
+    # simulate for each desired term
+    psimalpha[[i]] <- objpp$simulate()$alpha
+    psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re # why logAlpha_re? - if I want to do PP?
+    # ... other derived parameters?
+      # psimlogAlpha0[[i]] <- objpp$simulate()$logAlpha0 - doesn't exist - not derived
+      # $E ?
+    
+    psimlogRS_pred[[i]] <- objpp$simulate()$logRS_pred
+    
+    # add in observation error?
+        # look at how I did it for derived_post.R?
   }
   
-  parpar <- parp()
+  # Plot distributions for PRIOR PUSHFORWARD
+  ppsimalpha <- unlist(psimalpha) 
+  ppsimlogRS <- unlist(psimlogRS_pred)
   
-  # enter parpar into model function with MakeADFun
-  objpp <- RTMB::MakeADFun(f_srep,
-                       parpar,
-                       random = c("logAlpha_re", "logE_re"),
-                       silent=TRUE)
+  hist(ppsimalpha, breaks = 100, freq = TRUE) # Graphical hiccups
+  hist(unlist(psimlogAlpha_re))
+  plot(ppsimlogRS, ylim = c(-100, 100))
   
-  # simulate for each desired term
-  psimalpha[[i]] <- objpp$simulate()$alpha
-  psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re # why logAlpha_re? - if I want to do PP?
-  # ... other derived parameters?
-    # psimlogAlpha0[[i]] <- objpp$simulate()$logAlpha0 - doesn't exist - not derived
-    # $E ?
+  # Plotting logRS by simulated logRS (INCOMPLETE)
+  plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
+  for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
   
-  psimlogRS_pred[[i]] <- objpp$simulate()$logRS_pred
+  # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
   
-  # add in observation error?
-      # look at how I did it for derived_post.R?
-  
+  # Plot distributions for PRIOR PREDICTIVE
+  # First: add in observation error to logRS_pred
+  # ...
+  # Second: plot the distribution of logRS_pred with observation error
 }
-
-# Plot distributions for PRIOR PUSHFORWARD
-ppsimalpha <- unlist(psimalpha) 
-ppsimlogRS <- unlist(psimlogRS_pred)
-
-hist(ppsimalpha, breaks = 100, freq = TRUE) # Graphical hiccups
-hist(unlist(psimlogAlpha_re))
-plot(ppsimlogRS, ylim = c(-100, 100))
-
-# Plotting logRS by simulated logRS (INCOMPLETE)
-plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
-for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
-
-# Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
-
-# Plot distributions for PRIOR PREDICTIVE
-# First: add in observation error to logRS_pred
-# ...
 
 
 
@@ -592,77 +601,172 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 derived_obj <- derived_post(fitstan); beep(2)
 # add stocknames - see extra code from _Plots.R
 
+if(dat$prioronly == 1){print("Prior Prediction Mode")} else {print("Posterior Prediction Mode")}
 
 
-# APPROACH - Prior prediction with data exclusion ####
+# PRIOR PUSHFORWARD/PREDICTIVE CHECKS ####
+# APPROACH - Prior prediction with data exclusion
 # Make sure dat$prioronly <- 1 to not include data in the nll
 # Run all the way down to derived_obj
 
 # Pushforward tests:
+  # Just take the Prior Prediction Mode (dat$prioronly == 1)
+  # Then plot desired priors/parameters
+  # E.g. logAlpha
+  # geom_hist() or geom_density() are potential options
 
-# Predictive tests: *EXACTLY THE SAME AS BELOW FOR POSTERIOR*
-musim <- derived_obj$deripost_full$logRS_pred
-sigmasim <- derived_obj$deripost_full$tauobs
-simout <- matrix(NA, nrow = 10, ncol = 501)
-draws <- sample(1:10000, 10)
-for (i in seq_along(draws)) {
-  row <- draws[i]
-  # Vectorized rnorm over 501 obs using that row
-  means <- musim[row, ]                   # length 501
-  sds   <- sigmasim[row, stk]             # length 501 — select right SD for each obs
-  simout[i, ] <- rnorm(501, mean = means, sd = sqrt(1/sds))
-}
+# Predictive tests: 
+  # Exactly the same as for Posterior - just depends
+  # on whether data has been included in the likelihood or not.
+  # Check:
+  
+  # Note: prior predictive checks (if taking the method of excluding data)
+  # Can be repeated using the below posterior predictive checks.
+  # Specifically: logRS, logAlpha
 
 
 
 # POSTERIOR PREDICTIVE CHECKS ####
-# Run full model with dat$prioronly <- 0 for data included in nll
-# Run dervied_post() to extract posterior from chains
-# Randomly sample for logRS
-# Compare logRS with logRS_pred (including observation error)
-# e.g. rnorm(1, derived_obj$deripost_summary$logRS_pred$Median, 
-           # sd  = sqrt(1/derived_obj$deripost_summary$tauobs$Median))
+  # Run full model with dat$prioronly <- 0 for data included in nll
+  # Run dervied_post() to extract posterior from chains
+  # Randomly sample for logRS
+  # Compare logRS with logRS_pred (including observation error)
+  # e.g. rnorm(1, derived_obj$deripost_summary$logRS_pred$Median, 
+             # sd  = sqrt(1/derived_obj$deripost_summary$tauobs$Median))
 
-# each sample independent draw AND per observation
-  # 501 observations x 4000 times (matrix)
-
-# pp_logRS <- c()
-# for (i in stk){
-#   pp_logRS[i] <- rnorm(1, derived_obj$deripost_summary$logRS_pred$Median[i], # per sample
-#                   sd = sqrt(1/derived_obj$deripost_summary$tauobs$Median[stk[i]])) # sqrt(1/tau[i])
-# }
-# hist(pp_logRS)
-
-# create matrix of [10, 501] for 10 draws from 10000 iters
-for (i in stk){
-  ppsim[i] <- rnorm(1, derived_obj$deripost_full$logRS_pred[],
-                    sd = sqrt(1/derived_obj$deripost_full$tauobs[stk[i]]))
+slogRS_pred <- derived_obj$deripost_full$logRS_pred
+stauobs <- derived_obj$deripost_full$tauobs
+simlogRS <- matrix(NA, nrow = dim(slogRS_pred)[1], ncol = dim(slogRS_pred)[2])
+for (i in 1:dim(slogRS_pred)[1]){
+  simlogRS[i, ] <- rnorm(dim(slogRS_pred)[2], # 501
+                        mean = slogRS_pred[i, ], 
+                        sd = sqrt(1/stauobs[i, stk]))
 }
 
-# other method from derived_post
-  # unsure how to work this around indexing per stock for tau
-# matrices$logE_tar_adj <- apply(matrices$logE_tar, 2, FUN = function(x)rnorm(length(x), x, sd = matrices$logESD))
-# matrixsim <- apply(derived_obj$deripost_full$logRS_pred, 2, FUN = function(x)rnorm(length(x), x, sd = sqrt(1/derived_obj$deripost_full$tauobs)))
+# Retrieve 9 samples out of the 10000 iterations
+nsim <- 9
+draws <- sample(1:dim(slogRS_pred)[1], nsim)
+savedsims <- simlogRS[draws,] # [1:9,]
 
-# one method
-musim <- derived_obj$deripost_full$logRS_pred
-sigmasim <- derived_obj$deripost_full$tauobs
-simout <- matrix(NA, nrow = 10, ncol = 501)
-draws <- sample(1:10000, 10)
-for (i in seq_along(draws)) {
-  row <- draws[i]
-  # Vectorized rnorm over 501 obs using that row
-  means <- musim[row, ]                   # length 501
-  sds   <- sigmasim[row, stk]             # length 501 — select right SD for each obs
-  simout[i, ] <- rnorm(501, mean = means, sd = sqrt(1/sds))
+# Plot
+par(mfrow = c(5, 2)) # 5 x 2 grid
+plot(dat$logRS, xlab = "", ylab = "") # , col = stk - if you want stocks colored
+    # Do I want to set xlim, ylim for visualization?
+for (i in 1:nsim) {
+  plot(simlogRS[i, ], xlab = "", ylab = "")
+} 
+mtext("Observation Index", side = 1, outer = TRUE, line = -2)
+mtext("log(R/S)", side = 2, outer = TRUE, line = -1.5)
+par(mfrow = c(1, 1))
+
+# Plot curves?
+  # E.g. instead of logRS, plot R vs. S
+  # or Residuals (see below work) to compare observed logRS to 
+  # In order to get back to R - you can use srdat$Sp and the base Ricker
+  # equation - assuming some kind of randomness
+
+# Posterior Predictive Distribution: logAlpha
+    # Manually write out and add rnorms for hyper parameters.
+# I think I am interested in the following equation parts:
+      # logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]
+      # and dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE)
+    # For posterior predictive it would be:
+      # rnorms for each of the 3? assuming median value?
+      # Liermann says "for populations with no SR data"
+# 1. pull draws for logAlpha0
+# 2. pull draws for logAlphaSD
+# 3. iter for sims
+slogAlpha0 <- derived_obj$deripost_full$logAlpha0 # dim(10000, 1)
+slogAlpha02 <- derived_obj$deripost_full$logAlpha02 # dim(10000, 1)
+slogAlphaSD <- derived_obj$deripost_full$logAlphaSD # dim(10000, 1)
+simlogAlpha_s <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
+simlogAlpha_o <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
+for (i in 1:dim(slogAlpha0)[1]){
+  simlogAlpha_s[i] <- slogAlpha0[i] + rnorm(1, mean = 0, sd = slogAlphaSD[i])
+  simlogAlpha_o[i] <- simlogAlpha_s[i] + slogAlpha02[i]
 }
 
+ggplot() +
+  geom_density(aes(x = simlogAlpha_s), # For a new STREAM observation
+               fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+  geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
+              fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
+  theme_classic() +
+  # labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", y = "Density")
+  labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", y = "Density")
+
+# Pushforward (under prior predictive): logAlpha
+ggplot() +
+  geom_density(aes(x = slogAlpha0), # For a pushforward alpha?
+               fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+  theme_classic() +
+  labs(x = "logAlpha Prior Pushforward Distribution", y = "Density")
+
+# Posterior OR Prior Distribution ridge plot: logAlpha 
+  # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
+        # This is trash code - needs revision
+library(ggridges)
+library(data.table)
+dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
+Stocknames <- WAin$Stock
+colnames(dfalpharidge) <- Stocknames
+alpharidgetable <- as.data.table(dfalpharidge)
+alpharidgetable_long <- melt(alpharidgetable, measure.vars = Stocknames,
+                variable.name = "Stock", value.name = "Value")
+TypeLabels <- ifelse(lifehist$lh == 0, "S", "O")
+alpharidgetable_long[, Type := TypeLabels[match(Stock, Stocknames)]]
+n_S <- sum(TypeLabels == "S")
+n_O <- sum(TypeLabels == "O")
+
+ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, Stock))) +
+  geom_density_ridges(color = "gray20", alpha = 0.8, scale = 1.2) +
+  theme_classic() +
+  labs(x = "logAlpha", y = "Stock") +
+  theme(legend.position = "none") +
+  scale_fill_manual(
+    values = c(
+      setNames(colorRampPalette(c("#a8e6a3", "#0b6e0b"))(n_S),
+               paste("S.", Stocknames[TypeLabels == "S"], sep = "")),
+      setNames(colorRampPalette(c("#a3d5ff", "#084a8b"))(n_O),
+               paste("O.", Stocknames[TypeLabels == "O"], sep = ""))
+    )
+  )
+
+# ggplot(alpharidge_long, aes(x = Value, y = factor(Index), fill = factor(Index))) +
+#   geom_density_ridges(alpha = 0.5, scale = 1.2, color = "forestgreen") +
+#   theme_classic() +
+#   labs(x = "logAlpha Posterior", y = "Stock ID") +
+#   theme(legend.position = "none")
+# Change ordering of stocks e.g. by WA size as with point-wise comp. plots
+# Can I add in ocean/stream-type identifiers and colour via?
+
+# beta?
+
+# E?
+
+# Posterior Distributions of b0 and bWA
+ggplot() +
+  geom_density(aes(x = derived_obj$deripost_full$b0[,1]), 
+               fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+  geom_density(aes(x = (derived_obj$deripost_full$b0[,2] + derived_obj$deripost_full$b0[,1])),
+              fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
+  theme_classic() +
+  labs(x = "b0", y = "Density")
+
+ggplot() +
+  geom_density(aes(x = derived_obj$deripost_full$bWA[,1]), 
+               fill = "skyblue", alpha = 0.4, color = "forestgreen", size = 1.2) +
+  geom_density(aes(x = (derived_obj$deripost_full$bWA[,2] + derived_obj$deripost_full$bWA[,1])),
+              fill = "skyblue", alpha = 0.4, color = "skyblue", size = 1.2) +
+  theme_classic() +
+  labs(x = "bWA", y = "Density")
 
 # RESIDUALS? ####
 
 # Plot generated logRS vs. logRS from data?
 # plot(exp(dat$logRS), exp(derived_obj$deripost_summary$logRS_pred$Median))
 plot(dat$logRS, derived_obj$deripost_summary$logRS_pred$Median)
+points(dat$logRS, simlogRS[1,])
 
 # OR plot observed vs. generated logRS by stock? Can you see a difference?
 compRS <- cbind(dat$srdat, logRS = dat$logRS)
