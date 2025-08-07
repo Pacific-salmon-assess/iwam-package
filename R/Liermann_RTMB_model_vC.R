@@ -3,15 +3,18 @@
 library(RTMB)
 library(ggplot2)
 library(dplyr)
-library(tidyverse)
-library(progress)
-library(tmbstan)
-# library(TMB)
-# library(tidybayes)
-# library(bayesplot)
+library(tidyverse) 
+library(progress) # Progress bar
+library(tmbstan) # MCMC tmb model sampling
+# library(TMB) # Original TMB
+# library(tidybayes) # bayesian visualization
+library(bayesplot) # bayesian visualization
+library(coda) # bayesian package
 library(beepr) # Sounds
-library(viridis)
+library(viridis) # Colours
 # library(latex2exp)
+library(ggridges) # Ridge plots
+library(data.table) # Create data tables for pivoting
 
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
@@ -92,7 +95,7 @@ dat <- list(srdat = srdat,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), max(WAbase$logWAshifted), 0.1), # Not added to likelihood
             logRS = log(srdat$Rec) - log(srdat$Sp),
-            prioronly = 1) # 0 - run with data, 1 - prior prediction mode?
+            prioronly = 0) # 0 - run with data, 1 - prior prediction mode?
 
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
@@ -595,6 +598,15 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # Need a log-likelihood matrix to do this - would have to add a generated
   # quantity in the model to achieve this. Not generated otherwise.
 
+# Matching Liermann et al. statistics
+# mcmc_chains <- As.mcmc.list(fit)
+# autocorr.plot(mcmc_chains)
+# geweke_results <- geweke.diag(mcmc_chains)
+# print(geweke_results)
+# heidel_results <- heidel.diag(mcmc_chains)
+# print(heidel_results)
+# effectiveSize(mcmc_chains)
+# gelman.diag(mcmc_chains)
 
 
 # Acquire outputs of MCMC ####
@@ -705,8 +717,6 @@ ggplot() +
 # Posterior OR Prior Distribution ridge plot: logAlpha 
   # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
         # This is trash code - needs revision
-library(ggridges)
-library(data.table)
 dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
 Stocknames <- WAin$Stock
 colnames(dfalpharidge) <- Stocknames
