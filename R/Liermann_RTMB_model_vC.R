@@ -577,6 +577,21 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # tmbstan operates by default with NUTS MCMC sampler
 # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
+# Microbenchmarking
+library(microbenchmark)
+microbenchmark::microbenchmark(
+  fitstan <- tmbstan(obj, iter = 5000, warmup = 2500,
+                   init = init, 
+                   seed = 1, 
+                   lower = lower, upper = upper,
+                   chains = 4, open_progress = FALSE, silent = TRUE),
+  fitstanLong <- tmbstan(obj, iter = 11000000, warmup = 1000000,
+                   init = init, 
+                   seed = 1, thin = 1000,
+                   lower = lower, upper = upper,
+                   chains = 4, open_progress = FALSE, silent = TRUE)
+)
+
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
 
