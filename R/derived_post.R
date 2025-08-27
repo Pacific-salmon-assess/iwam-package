@@ -63,8 +63,10 @@ derived_post <- function(x) {
     # logE_tar <- dnorm(logE_re, mean = 0, sd = logESD, log = TRUE)
   # matrices$logE_re <- dnorm(...) # ? is this necessary?
   
-  matrices$logE_tar_adj <- apply(matrices$logE_tar, 2, FUN = function(x)rnorm(length(x), x, sd = matrices$logESD))
-  matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, FUN = function(x)rnorm(length(x), x, sd = matrices$logAlphaSD))
+  matrices$logE_tar_adj <- apply(matrices$logE_tar, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logESD))
+  matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logAlphaSD))
 
   # Now we have logE and logAlpha for our targets
     # These need to be transformed - and ALSO need to re-calculate 
@@ -78,7 +80,8 @@ derived_post <- function(x) {
     LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
 
   # # Prior predictions and posterior predictions - adding in observation error
-  # matrices$logRS_pred_obs <- apply(matrices$logRS_pred, 2, FUN = function(x) rnorm(length(x), x, sd = sqrt(1/matrices$tauobs)))
+  # matrices$logRS_pred_obs <- apply(matrices$logRS_pred, 2,
+  #   FUN = function(x) rnorm(length(x), x, sd = sqrt(1/matrices$tauobs)))
   # # sqrt(1/tauobs[stk[i]])
   
   # Re-calculate lengths for added parameters
@@ -103,7 +106,8 @@ derived_post <- function(x) {
     dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
     dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
     dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
-    dataframes[[i]]$PosteriorMode <- apply(matrices[[i]], 2, function(col) {posterior.mode(as.mcmc(col))}) 
+    dataframes[[i]]$PosteriorMode <- apply(matrices[[i]], 2, 
+      function(col) {posterior.mode(as.mcmc(col))}) 
       # New addition of posterior Mode
     dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
     dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95

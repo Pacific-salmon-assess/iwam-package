@@ -1,4 +1,5 @@
 # Liermann Srep (E) RTMB Model with MCMC Sampling ####
+
 # Libaries ####
 library(RTMB)
 library(ggplot2)
@@ -12,25 +13,13 @@ library(bayesplot) # bayesian visualization
 library(coda) # bayesian package
 library(beepr) # Sounds
 library(viridis) # Colours
-# library(latex2exp)
 library(ggridges) # Ridge plots
 library(data.table) # Create data tables for pivoting
+library(microbenchmark) # Timing functions
 
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
-
-
-
-# Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv")
-# WAin <- c("DataIn/WCVIStocks.csv")
-
-# For re-evaluation of synoptic sets e.g. WAbase
-    # Run model until setting up data section
-    # Then over-write WAin <- WAbase
-    # And rename logWAshifted to logWAshifted_t
-    # And make sure to change type_tar to fit the expected 0:1 indexing
 
 # New LambertW0
 # See: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
@@ -38,6 +27,14 @@ LambertW0 <- ADjoint(
   function(x){gsl::lambert_W0(x)},
   function(x, y, dy) {dy / (x + exp(y))}
 )
+
+# Raw data read-in ####
+WAin <- c("DataIn/Parken_evalstocks.csv") # c("DataIn/WCVIStocks.csv")
+# For re-evaluation of synoptic sets e.g. WAbase
+    # Run model until setting up data section
+    # Then over-write WAin <- WAbase
+    # And rename logWAshifted to logWAshifted_t
+    # And make sure to change type_tar to fit the expected 0:1 indexing
 
 # Data Manipulations ####
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
@@ -61,9 +58,9 @@ srdat <- srdatwna %>%
   mutate(yr_num = 0:(n()-1)) %>%
   ungroup() %>%
   arrange(Stocknumber) %>%
-  mutate(lh = factor(ifelse(Stream == 0, "stream", "ocean"), # Stream = 0, Ocean  = 1
-    levels = c("stream", "ocean"))) |> 
-  mutate(Stocknumber = as.integer(factor(Stocknumber)) - 1)  # Re-numbering uniquely
+  mutate(lh = factor(ifelse(Stream == 0, "stream", "ocean"),
+    levels = c("stream", "ocean"))) |> # Stream = 0, Ocean  = 1
+  mutate(Stocknumber = as.integer(factor(Stocknumber)) - 1) # Re-numbering uniquely
 
 names <- srdat %>% 
   dplyr::select (Stocknumber, Name, lh) %>% 
@@ -93,17 +90,18 @@ lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>%
 dat <- list(srdat = srdat,
             WAbase = WAbase,
             WAin = WAin,
-            lineWA =  seq(min(WAbase$logWAshifted), max(WAbase$logWAshifted), 0.1), # Not added to likelihood
+            lineWA =  seq(min(WAbase$logWAshifted), 
+                          max(WAbase$logWAshifted), 0.1), # Not added to NLL
             logRS = log(srdat$Rec) - log(srdat$Sp),
-            prioronly = 0) # 0 - run with data, 1 - prior prediction mode?
+            prioronly = 0) # 0-run with data, 1-prior prediction mode
 
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
 N_Obs <- nrow(srdat)
 stk = srdat$Stocknumber + 1
 
-# NEW: alpha0 prior for LH specific dists. - ON/OFF
-lhdiston <- T # Set true to run
+# NEW: alpha0 prior for LH specific dists.
+lhdiston <- T # T = LH Specific
 
 # Parameters/Initial values
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
@@ -122,9 +120,6 @@ if (lhdiston) {
 
 f_srep <- function(par){
   getAll(dat, par)
-
-  # logRS <- OBS(logRS) # Mark response for one-step-ahead residual calculation
-    # Not currently used - with oneStepPredict()
   
   N_Stk = max(srdat$Stocknumber + 1) # number of stocks
   stk = srdat$Stocknumber + 1 # vector of stocknumbers
@@ -142,8 +137,7 @@ f_srep <- function(par){
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
-  # logRS_sim <- numeric(N_Obs) # Posterior predictive simulated vector?
-  
+
   E_tar <- numeric(N_Pred)
   logE_tar <- numeric(N_Pred)
   
@@ -166,18 +160,26 @@ f_srep <- function(par){
   nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
   if(lhdiston) nll <- nll - sum(dnorm(logAlpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
   
+  # Half normal/half student-t/half cauchy for SD parameters
+    # Half normal:
+  maskAlpha <- (logAlphaSD >= 0)
+  maskE <- (logESD >= 0)
+  
+  # nll < nll - sum(ifelse(logAlphaSD < 0, -Inf, dnorm(logAlphaSD, mean = 0, sd = 31.6, log = TRUE) + log(2)))
+  # nll < nll - sum(ifelse(logESD < 0, -Inf, dnorm(logESD, mean = 0, sd = 31.6, log = TRUE) + log(2)))
+  
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
-    nll <- nll - dnorm(logE_re[i], 0, sd = logESD, log = TRUE) # Unobserved
-    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i] # DATA FLAG
+    nll <- nll - dnorm(logE_re[i], 0, sd = 1, log = TRUE) # Unobserved
+    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD
     E[i] <- exp(logE[i])
     
     # nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
     nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE) # Non-centered
-    # half sdnormal? half t? half cauchy?
-    
+
     # Original partial non-centering
-    # if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i] # LH specific distributions for prod.
+    # LH specific distributions for prod.
+    # if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]
     # else logAlpha[i] <- logAlpha0 + logAlpha_re[i]
     
     # Non-centered with scaling of mean by logAlphaSD
@@ -187,7 +189,7 @@ f_srep <- function(par){
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
-  ## First level of hierarchy - Ricker model:
+  ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
     logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # DATA FLAG
     # nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) # DATA FLAG
@@ -195,19 +197,7 @@ f_srep <- function(par){
     if(!prioronly){
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
     } # If prioronly is 0, then likelihood is calculated
-    # If prioronly is 1, then likelihood is not calculated
-    
-    # prior pushforward - turn it back into the curve that is expected based on the priors
-    
-    # posterior predictive check
-    # logRS_sim[i] <- rnorm(1, logRS_pred[i], sd = sqrt(1/tauobs[stk[i]])) # Simulated logRS for posterior predictive check
-      # do I need an rnorm or a simulate?
-      # I think I could either:
-      # rnorm for both parameters as the mean?
-      # or simulate() and then rnorm?
-    
-    # outside of RTMB:
-    # create an rnorm with mean logRS_pred, sd = sqrt(1/tauobs) etc.
+      # If prioronly is 1, then likelihood is not calculated
   }
   
   ## Calculate SMSY for Synoptic set - for plotting
@@ -226,7 +216,8 @@ f_srep <- function(par){
 
   # Conditional posterior predictions
   for (i in 1:N_Pred){
-    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] # NEW: alpha0 prior for LH specific dists.
+    # NEW: alpha0 prior for LH specific dists.
+    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i]
     else logAlpha_tar[i] <- logAlpha0
 
     logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
@@ -249,9 +240,6 @@ f_srep <- function(par){
     E_line_stream[i] <- exp(logE_line_stream[i])
   }
   
-  # QUESTION: Do you need both ADREPORT and REPORT per variable?
-    # Does ADREPORT cover REPORT too?
-  
   ## ADREPORT - internal values (synoptic specific/Ricker)
   alpha <- exp(logAlpha)
   
@@ -260,8 +248,7 @@ f_srep <- function(par){
   
   # ADREPORT(logRS_pred)
   REPORT(logRS_pred)
-  # REPORT(logRS_sim) # Is logRS_pred as a REPORT the same as logRS_sim? (Question for Sean/Paul)
-  
+
   # ADREPORT(logE_re)
   # ADREPORT(E)
   # ADREPORT(logAlpha)
@@ -318,8 +305,6 @@ f_srep <- function(par){
   nll # output of negative log-likelihood
 }
 
-
-
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_srep,
                        par,
@@ -365,7 +350,7 @@ obj <- RTMB::MakeADFun(f_srep,
 
 # priorlogRS <- obj$simulate()$logRS_pred
 
-# What is the difference between logRS_pred and logRS as an OBS() object?
+
 
 # Alternative approach from Sean ####
   # rnorms for each of alpha prior
@@ -467,6 +452,7 @@ if(randomgenmethod == T){
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
+
 upper[names(obj$par) == "logESD"] <- 100
 lower[names(obj$par) == "logESD"] <- 0
 upper[names(obj$par) == "logAlphaSD"] <- 100
@@ -507,6 +493,7 @@ init <- function() {
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
+       # Should these be 0.01 to 100s? Would that be more accurate?
        logESD = runif(1, 0.01, 3), # Positive
        logAlphaSD = runif(1, 0.01, 3) # Positive
   )
@@ -541,21 +528,7 @@ init <- function() {
 #   return(listinitfixed)
 # }
 
-# PREVIOUS RANDOM INIT (DEPRECIATED)
-# init2 <- function() {
-#   list(b0 = c(rnorm(1,10,1), rnorm(1,0,1)), # Contains negatives
-#        bWA = c(rnorm(1,0,1), rnorm(1,0,1)), # Contains negatives
-#        
-#        logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
-#        logAlpha0 = rnorm(1,0.6,1), # Contains negatives
-#        logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
-# 
-#        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
-#        
-#        logESD = runif(1, 0.01, 3), # Positive
-#        logAlphaSD = runif(1, 0.01, 3) # Positive
-#   )
-# }
+
 
 # SAMPLE MCMC ####
   # Can consider in parallel - Kasper's github example doesn't currently work
@@ -563,11 +536,9 @@ init <- function() {
 # cores <- 1
 # options(mc.cores = cores)
 
-# Seeding
-# rm(.Random.seed, envir=globalenv())
-
 # The set.seed precedes this in order to have fixed "identical" runs with initfixed
-set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter/2 for warmup - Typically 5000 and 1000
+set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter/2 for warmup 
+                                                                  # - Typically 5000 and 1000
                    init = init, # init = init function or "random" or initfixed for fixed points
                    seed = 1, # set seed or leave out for random - now set at 1 above
                       # but not technically within sampling - unsure if each chain takes seed                  
@@ -577,20 +548,13 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # tmbstan operates by default with NUTS MCMC sampler
 # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
-# Microbenchmarking
-library(microbenchmark)
-microbenchmark::microbenchmark(
-  fitstan <- tmbstan(obj, iter = 5000, warmup = 2500,
-                   init = init, 
-                   seed = 1, 
-                   lower = lower, upper = upper,
-                   chains = 4, open_progress = FALSE, silent = TRUE),
-  fitstanLong <- tmbstan(obj, iter = 11000000, warmup = 1000000,
-                   init = init, 
-                   seed = 1, thin = 1000,
-                   lower = lower, upper = upper,
-                   chains = 4, open_progress = FALSE, silent = TRUE)
-)
+# fitstanLong <- tmbstan(obj, iter = 500000, warmup = 250000, # iter = 11000000, warmup = 1000000,
+#                  init = init,
+#                  seed = 1, thin = 100,
+#                  lower = lower, upper = upper,
+#                  chains = 4, open_progress = FALSE, silent = TRUE)
+
+
 
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
@@ -614,10 +578,14 @@ microbenchmark::microbenchmark(
   # quantity in the model to achieve this. Not generated otherwise.
 
 # Matching Liermann et al. statistics
-# mcmc_chains <- As.mcmc.list(fit)
+# mcmc_chains <- As.mcmc.list(fitstan)
 # autocorr.plot(mcmc_chains)
 # geweke_results <- geweke.diag(mcmc_chains)
 # print(geweke_results)
+# par(mfrow = c(2, 2))  # adjust depending on number of chains
+# for (i in 1:length(mcmc_chains)) {
+#   geweke.plot(mcmc_chains[[i]], main = paste("Chain", i))
+# }
 # heidel_results <- heidel.diag(mcmc_chains)
 # print(heidel_results)
 # effectiveSize(mcmc_chains)
@@ -668,7 +636,7 @@ for (i in 1:dim(slogRS_pred)[1]){
   simlogRS[i, ] <- rnorm(dim(slogRS_pred)[2], # 501
                         mean = slogRS_pred[i, ], 
                         sd = sqrt(1/stauobs[i, stk]))
-}
+} # dim of simlogRS is 10
 
 # Retrieve 9 samples out of the 10000 iterations
 nsim <- 9
@@ -685,6 +653,26 @@ for (i in 1:nsim) {
 mtext("Observation Index", side = 1, outer = TRUE, line = -2)
 mtext("log(R/S)", side = 2, outer = TRUE, line = -1.5)
 par(mfrow = c(1, 1))
+
+# POSTERIOR P-VALUES
+    # Take the mean and sd of each of the iterations e.g. do more than 9 in this case
+    # Then plot the histogram of these means against the mean of
+    # the observed data
+    # Then the p-value is the proportion of simulated means that are
+    # ABOVE the mean of the observations.
+    # Report this value.
+
+# Mean value of simulations: simlogRS
+# Mean value of observed data: dat$logRS
+mean_simlogRS <- apply(simlogRS, 1, mean) # Mean of all simulated logRS
+  # this should produce 10,000 means
+hist(mean_simlogRS, xlab = "Mean of Log(R/S)", 
+     main = "Visualization of Posterior Predictive P-Value")
+abline(v = mean(dat$logRS), col = "red", lwd = 3) # Mean of observed logRS
+
+pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS) # Proportion of simulated means above observed mean
+print(paste0("Posterior Predictive P-Value = ", pvalpp))
+  # Therefore a slightly higher bias than observed predictions
 
 # Plot curves?
   # E.g. instead of logRS, plot R vs. S
@@ -719,8 +707,10 @@ ggplot() +
   geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  # labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", y = "Density")
-  labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", y = "Density")
+  # labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", 
+         # y = "Density")
+  labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", 
+       y = "Density")
 
 # Pushforward (under prior predictive): logAlpha
 ggplot() +
@@ -807,7 +797,8 @@ points(
   pch = 16,
   cex = 0.3
 )
-# plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) # Coming from original tmb obj$ no sampling, no nlminb
+# plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) 
+# Coming from original tmb obj$ no sampling, no nlminb
 
 # Tor: this would make it seem like the model is not working great in terms
   # of generating observations from the Ricker model. It is more restricted
