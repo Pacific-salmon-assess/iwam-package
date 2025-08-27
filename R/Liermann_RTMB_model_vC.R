@@ -152,6 +152,7 @@ f_srep <- function(par){
   
   nll <- 0 # Begin negative log-likelihood
   
+  # Can I remove the sum() from these arguments?
   nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE)) # Prior
   nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) # Prior
   nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior
@@ -162,11 +163,12 @@ f_srep <- function(par){
   
   # Half normal/half student-t/half cauchy for SD parameters
     # Half normal:
-  maskAlpha <- (logAlphaSD >= 0)
-  maskE <- (logESD >= 0)
-  
-  # nll < nll - sum(ifelse(logAlphaSD < 0, -Inf, dnorm(logAlphaSD, mean = 0, sd = 31.6, log = TRUE) + log(2)))
-  # nll < nll - sum(ifelse(logESD < 0, -Inf, dnorm(logESD, mean = 0, sd = 31.6, log = TRUE) + log(2)))
+  # nll <- nll - dnorm(logAlphaSD, mean = 0, sd = 31.6, log = TRUE)
+  # nll <- nll - dnorm(logESD, mean = 0, sd = 31.6, log = TRUE)
+    # Half Student: Doesn't perform - particularly logESD
+  # nll <- nll - dt(logAlphaSD, df = 1, log = TRUE)
+  # nll <- nll - dt(logESD, df = 1, log = TRUE)
+    # Half Cauchy: Still unsure how to pull - not a native TMB distribution
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
@@ -453,9 +455,9 @@ upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
 
-upper[names(obj$par) == "logESD"] <- 100
+upper[names(obj$par) == "logESD"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "logESD"] <- 0
-upper[names(obj$par) == "logAlphaSD"] <- 100
+upper[names(obj$par) == "logAlphaSD"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "logAlphaSD"] <- 0
 
 
