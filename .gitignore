@@ -416,3 +416,4 @@ DataOut/pars_p250k_NoAgg_ricinvgamma_0.1_wagamma_1_IWAM_Liermann
 DataOut/pars_p250k_NoInlet_ricinvgamma_0.1_wagamma_1_IWAM_Liermann
 DataOut/pars_p250k_oldpredint_ricinvgamma_0.1_wagamma_1_IWAM_Liermann
 DataOut/lsm250k_dataout_target_ocean_noEnh.csv
+derived_obj.RData

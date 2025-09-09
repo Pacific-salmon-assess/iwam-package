@@ -17,6 +17,9 @@ library(ggridges) # Ridge plots
 library(data.table) # Create data tables for pivoting
 library(microbenchmark) # Timing functions
 
+here::i_am("R/LambertWs.R") # New line for re-establishing here
+							# when not working in RStudio
+
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
@@ -454,7 +457,6 @@ if(randomgenmethod == T){
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
-
 upper[names(obj$par) == "logESD"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "logESD"] <- 0
 upper[names(obj$par) == "logAlphaSD"] <- 100 # Turn off for half dists.
@@ -550,12 +552,6 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # tmbstan operates by default with NUTS MCMC sampler
 # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
-# fitstanLong <- tmbstan(obj, iter = 500000, warmup = 250000, # iter = 11000000, warmup = 1000000,
-#                  init = init,
-#                  seed = 1, thin = 100,
-#                  lower = lower, upper = upper,
-#                  chains = 4, open_progress = FALSE, silent = TRUE)
-
 
 
 # Test and diagnostic plots ####
@@ -597,6 +593,10 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan); beep(2)
 # add stocknames - see extra code from _Plots.R
+
+# SAVING R OBJECTS: ####
+# In script_A.R
+save(derived_obj, file = "derived_obj.RData")
 
 if(dat$prioronly == 1){print("Prior Prediction Mode")} else {print("Posterior Prediction Mode")}
 
@@ -676,11 +676,7 @@ pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS) # Proportio
 print(paste0("Posterior Predictive P-Value = ", pvalpp))
   # Therefore a slightly higher bias than observed predictions
 
-# Plot curves?
-  # E.g. instead of logRS, plot R vs. S
-  # or Residuals (see below work) to compare observed logRS to 
-  # In order to get back to R - you can use srdat$Sp and the base Ricker
-  # equation - assuming some kind of randomness
+
 
 # Posterior Predictive Distribution: logAlpha
     # Manually write out and add rnorms for hyper parameters.
@@ -714,14 +710,14 @@ ggplot() +
   labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", 
        y = "Density")
 
-# Pushforward (under prior predictive): logAlpha
+# Pushforward (under prior predictive): logAlpha ####
 ggplot() +
   geom_density(aes(x = slogAlpha0), # For a pushforward alpha?
                fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
   theme_classic() +
   labs(x = "logAlpha Prior Pushforward Distribution", y = "Density")
 
-# Posterior OR Prior Distribution ridge plot: logAlpha 
+# Posterior OR Prior Distribution ridge plot: logAlpha ####
   # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
         # This is trash code - needs revision
 dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
@@ -759,7 +755,11 @@ ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, 
 
 # beta?
 
-# E?
+# Posterior Predictive Calculation for: SREP (E)
+	# logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD
+	# Need b0, bWA, WA, and random effects
+	# Will get one for stream and one for ocean
+	
 
 # Posterior Distributions of b0 and bWA
 ggplot() +
@@ -777,6 +777,100 @@ ggplot() +
               fill = "skyblue", alpha = 0.4, color = "skyblue", size = 1.2) +
   theme_classic() +
   labs(x = "bWA", y = "Density")
+
+
+
+# Plot curves?
+  # E.g. instead of logRS, plot R vs. S
+  # or Residuals (see below work) to compare observed logRS to 
+  # In order to get back to R - you can use srdat$Sp and the base Ricker
+  # equation - assuming some kind of randomness
+# 1. Get raw data for R and S
+	# srdat$Rec and srdat$Sp
+# 2. Get out posterior predictive parameters for Ricker model PER STOCK
+	# simlogRS is 501 random observations 
+	# Alpha: simlogAlpha_s and simlogAlpha_o (each a draw for a single value for the different alpha's)
+	# SREP (E): logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD
+	# May want to sample 1000 from the 10,000 iterations for ease of viewing?
+# X. USE POSTERIORS for STOCKS - WITHOUT RANDOM ERROR - JUST AS MODEL SEES IT?
+	# derived_obj$deripost_summary$E
+	# derived_obj$deripost_summary$logAlpha
+# lineSREPmedian <- derived_obj$deripost_summary$E$Median
+# lineAlphamedian <- exp(derived_obj$deripost_summary$logAlpha$Median)
+# 3. Create an imaginary line of spawners
+# 4. Use imaginary line to solve for recruits PER STOCK
+	# e.g. IWAM: RR[j] <- a * SS[j] * exp(-b * SS[j])
+	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]])
+	# logR/S <- loga * (1 - S/E)
+	# R <-  S e ^ (a (1 - S/E) + w) # I think w is incorporated already?
+	# RR[j] <- SS[j] * exp(alpha * (1 - S / SREP))
+# create an object for the alphas - if it is random draw, it has to match the same number draw for SREP
+# create an object for the SREPs
+# SS <- c()
+# for (j in 1:100) {SS[j] <- j*(max(srdat$Sp[srdat$Name == 'Harrison'])/100)} # where j is 1:100 (so a 100 point line)
+# RR <- c()
+# for (i in 1:25){
+	# for (j in 1:100) {
+		# SS[j] <- *(max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])/100)
+		# RR[j] <- SS[j] * lineAlpha[1] ^ (1 - SS[j] / lineSREP[1])
+	# }
+# }
+# for (j in 1:100) {
+	# RR[j] <- SS[j] * exp(lineAlpha[1] * (1 - SS[j] / lineSREP[1]))
+	# RR[j] <- SS[j] * lineAlpha[1] ^ (1 - SS[j] / lineSREP[1])
+# }
+# 5. Plot spawners by recruits PER STOCK
+	# Do it for one stock first - and then iterate over
+	# and will need a grid by parmfrow or with ggplot
+# Base plot e.g. plot(x=S$Sp, y=R$Rec, xlab="", ylab="", pch=20, xlim=c(0,max(S$Sp)), ylim=c(0,max(R$Rec) ) )
+# plot(x = srdat$Sp[srdat$Name == 'Harrison'], y = srdat$Rec[srdat$Name == 'Harrison']) # Stock 1 of synoptic set
+# lines(x = SS, y = RR)
+
+lineSREPdraws <- derived_obj$deripost_full$E # 10000, 25
+lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
+SSdraws <- matrix(NA, nrow = 10000, ncol = 100) # this needs to be 10,000 by 100?
+RRdraws <- matrix(NA, nrow = 10000, ncol = 100)
+RRmedian <- lineAlphamedian <- lineSREPmedian <- SSmedian <- NA
+
+rowsample <- sample(1:10000, 1000)
+
+par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1))
+
+for (i in 1:25){
+	for (k in 1:10000){ # length(rowsample)
+		for (j in 1:100){
+			SSdraws[k, j] <- j*(max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])/100) # srdat$Name == 'Harrison'
+			RRdraws[k, j] <- SSdraws[k, j] * lineAlphadraws[k, i] ^ (1 - SSdraws[k, j] / lineSREPdraws[k, i])
+		}
+	}
+
+	lineAlphamedian <- median(lineAlphadraws[,i]) # Per stock median (single value)
+	lineSREPmedian <- median(lineSREPdraws[,i])
+	
+	for (j in 1:100){
+		SSmedian[j] <- median(SSdraws[,j]) # single over-written value
+		RRmedian[j] <- SSmedian[j] * lineAlphamedian ^ (1 - SSmedian[j] / lineSREPmedian) # I need 100 of these for a line
+	}
+
+	plot(x = srdat$Sp[srdat$Name == unique(srdat$Name)[i]], 
+		y = srdat$Rec[srdat$Name == unique(srdat$Name)[i]],
+		xlim=c(0,max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])), 
+		ylim=c(0,max(srdat$Rec[srdat$Name == unique(srdat$Name)[i]]) ) ) # Stock 1 of synoptic set
+	
+	mtext(unique(srdat$Name[srdat$Name == unique(srdat$Name)[i]]), side=3, cex=0.8)
+	
+	# subset matrix of draws
+	SSsubdraws <- SSdraws[rowsample,]
+	RRsubdraws <- RRdraws[rowsample,]
+	
+	for (k in 1:1000){ # subset for 1000 out of 10,000
+		lines(SSsubdraws[k,], RRsubdraws[k,], col=rgb(0, 0, 0, alpha=0.1))
+		lines(x = SSmedian, y = RRmedian, col = c("red")) # Median line
+	}
+	
+	mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
+	mtext("Recruitment", side = 2, line  = 1, outer = TRUE, cex = 1.3, las = 0)
+}
 
 # RESIDUALS? ####
 
@@ -805,9 +899,3 @@ points(
 # Tor: this would make it seem like the model is not working great in terms
   # of generating observations from the Ricker model. It is more restricted
   # than the observed data.
-
-# SAVING R OBJECTS: ####
-# In script_A.R
-save(my_object, file = "my_object.RData")
-# In script_B.R
-load("my_object.RData")

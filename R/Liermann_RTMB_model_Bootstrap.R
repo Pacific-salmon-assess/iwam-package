@@ -16,13 +16,14 @@ library(latex2exp)
 
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
-source(here::here("R/derived_post.R")) # For posterior extraction
 
 # SAVING R OBJECTS: ####
 # In script_A.R
-save(my_object, file = "my_object.RData")
+# save(derived_obj, file = "derived_obj.RData")
 # In script_B.R
-load("my_object.RData")
+load(here::here("derived_obj.RData"))
+WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- read.csv(here::here(WAin))
 
 # Bootstrap Posterior to Match Original IWAM Model ####
     # The point of this is to use the Parken assumptions of productivity
@@ -31,13 +32,14 @@ load("my_object.RData")
 
     # 1. SETUP
 BS <- TRUE # default for FALSE
-bsiters <- 20000 # New with Brown et al. CSAS runs
+bsiters <- 100 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 # set.seed <- 1
 # set.seed(1) # Now set at header of code
-conditional <- T # Default T for conditional - FALSE for Marginal medians
-prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
+conditional <- TRUE # Default T for conditional - FALSE for Marginal medians
+MCMC <- TRUE # Default F to use original method, T takes logA from MCMC samples to estimate SGEN
+prod <- c("Parken") # "LifeStageModel" or "Parken"
 # bias.cor <- FALSE
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
@@ -103,41 +105,47 @@ set.seed(1) ; if (BS == TRUE) {
       est_loga <- function(SMSY, SREP, shortloga=FALSE){
         loga <- nlminb(start = (0.5 - SMSY/SREP) / 0.07, 
                        objective = calc_loga, # Try to fix with a Scheurel version of LW if possible
-                       SMSY= SMSY, 
-                       SREP=SREP)$par
+                       SMSY = SMSY, 
+                       SREP = SREP)$par
         if (shortloga) loga <- (0.5 - SMSY/SREP) / 0.07
         beta <- loga/SREP
         return( list( loga = loga , beta = beta, SMSY = SMSY, SREP = SREP) )
       }
       
+      # Skip above 
+		# - take loga, SREP, SMSY, and BETA from MCMC
+	  if (conditional == T) lnalphamc <- derived_obj$deripost_summary$logAlpha_tar_adj$Median else # Conditional
+		lnalphamc <- derived_obj$deripost_summary$logAlpha_tar$Median # Marginal
+      
       # Again: conditional or marginal estimates? 
       # Mean, Median, or Mode?
-      if (conditional == T) SMSY <- derived_obj$deripost_summary$SMSY_adj$Median # Conditional
-      else SMSY <- derived_obj$deripost_summary$SMSY$Median # Maringla
+      if (conditional == T) SMSY <- derived_obj$deripost_summary$SMSY_adj$Median else # Conditional
+		SMSY <- derived_obj$deripost_summary$SMSY$Median # Maringal
       
       # purrr the est_loga function for logA
-      lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, 
-                                         est_loga)
+      if (MCMC == F) lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, est_loga)
         # Would this change if SMSY and SREP are calculated with Median vs. Mean? - Yes
         # Median should be used as it would be closer to the MLE estimate.
         # Other consideration would be NOT sampling, but just running nlminb and then 
           # bootstrapping.
       
       # Or do explicit method
-      SREP_e <- SREP
-      SMSY_e <- SMSY
-      loga_e <- SREP_e * (SMSY_e * gsl::lambert_W0(-exp(1-SREP_e / SMSY_e) * (SREP_e-SMSY_e) / SMSY_e) +
-        SREP_e - SMSY_e) / (SMSY_e * (SREP_e-SMSY_e))
-      beta_e <- loga_e/SREP_e
+			# Concerned that this method slightly undercalculates alpha
+      # SREP_e <- SREP
+      # SMSY_e <- SMSY
+      # loga_e <- SREP_e * (SMSY_e * gsl::lambert_W0(-exp(1-SREP_e / SMSY_e) * (SREP_e-SMSY_e) / SMSY_e) +
+        # SREP_e - SMSY_e) / (SMSY_e * (SREP_e-SMSY_e))
+      # beta_e <- loga_e/SREP_e
       
-      # Bias correction location 
+      # Bias correction location #
       
       sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
       if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
       
       # Do SGEN calcs with new variables
-      SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2)
-      SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), SREP_e, Sgen.fn2) # Explicit
+      if (MCMC == F) SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2) else
+		SGENcalcs <- purrr::map2_dfr (exp(median(lnalphamc)), sREP, Sgen.fn2)
+      # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), SREP_e, Sgen.fn2) # Explicit
     }
     
     setTxtProgressBar(pb, k)
@@ -151,20 +159,16 @@ set.seed(1) ; if (BS == TRUE) {
     
     out <- list(bench = select(SGENcalcs, -apar, -bpar))
     outBench[[k]] <- out$bench
+			# This produces: SGEN (new), SMSY (new), and feeds out used SREP
     
     # oute <- list(bench = select(SGENcalcs_e, -apar, -bpar))
     # outBenche[[k]] <- oute$bench
     
-    if (prod == "Parken") outA <- list(alpha = exp(median(lnalpha_Parkin$loga)))
+    if (prod == "Parken" & MCMC == F) outA <- list(alpha = exp(median(lnalpha_Parkin$loga))) else
+		outA <- list(alpha = exp(median(lnalphamc)))
     if (prod == "LifeStageModel") outA <- list(alpha = Ric.A)
     if (prod == "Parken") outAlpha <- outA
     if (prod == "LifeStageModel") outAlpha[[k]] <- outA
-    
-    # result <- list(
-    #   bench = select(SGENcalcs, -apar, -bpar),
-    #   alpha = if (prod == "Parken") exp(median(lnalpha_Parkin$loga)) else Ric.A
-    # )
-    # return(result)
     
   } # ; stopCluster(cl)
   
@@ -247,6 +251,7 @@ set.seed(1) ; if (BS == TRUE) {
   BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
   if (prod == "Parken") alphaout <- outAlpha$alpha
 }; beep(2)
+
 # BS.dfout.LSM <- BS.dfout
 # BS.dfout.parken <- BS.dfout
 
