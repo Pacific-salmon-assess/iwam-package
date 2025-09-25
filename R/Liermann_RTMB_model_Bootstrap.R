@@ -32,17 +32,23 @@ WAin <- read.csv(here::here(WAin))
 
     # 1. SETUP
 BS <- TRUE # default for FALSE
-bsiters <- 100 # New with Brown et al. CSAS runs
+bsiters <- 2000 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 # set.seed <- 1
 # set.seed(1) # Now set at header of code
-conditional <- TRUE # Default T for conditional - FALSE for Marginal medians
+
+	# This references whether or not predictions have included
+	# stock-level error (through rnorm)
+	# Naming is under investigation
+adj <- T # Default T for conditional - FALSE for Marginal medians
+
 MCMC <- TRUE # Default F to use original method, T takes logA from MCMC samples to estimate SGEN
 prod <- c("Parken") # "LifeStageModel" or "Parken"
-# bias.cor <- FALSE
+bias.cor <- F # True to add a bias correction term for sREP
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
+# Parallel setup - NOT FUCNTIONING
 # library(doParallel)
 # library(doRNG)
 # cl <- makeCluster(detectCores() - 1)
@@ -58,15 +64,17 @@ set.seed(1) ; if (BS == TRUE) {
   # results <- foreach(k = 1:bsiters, .packages = c("dplyr", "purrr")) %dopar% {
   for (k in 1:bsiters) {
     
-    # Should this use the conditional or marginal estimate of SREP?
-    if (conditional == T) {
-    SREP <- derived_obj$deripost_summary$E_tar_adj$Median # Conditional
-    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar_adj$LQ_5)) / 1.96 # Conditional
-    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar_adj$LQ_5) / 1.96 # Conditional
+	# Use mean SREP on realscale
+		# Conditional if bias corrected
+		# Marginal if rnorm
+    if (adj == T) { # These should be means - not medians!!!
+		SREP <- derived_obj$deripost_summary$E_tar_adj$Median 
+		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar_adj$LQ_5)) / 1.96 
+		SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar_adj$LQ_5) / 1.96
     } else {
-    SREP <- derived_obj$deripost_summary$E_tar$Median # Marginal
-    SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96 # Marginal
-    SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96 # Marginal
+		SREP <- derived_obj$deripost_summary$E_tar$Median
+		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96 
+		SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96 
     }
   
     # Steps not included in this bootstrapping function
@@ -86,16 +94,17 @@ set.seed(1) ; if (BS == TRUE) {
       Sig.Ric.A <- 0.51 
      
       Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
+		# Mean will be larger than 1
       if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
       
-      # if (bias.cor == TRUE) {
-      #   sREP <- exp(rnorm(length(SREP), log(RPs$SREP) - 0.5*SREP_logSE$SE^2, SREP_logSE$SE))
-      #   if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
-      #     SREP_logSE$SE))
-      # } else {
-      sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
-      if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
-      # }
+	  # Bias correction
+      if (bias.cor == TRUE) { # Only if mean
+        sREP <- exp(rnorm(length(SREP), log(SREP) - 0.5*SREP_logSE^2, SREP_logSE))
+        if(min(sREP)<=0) sREP <- exp(rnorm(length(SREP), log(SREP) - 0.5*SREP_logSE^2, SREP_logSE))
+      } else {
+		sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
+		if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
+      }
   
       SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
     }
@@ -114,13 +123,13 @@ set.seed(1) ; if (BS == TRUE) {
       
       # Skip above 
 		# - take loga, SREP, SMSY, and BETA from MCMC
-	  if (conditional == T) lnalphamc <- derived_obj$deripost_summary$logAlpha_tar_adj$Median else # Conditional
-		lnalphamc <- derived_obj$deripost_summary$logAlpha_tar$Median # Marginal
+	  if (adj == T) lnalphamc <- derived_obj$deripost_summary$logAlpha_tar_adj$Median else 
+		lnalphamc <- derived_obj$deripost_summary$logAlpha_tar$Median 
       
       # Again: conditional or marginal estimates? 
       # Mean, Median, or Mode?
-      if (conditional == T) SMSY <- derived_obj$deripost_summary$SMSY_adj$Median else # Conditional
-		SMSY <- derived_obj$deripost_summary$SMSY$Median # Maringal
+      if (adj == T) SMSY <- derived_obj$deripost_summary$SMSY_adj$Median else 
+		SMSY <- derived_obj$deripost_summary$SMSY$Median 
       
       # purrr the est_loga function for logA
       if (MCMC == F) lnalpha_Parkin <- purrr::map2_dfr (SMSY, SREP, shortloga=FALSE, est_loga)
@@ -138,9 +147,16 @@ set.seed(1) ; if (BS == TRUE) {
       # beta_e <- loga_e/SREP_e
       
       # Bias correction location #
-      
-      sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
-      if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
+		# Note the < instead of the <= in the above if statement for LSM assumption
+      if (bias.cor == TRUE) {
+        sREP <- exp(rnorm(length(SREP), log(SREP) - 0.5*SREP_logSE^2, SREP_logSE))
+        if(min(sREP) < 0) sREP <- exp(rnorm(length(SREP), log(SREP) - 0.5*SREP_logSE^2, SREP_logSE))
+      } else {
+		sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
+		if(min(sREP) < 0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
+      }
+      # sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
+      # if(min(sREP)<0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE$SE))
       
       # Do SGEN calcs with new variables
       if (MCMC == F) SGENcalcs <- purrr::map2_dfr (exp(median(lnalpha_Parkin$loga)), sREP, Sgen.fn2) else

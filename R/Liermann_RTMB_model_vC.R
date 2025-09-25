@@ -105,6 +105,7 @@ stk = srdat$Stocknumber + 1
 
 # NEW: alpha0 prior for LH specific dists.
 lhdiston <- T # T = LH Specific
+bias.cor <- F # T = subtract bias correction terms from expontiated mean terms
 
 # Parameters/Initial values
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
@@ -143,7 +144,6 @@ f_srep <- function(par){
 
   E_tar <- numeric(N_Pred)
   logE_tar <- numeric(N_Pred)
-  
   logAlpha_tar <- numeric(N_Pred)
   
   # Simulated line vectors
@@ -152,6 +152,16 @@ f_srep <- function(par){
   E_line_stream <- numeric(line)
   logE_line_ocean <- numeric(line)
   E_line_ocean <- numeric(line)
+  
+  if (bias.cor) {
+	biaslogE <- -0.5*logESD^2
+	biaslogAlpha <- -0.5*logAlphaSD^2
+	biaslogRS <- -0.5*(sqrt(1/tauobs))^2
+  } else {
+	biaslogE <- 0
+	biaslogAlpha <- 0
+	biaslogRS <- numeric(N_Stk)
+  }
   
   nll <- 0 # Begin negative log-likelihood
   
@@ -175,29 +185,24 @@ f_srep <- function(par){
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
-    nll <- nll - dnorm(logE_re[i], 0, sd = 1, log = TRUE) # Unobserved
-    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD
+    nll <- nll - dnorm(logE_re[i], 0, sd = 1, log = TRUE) # Median of E
+	
+    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD + biaslogE
     E[i] <- exp(logE[i])
     
     # nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
-    nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE) # Non-centered
-
-    # Original partial non-centering
-    # LH specific distributions for prod.
-    # if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]
-    # else logAlpha[i] <- logAlpha0 + logAlpha_re[i]
+	nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE) # Non-centered
     
     # Non-centered with scaling of mean by logAlphaSD
-    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlphaSD
-    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlphaSD
+    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlphaSD + biaslogAlpha
+    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlphaSD + biaslogAlpha
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
-    logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) # DATA FLAG
-    # nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) # DATA FLAG
+	logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) + biaslogRS[stk[i]]
 
     if(!prioronly){
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
@@ -220,12 +225,16 @@ f_srep <- function(par){
   SGEN = numeric(nrow(WAin))
 
   # Conditional posterior predictions
+	# Conditioning on the random effect being equal to zero if bias.cor <- F
+	# Conditioning on a random site, but the conditional mean
   for (i in 1:N_Pred){
     # NEW: alpha0 prior for LH specific dists.
-    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i]
-    else logAlpha_tar[i] <- logAlpha0
+    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] # + biaslogAlpha + logAlphaSD^2/2
+    else logAlpha_tar[i] <- logAlpha0 # + biaslogAlpha + logAlphaSD^2/2
 
-    logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i]
+    logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] # + biaslogE + logESD^2/2
+		# add -0.5*logESD^2 OR 
+		# do the random normal when extracting the posterior
     E_tar[i] <- exp(logE_tar[i])
     
     # Predict BETA
@@ -871,6 +880,39 @@ for (i in 1:25){
 	mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
 	mtext("Recruitment", side = 2, line  = 1, outer = TRUE, cex = 1.3, las = 0)
 }
+
+# Optimized version of the above
+lineSREPdraws <- derived_obj$deripost_full$E # 10000, 25
+lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
+rowsample <- sample(1:10000, 1000)
+par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
+
+for (i in 1:25) {
+  stock_name <- unique(srdat$Name)[i]
+  spawners   <- srdat$Sp[srdat$Name == stock_name]
+  recruits   <- srdat$Rec[srdat$Name == stock_name]
+  Smax       <- max(spawners)
+
+  SSseq <- seq(Smax/100, Smax, length.out = 100)
+  alpha_draws <- lineAlphadraws[, i]
+  srep_draws  <- lineSREPdraws[, i]
+
+  SSmat <- matrix(SSseq, nrow = 10000, ncol = 100, byrow = TRUE)
+  RRmat <- SSmat * alpha_draws^(1 - SSmat / srep_draws)
+
+  RRmed <- SSseq * median(alpha_draws)^(1 - SSseq / median(srep_draws))
+
+  plot(spawners, recruits, xlim = c(0, Smax), ylim = c(0, max(recruits)))
+  mtext(stock_name, side = 3, cex = 0.8)
+  matlines(t(SSmat[rowsample, ]), t(RRmat[rowsample, ]),
+           col = rgb(0, 0, 0, 0.1), lty = 1)
+  lines(SSseq, RRmed, col = "red", lwd = 2)
+}
+
+mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
+mtext("Recruitment", side = 2, line = 1, outer = TRUE, cex = 1.3)
+
+
 
 # RESIDUALS? ####
 
