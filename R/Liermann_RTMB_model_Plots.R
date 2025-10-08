@@ -29,7 +29,7 @@ load("my_object.RData")
 
 # add stocknames - could add them in to each object of derived_obj?
 # Stocknames <- WAin$Stock
-# Srep_example <- cbind(derived_obj$deripost_summary$E_tar_adj, Stocknames) |> 
+# Srep_example <- cbind(derived_obj$deripost_summary$SREP_tar_adj, Stocknames) |> 
 #   Srep_example[c(1, 7, 2, 3, 4, 5, 6)]
 
 # Prepare/load datasets for plotting ####
@@ -52,12 +52,12 @@ targets2 <- cbind(targets1, derived_obj$deripost_summary$SGEN) |>
     "SGEN_LQ_5" = LQ_5, "SGEN_UQ_95" = UQ_95, "SGEN_Stocknum" = Stock,
     "SGEN_Mode" = PosteriorMode)
   # Marginal Mean for SREP (E)
-targets3 <- cbind(targets2, derived_obj$deripost_summary$E_tar_adj) |> 
+targets3 <- cbind(targets2, derived_obj$deripost_summary$SREP_tar_adj) |> 
   rename("E_tar_adj_mean" = Mean, "E_tar_adj_median" = Median,
     "E_tar_adj_LQ_5" = LQ_5, "E_tar_adj_UQ_95" = UQ_95, "E_tar_adj_Stocknum" = Stock,
     "E_tar_adj_Mode" = PosteriorMode)
   # SREP ESTIMATE FOR TARGET STOCKS
-targetsAll <- cbind(targets3, derived_obj$deripost_summary$E_tar) |> 
+targetsAll <- cbind(targets3, derived_obj$deripost_summary$SREP_tar) |> 
   rename("E_tar_mean" = Mean, "E_tar_median" = Median,
     "E_tar_LQ_5" = LQ_5, "E_tar_UQ_95" = UQ_95, "E_tar_Stocknum" = Stock,
     "E_tar_Mode" = PosteriorMode)
@@ -171,7 +171,7 @@ for(i in 1:length(WAbase$lh)) {
 }
 
     # Step 2. PLOT base points
-plot(y = dpars$E$Mean, x = WAbase$WA, pch = 20, 
+plot(y = dpars$SREP$Mean, x = WAbase$WA, pch = 20, 
      # col = ifelse(WAbase$Name == "Chehalis" | WAbase$Name == "Skagit", 'red', col.use), 
      col = col.use, cex = 1.5,
      xlab = expression("Accessible Watershed Area, km"^2), 
@@ -185,7 +185,7 @@ points(y = Parkentable1$Srep, x = Parkentable1$WA, pch = 20, col = alpha('black'
 
 # Liermann points for TARGET ESTIMATES
     # Can change here betwen Median, Mean, and to Marginal vs. Conditional
-points(y = dpars$E_tar$Median, x = WAin$WA, pch = 20, 
+points(y = dpars$SREP_tar$Median, x = WAin$WA, pch = 20, 
   col = alpha(ifelse(WAin$Stock == "Coldwater"| WAin$Stock == "Deadman", 'red', 'skyblue'), 0.5))
   # Can I write this such that for the 'red' points, the alpha is also higher?
 
@@ -207,13 +207,13 @@ lines(x = exp(simWA), y = exp(Predso), col = alpha("dodgerblue3", 0.5), lwd = 2,
 # Calculate quantile - uppers and lowers
   # pred_lnSMSY IS THE TARGET's
   # predlnWA should be using: WAin$logWAshifted_t
-Eline_stream <- derived_obj$deripost_summary$E_line_stream |> 
+Eline_stream <- derived_obj$deripost_summary$SREP_line_stream |> 
   rename("line_stocks" = Stock,
     "s_mean" = Mean,
     "s_median" = Median,
     "s_LQ_5" = LQ_5,
     "s_UQ_95" = UQ_95)
-Eline_ocean <- derived_obj$deripost_summary$E_line_ocean |> 
+Eline_ocean <- derived_obj$deripost_summary$SREP_line_ocean |> 
   rename("line_stocko" = Stock,
     "o_mean" = Mean,
     "o_median" = Median,
@@ -248,7 +248,7 @@ lines(x = exp(simWA), y = exp(Predso_Parken), col = alpha("dodgerblue3", 0.5), l
 
 # Bar plot comparison of SYNOPTIC values of SREP ####
   # Compare Parken and Liermann estimates of SREP for the SYNOPTIC STOCKS
-tempEpars <- dpars$E |> 
+tempEpars <- dpars$SREP |> 
   rename("E_stock_temp" = Stock)
 bardf <- cbind(Parkentable1, tempEpars)
 bardf_long <- bardf %>%
@@ -381,9 +381,9 @@ for (i in Stks){
   SMAX <- 1/derived_obj$deripost_summary$BETA_r$Median[derived_obj$deripost_summary$BETA_r$Stock - 1 == i]
   SMAX_ul <- 1/derived_obj$deripost_summary$BETA_r$UQ_95[derived_obj$deripost_summary$BETA_r$Stock - 1 == i] # Rev.
   SMAX_ll <- 1/derived_obj$deripost_summary$BETA_r$LQ_5[derived_obj$deripost_summary$BETA_r$Stock - 1 == i] # Rev.
-  # SREP <- derived_obj$deripost_summary$E$Median[derived_obj$deripost_summary$E$Stock - 1 == i]
-  # SREP_ul <- derived_obj$deripost_summary$E$UQ_95[derived_obj$deripost_summary$E$Stock - 1 == i]
-  # SREP_ll <- derived_obj$deripost_summary$E$LQ_5[derived_obj$deripost_summary$E$Stock - 1 == i]
+  # SREP <- derived_obj$deripost_summary$SREP$Median[derived_obj$deripost_summary$SREP$Stock - 1 == i]
+  # SREP_ul <- derived_obj$deripost_summary$SREP$UQ_95[derived_obj$deripost_summary$SREP$Stock - 1 == i]
+  # SREP_ll <- derived_obj$deripost_summary$SREP$LQ_5[derived_obj$deripost_summary$SREP$Stock - 1 == i]
   if(exists("iwamobj")) SMAXiwam <- 1/biwam
   if(exists("iwamobj")) SMAXiwam_ll <- 1/(biwam_se$B_lower)
   if(exists("iwamobj")) SMAXiwam_ul <- 1/(biwam_se$B_upper)

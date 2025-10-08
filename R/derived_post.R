@@ -66,15 +66,15 @@ derived_post <- function(x) {
   # monte carlo integration - WRONG
   # This creates a prediction interval - including new site variability
 	# If you take the mean of logE_tar_adj --> marginal mean - WRONG
-  matrices$logE_tar_adj <- apply(matrices$logE_tar, 2, 
-    FUN = function(x)rnorm(length(x), x, sd = matrices$logESD))
+  matrices$logSREP_tar_adj <- apply(matrices$logSREP_tar, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
 
-  mean(exp(matrices$logE_tar_adj[,1])) # Should be the same as below - larger
-  exp(mean(matrices$logE_tar_adj[,1] + matrices$logESD^2/2)) # Should be the same as above - smaller
+  # mean(exp(matrices$logE_tar_adj[,1])) # Should be the same as below - larger
+  # exp(mean(matrices$logE_tar_adj[,1] + matrices$logESD^2/2)) # Should be the same as above - smaller
   # NOT CURRENTLY THE SAME - SOMETHING IS WRONG
 
   matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
-    FUN = function(x)rnorm(length(x), x, sd = matrices$logAlphaSD))
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logAlpha_sd))
 
   # Instead of doing this false conditional estimate
   # This is where we should calculate the marginal mean estimate with bias correction subtracted
@@ -87,8 +87,8 @@ derived_post <- function(x) {
     # BETA, SMSY, and SGEN with these new values
     # Would this be done on EVERY iteration for EACH chain?
   # e.g.
-  matrices$E_tar_adj <- exp(matrices$logE_tar_adj) # for transformed E
-  matrices$BETA_adj <- matrices$logAlpha_tar_adj / matrices$E_tar_adj
+  matrices$SREP_tar_adj <- exp(matrices$logSREP_tar_adj) # for transformed E
+  matrices$BETA_adj <- matrices$logAlpha_tar_adj / matrices$SREP_tar_adj
   matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_adj
   matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
     LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))

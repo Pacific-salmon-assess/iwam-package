@@ -111,12 +111,12 @@ bias.cor <- F # T = subtract bias correction terms from expontiated mean terms
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
             # logRS_pred = numeric(nrow(srdat)), # Zeroes - testing as a parameter
-            logE_re = numeric(N_Stk), # Zeroes
+            logSREP_re = numeric(N_Stk), # Zeroes
             logAlpha0 = 0.6,
             logAlpha_re = numeric(nrow(dat$WAbase)), # Zeroes
             tauobs = 0.01 + numeric(N_Stk), # Constrained positive
-            logESD = 1,
-            logAlphaSD = 1
+            logSREP_sd = 1, 
+            logAlpha_sd = 1
 )
 if (lhdiston) {
   par$logAlpha02 <- 0
@@ -134,31 +134,31 @@ f_srep <- function(par){
   type = lifehist$lh
   type_tar = as.numeric(WAin$lh) 
 
-  E <- numeric(N_Stk)
-  logE_pred <- numeric(N_Stk)
-  logE <- numeric(N_Stk)
+  SREP <- numeric(N_Stk)
+  # logE_pred <- numeric(N_Stk)
+  logSREP <- numeric(N_Stk)
   logAlpha <- numeric(N_Stk)
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
 
-  E_tar <- numeric(N_Pred)
-  logE_tar <- numeric(N_Pred)
+  SREP_tar <- numeric(N_Pred)
+  logSREP_tar <- numeric(N_Pred)
   logAlpha_tar <- numeric(N_Pred)
   
   # Simulated line vectors
   line <- length(lineWA)
-  logE_line_stream <- numeric(line)
-  E_line_stream <- numeric(line)
-  logE_line_ocean <- numeric(line)
-  E_line_ocean <- numeric(line)
+  logSREP_line_stream <- numeric(line)
+  SREP_line_stream <- numeric(line)
+  logSREP_line_ocean <- numeric(line)
+  SREP_line_ocean <- numeric(line)
   
   if (bias.cor) {
-	biaslogE <- -0.5*logESD^2
-	biaslogAlpha <- -0.5*logAlphaSD^2
+	biaslogSREP <- -0.5*logSREP_sd^2
+	biaslogAlpha <- -0.5*logAlpha_sd^2
 	biaslogRS <- -0.5*(sqrt(1/tauobs))^2
   } else {
-	biaslogE <- 0
+	biaslogSREP <- 0
 	biaslogAlpha <- 0
 	biaslogRS <- numeric(N_Stk)
   }
@@ -176,33 +176,33 @@ f_srep <- function(par){
   
   # Half normal/half student-t/half cauchy for SD parameters
     # Half normal:
-  # nll <- nll - dnorm(logAlphaSD, mean = 0, sd = 31.6, log = TRUE)
-  # nll <- nll - dnorm(logESD, mean = 0, sd = 31.6, log = TRUE)
-    # Half Student: Doesn't perform - particularly logESD
-  # nll <- nll - dt(logAlphaSD, df = 1, log = TRUE)
-  # nll <- nll - dt(logESD, df = 1, log = TRUE)
+  # nll <- nll - dnorm(logAlpha_sd, mean = 0, sd = 31.6, log = TRUE)
+  # nll <- nll - dnorm(logSREP_sd, mean = 0, sd = 31.6, log = TRUE)
+    # Half Student: Doesn't perform - particularly logSREP_sd
+  # nll <- nll - dt(logAlpha_sd, df = 1, log = TRUE)
+  # nll <- nll - dt(logSREP_sd, df = 1, log = TRUE)
     # Half Cauchy: Still unsure how to pull - not a native TMB distribution
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
-    nll <- nll - dnorm(logE_re[i], 0, sd = 1, log = TRUE) # Median of E
+    nll <- nll - dnorm(logSREP_re[i], 0, sd = 1, log = TRUE) # Median of E
 	
-    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD + biaslogE
-    E[i] <- exp(logE[i])
+    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd + biaslogSREP
+    SREP[i] <- exp(logSREP[i])
     
-    # nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE) # Prior (hj)
+    # nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlpha_sd, log = TRUE) # Prior (hj)
 	nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE) # Non-centered
     
-    # Non-centered with scaling of mean by logAlphaSD
-    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlphaSD + biaslogAlpha
-    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlphaSD + biaslogAlpha
+    # Non-centered with scaling of mean by logAlpha_sd
+    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlpha_sd + biaslogAlpha
+    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlpha_sd + biaslogAlpha
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
-	logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/E[stk[i]]) + biaslogRS[stk[i]]
+	logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
 
     if(!prioronly){
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
@@ -229,16 +229,16 @@ f_srep <- function(par){
 	# Conditioning on a random site, but the conditional mean
   for (i in 1:N_Pred){
     # NEW: alpha0 prior for LH specific dists.
-    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] # + biaslogAlpha + logAlphaSD^2/2
-    else logAlpha_tar[i] <- logAlpha0 # + biaslogAlpha + logAlphaSD^2/2
+    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    else logAlpha_tar[i] <- logAlpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
 
-    logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] # + biaslogE + logESD^2/2
-		# add -0.5*logESD^2 OR 
+    logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP # + biaslogE + logSREP_sd^2/2
+		# add -0.5*logSREP_sd^2 OR 
 		# do the random normal when extracting the posterior
-    E_tar[i] <- exp(logE_tar[i])
+    SREP_tar[i] <- exp(logSREP_tar[i])
     
     # Predict BETA
-    BETA[i] <- logAlpha_tar[i]/E_tar[i]
+    BETA[i] <- logAlpha_tar[i]/SREP_tar[i]
     # Predict SMSY
     SMSY[i] <- (1-LambertW0(exp(1-logAlpha_tar[i])))/BETA[i]
     # Predict SGEN
@@ -247,11 +247,11 @@ f_srep <- function(par){
   
   # Create predictions on an simulated line
   for (i in 1:line){
-    logE_line_ocean[i] <- b0[1] + b0[2] + (bWA[1] + bWA[2])*lineWA[i] # DATA - not in likelihood
-    E_line_ocean[i] <- exp(logE_line_ocean[i])
+    logSREP_line_ocean[i] <- b0[1] + b0[2] + (bWA[1] + bWA[2])*lineWA[i] # DATA - not in likelihood
+    SREP_line_ocean[i] <- exp(logSREP_line_ocean[i])
     
-    logE_line_stream[i] <- b0[1] + (bWA[1])*lineWA[i] # DATA - not in likelihood
-    E_line_stream[i] <- exp(logE_line_stream[i])
+    logSREP_line_stream[i] <- b0[1] + (bWA[1])*lineWA[i] # DATA - not in likelihood
+    SREP_line_stream[i] <- exp(logSREP_line_stream[i])
   }
   
   ## ADREPORT - internal values (synoptic specific/Ricker)
@@ -263,8 +263,8 @@ f_srep <- function(par){
   # ADREPORT(logRS_pred)
   REPORT(logRS_pred)
 
-  # ADREPORT(logE_re)
-  # ADREPORT(E)
+  # ADREPORT(logSREP_re)
+  # ADREPORT(SREP)
   # ADREPORT(logAlpha)
   # ADREPORT(logAlpha_re) # random effect parameter for resampling
   # ADREPORT(alpha)
@@ -273,13 +273,13 @@ f_srep <- function(par){
   # ADREPORT(tauobs)
   
   # REPORT(logRS) # logRS for all 501 data points
-  REPORT(logE_re)
-  REPORT(E) # E (Srep) for all synoptic data set rivers (25)
+  REPORT(logSREP_re)
+  REPORT(SREP) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logAlpha) # model logAlpha (25)
   REPORT(logAlpha0)
   REPORT(logAlpha02)
   REPORT(logAlpha_re) # random effect parameter for resampling
-  REPORT(logAlphaSD)
+  REPORT(logAlpha_sd)
   REPORT(alpha)
   REPORT(SMSY_r)
   REPORT(BETA_r)
@@ -289,13 +289,13 @@ f_srep <- function(par){
     # Mean estimate of the median (without bias correction)
   alpha_tar <- exp(logAlpha_tar)
   
-  # ADREPORT(E_tar) # target E (Srep) (21)
-  # ADREPORT(logE_tar) # exp these for the correct confidence intervals
+  # ADREPORT(SREP_tar) # target E (Srep) (21)
+  # ADREPORT(logSREP_tar) # exp these for the correct confidence intervals
   # ADREPORT(logAlpha_tar)
   # ADREPORT(alpha_tar)
   
-  REPORT(E_tar)
-  REPORT(logE_tar)
+  REPORT(SREP_tar)
+  REPORT(logSREP_tar)
   REPORT(logAlpha_tar)
   REPORT(alpha_tar)
 
@@ -308,13 +308,13 @@ f_srep <- function(par){
   REPORT(SGEN)
   
   # Simulated line values for plotting
-  REPORT(E_line_stream) 
-  # ADREPORT(E_line_stream)
-  REPORT(E_line_ocean) 
-  # ADREPORT(E_line_ocean)
+  REPORT(SREP_line_stream) 
+  # ADREPORT(SREP_line_stream)
+  REPORT(SREP_line_ocean) 
+  # ADREPORT(SREP_line_ocean)
   
-  REPORT(logAlphaSD)
-  REPORT(logESD)
+  REPORT(logAlpha_sd)
+  REPORT(logSREP_sd)
   
   nll # output of negative log-likelihood
 }
@@ -322,7 +322,7 @@ f_srep <- function(par){
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_srep,
                        par,
-                       random = c("logAlpha_re", "logE_re"),
+                       random = c("logAlpha_re", "logSREP_re"),
                        silent=TRUE)
 
 
@@ -386,33 +386,33 @@ if(randomgenmethod == T){
     # Random parameter creation: Random parameter starts for prior simulation
     parp <- function() {
       # Random parameter starts for prior simulation
-      logESD <- runif(1, 0, 100)
-      logAlphaSD <- runif(1, 0, 100)
+      logSREP_sd <- runif(1, 0, 100)
+      logAlpha_sd <- runif(1, 0, 100)
       listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
         bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
-        logESD = logESD, # This isn't being saved internally
-        logAlphaSD = logAlphaSD, # This isn't being saved internally
+        logSREP_sd = logSREP_sd, # This isn't being saved internally
+        logAlpha_sd = logAlpha_sd, # This isn't being saved internally
         
-        logE_re = rnorm(N_Stk, 0, logESD),
+        logSREP_re = rnorm(N_Stk, 0, logSREP_sd),
         logAlpha0 = rnorm(1, 0.6, 0.45),
         logAlpha02 = rnorm(1, 0, 31.6),
-        logAlpha_re = rnorm(nrow(dat$WAbase), 0, logAlphaSD),
+        logAlpha_re = rnorm(nrow(dat$WAbase), 0, logAlpha_sd),
         
         tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
         )
       
       # Alternative priors from Liermann et al. 2010 - comment on/off for now
-      logESDalt <- runif(1, 0, 20)
-      logAlphaSDalt <- runif(1, 0, 20)
+      logSREP_sdalt <- runif(1, 0, 20)
+      logAlpha_sdalt <- runif(1, 0, 20)
       listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
         bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
-        logESD = logESDalt, # This isn't being saved internally
-        logAlphaSD = logAlphaSDalt, # This isn't being saved internally
+        logSREP_sd = logSREP_sdalt, # This isn't being saved internally
+        logAlpha_sd = logAlpha_sdalt, # This isn't being saved internally
     
-        logE_re = rnorm(N_Stk, 0, sd = logESD),
+        logSREP_re = rnorm(N_Stk, 0, sd = logSREP_sd),
         logAlpha0 = rnorm(1, 0, sd = 0.71),
         logAlpha02 = rnorm(1, 0, sd = 31.6),
-        logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlphaSD),
+        logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlpha_sd),
     
         tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
         )
@@ -424,7 +424,7 @@ if(randomgenmethod == T){
     # enter parpar into model function with MakeADFun
     objpp <- RTMB::MakeADFun(f_srep,
                          parpar,
-                         random = c("logAlpha_re", "logE_re"),
+                         random = c("logAlpha_re", "logSREP_re"),
                          silent=TRUE)
     
     # simulate for each desired term
@@ -432,7 +432,7 @@ if(randomgenmethod == T){
     psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re # why logAlpha_re? - if I want to do PP?
     # ... other derived parameters?
       # psimlogAlpha0[[i]] <- objpp$simulate()$logAlpha0 - doesn't exist - not derived
-      # $E ?
+      # $SREP ?
     
     psimlogRS_pred[[i]] <- objpp$simulate()$logRS_pred
     
@@ -466,10 +466,10 @@ if(randomgenmethod == T){
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
-upper[names(obj$par) == "logESD"] <- 100 # Turn off for half dists.
-lower[names(obj$par) == "logESD"] <- 0
-upper[names(obj$par) == "logAlphaSD"] <- 100 # Turn off for half dists.
-lower[names(obj$par) == "logAlphaSD"] <- 0
+upper[names(obj$par) == "logSREP_sd"] <- 100 # Turn off for half dists.
+lower[names(obj$par) == "logSREP_sd"] <- 0
+upper[names(obj$par) == "logAlpha_sd"] <- 100 # Turn off for half dists.
+lower[names(obj$par) == "logAlpha_sd"] <- 0
 
 
 
@@ -499,7 +499,7 @@ init <- function() {
        bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
        
        # logRS_pred = rnorm(N_Obs, 0, 1),
-       logE_re = rnorm(N_Stk, 0, 1), # Contains negatives
+       logSREP_re = rnorm(N_Stk, 0, 1), # Contains negatives
        logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
        # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
        logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
@@ -507,8 +507,8 @@ init <- function() {
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
        # Should these be 0.01 to 100s? Would that be more accurate?
-       logESD = runif(1, 0.01, 3), # Positive
-       logAlphaSD = runif(1, 0.01, 3) # Positive
+       logSREP_sd = runif(1, 0.01, 3), # Positive
+       logAlpha_sd = runif(1, 0.01, 3) # Positive
   )
   
   if (lhdiston) {
@@ -524,14 +524,14 @@ init <- function() {
 #        b0 = c(10, 0), # Contains negatives
 #        bWA = c(0, 0), # Contains negatives
 #        
-#        logE_re = numeric(N_Stk), # Contains negatives
+#        logSREP_re = numeric(N_Stk), # Contains negatives
 #        logAlpha0 = 0.6, # Contains negatives
 #        logAlpha_re = numeric(nrow(dat$WAbase)), # Contains negatives
 # 
 #        tauobs = 0.01 + numeric(N_Stk), # Uniform to REMAIN positive
 #        
-#        logESD = 1, # Positive
-#        logAlphaSD = 1 # Positive
+#        logSREP_sd = 1, # Positive
+#        logAlpha_sd = 1 # Positive
 #   )
 #   
 #   if (lhdiston) {
@@ -571,11 +571,12 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 
   # PAIRS PLOTS
-# pairs_pars <- c("b0", "bWA", "logAlpha0", "logESD", "logAlphaSD")
+# pairs_pars <- c("b0", "bWA", "logAlpha0", "logSREP_sd", "logAlpha_sd")
 # pairs(fitstan, pars = pairs_pars) # for specific par names from above
 
   # ACF
 # bayesplot::mcmc_acf(fitstan, regex_pars = "b0") # ACF plot for b0
+# bayesplot::mcmc_acf(fitstan) # For every and all - should be a faster way to save them
 
   # RHAT
 # fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
@@ -601,7 +602,7 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan); beep(2)
-# add stocknames - see extra code from _Plots.R
+	# add stocknames - see extra code from _Plots.R
 
 # SAVING R OBJECTS: ####
 # In script_A.R
@@ -691,20 +692,20 @@ print(paste0("Posterior Predictive P-Value = ", pvalpp))
     # Manually write out and add rnorms for hyper parameters.
 # I think I am interested in the following equation parts:
       # logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]
-      # and dnorm(logAlpha_re[i], 0, sd  = logAlphaSD, log = TRUE)
+      # and dnorm(logAlpha_re[i], 0, sd  = logAlpha_sd, log = TRUE)
     # For posterior predictive it would be:
       # rnorms for each of the 3? assuming median value?
       # Liermann says "for populations with no SR data"
 # 1. pull draws for logAlpha0
-# 2. pull draws for logAlphaSD
+# 2. pull draws for logAlpha_sd
 # 3. iter for sims
 slogAlpha0 <- derived_obj$deripost_full$logAlpha0 # dim(10000, 1)
 slogAlpha02 <- derived_obj$deripost_full$logAlpha02 # dim(10000, 1)
-slogAlphaSD <- derived_obj$deripost_full$logAlphaSD # dim(10000, 1)
+slogAlpha_sd <- derived_obj$deripost_full$logAlpha_sd # dim(10000, 1)
 simlogAlpha_s <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
 simlogAlpha_o <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
 for (i in 1:dim(slogAlpha0)[1]){
-  simlogAlpha_s[i] <- slogAlpha0[i] + rnorm(1, mean = 0, sd = slogAlphaSD[i])
+  simlogAlpha_s[i] <- slogAlpha0[i] + rnorm(1, mean = 0, sd = slogAlpha_sd[i])
   simlogAlpha_o[i] <- simlogAlpha_s[i] + slogAlpha02[i]
 }
 
@@ -765,7 +766,7 @@ ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, 
 # beta?
 
 # Posterior Predictive Calculation for: SREP (E)
-	# logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD
+	# logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd
 	# Need b0, bWA, WA, and random effects
 	# Will get one for stream and one for ocean
 	
@@ -799,12 +800,12 @@ ggplot() +
 # 2. Get out posterior predictive parameters for Ricker model PER STOCK
 	# simlogRS is 501 random observations 
 	# Alpha: simlogAlpha_s and simlogAlpha_o (each a draw for a single value for the different alpha's)
-	# SREP (E): logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logE_re[i]*logESD
+	# SREP (E): logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd
 	# May want to sample 1000 from the 10,000 iterations for ease of viewing?
 # X. USE POSTERIORS for STOCKS - WITHOUT RANDOM ERROR - JUST AS MODEL SEES IT?
-	# derived_obj$deripost_summary$E
+	# derived_obj$deripost_summary$SREP
 	# derived_obj$deripost_summary$logAlpha
-# lineSREPmedian <- derived_obj$deripost_summary$E$Median
+# lineSREPmedian <- derived_obj$deripost_summary$SREP$Median
 # lineAlphamedian <- exp(derived_obj$deripost_summary$logAlpha$Median)
 # 3. Create an imaginary line of spawners
 # 4. Use imaginary line to solve for recruits PER STOCK
@@ -835,7 +836,7 @@ ggplot() +
 # plot(x = srdat$Sp[srdat$Name == 'Harrison'], y = srdat$Rec[srdat$Name == 'Harrison']) # Stock 1 of synoptic set
 # lines(x = SS, y = RR)
 
-lineSREPdraws <- derived_obj$deripost_full$E # 10000, 25
+lineSREPdraws <- derived_obj$deripost_full$SREP # 10000, 25
 lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
 SSdraws <- matrix(NA, nrow = 10000, ncol = 100) # this needs to be 10,000 by 100?
 RRdraws <- matrix(NA, nrow = 10000, ncol = 100)
@@ -882,7 +883,7 @@ for (i in 1:25){
 }
 
 # Optimized version of the above
-lineSREPdraws <- derived_obj$deripost_full$E # 10000, 25
+lineSREPdraws <- derived_obj$deripost_full$SREP # 10000, 25
 lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
 rowsample <- sample(1:10000, 1000)
 par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
