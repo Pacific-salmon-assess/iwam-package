@@ -4,6 +4,7 @@
 library(RTMB)
 library(MCMCglmm) # For posterior.mode()
 library(beepr)
+library(HDInterval) # High density interval for posteriors with skew/multimodality
 
 # Function start
 derived_post <- function(x) {
@@ -62,11 +63,20 @@ derived_post <- function(x) {
     # logAlpha_tar <- dnorm(logAlpha_re, mean = 0, sd = logAlphaSD, log = TRUE)
     # logE_tar <- dnorm(logE_re, mean = 0, sd = logESD, log = TRUE)
   # matrices$logE_re <- dnorm(...) # ? is this necessary?
-
+  
+  if (dat$prioronly == 0) { # Just to be able to run prioronly without these additional items
+  # LambertW0 doesn't work in prioronly settings
+  
   # monte carlo integration - WRONG
   # This creates a prediction interval - including new site variability
 	# If you take the mean of logE_tar_adj --> marginal mean - WRONG
   matrices$logSREP_tar_adj <- apply(matrices$logSREP_tar, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
+
+  matrices$logSREP_line_ocean_adj <- apply(matrices$logSREP_line_ocean, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
+	
+  matrices$logSREP_line_stream_adj <- apply(matrices$logSREP_line_stream, 2, 
     FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
 
   # mean(exp(matrices$logE_tar_adj[,1])) # Should be the same as below - larger
@@ -93,6 +103,10 @@ derived_post <- function(x) {
   matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
     LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
 
+  matrices$SREP_line_ocean_adj <- exp(matrices$logSREP_line_ocean_adj) 
+  matrices$SREP_line_stream_adj <- exp(matrices$logSREP_line_stream_adj) 
+  }
+
   # # Prior predictions and posterior predictions - adding in observation error
   # matrices$logRS_pred_obs <- apply(matrices$logRS_pred, 2,
   #   FUN = function(x) rnorm(length(x), x, sd = sqrt(1/matrices$tauobs)))
@@ -117,6 +131,8 @@ derived_post <- function(x) {
   names(dataframes) <- names(matrices)
   
   for (i in 1:n_matrices) {
+	hdi_list <- apply(matrices[[i]], 2, function(x) hdi(x, credMass = 0.9)) # 0.9 = 90% HDI
+
     dataframes[[i]]$Stock <- c(1:ncol(matrices[[i]]))
     dataframes[[i]]$Mean <- apply(matrices[[i]], 2 , mean)
     dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
@@ -125,6 +141,10 @@ derived_post <- function(x) {
       # New addition of posterior Mode
     dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
     dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
+	# Consider adding HDPI intervals here
+		# Using and apply function with hdi(x, credMass = 0.89)
+	# dataframes[[i]]$HDIlwr <- sapply(hdi_list, `[`, 1) # lower bound
+	# dataframes[[i]]#HDIupr <- sapply(hdi_list, `[`, 2) # upper bound
   }
 
   return(list(deripost_summary = dataframes,

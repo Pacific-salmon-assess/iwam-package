@@ -21,7 +21,7 @@ source(here::here("R/helperFunctions.R")) # For bootstrapping
 # In script_A.R
 # save(derived_obj, file = "derived_obj.RData")
 # In script_B.R
-load(here::here("derived_obj.RData"))
+# load(here::here("derived_obj.RData"))
 WAin <- c("DataIn/Parken_evalstocks.csv")
 WAin <- read.csv(here::here(WAin))
 
@@ -32,7 +32,7 @@ WAin <- read.csv(here::here(WAin))
 
     # 1. SETUP
 BS <- TRUE # default for FALSE
-bsiters <- 2000 # New with Brown et al. CSAS runs
+bsiters <- 250000 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 # set.seed <- 1
@@ -41,10 +41,10 @@ outAlpha <- list()
 	# This references whether or not predictions have included
 	# stock-level error (through rnorm)
 	# Naming is under investigation
-adj <- T # Default T for conditional - FALSE for Marginal medians
+adj <- F # Default T for conditional - FALSE for Marginal medians - FLIPPED ********************************************
 
-MCMC <- TRUE # Default F to use original method, T takes logA from MCMC samples to estimate SGEN
-prod <- c("Parken") # "LifeStageModel" or "Parken"
+MCMC <- TRUE # Default F to use original method, T takes logA from MCMC samples to estimate SGEN FOR PARKEN METHOD **********************
+prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
 bias.cor <- F # True to add a bias correction term for sREP
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
@@ -68,13 +68,13 @@ set.seed(1) ; if (BS == TRUE) {
 		# Conditional if bias corrected
 		# Marginal if rnorm
     if (adj == T) { # These should be means - not medians!!!
-		SREP <- derived_obj$deripost_summary$E_tar_adj$Median 
-		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar_adj$LQ_5)) / 1.96 
-		SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar_adj$LQ_5) / 1.96
+		SREP <- derived_obj$deripost_summary$SREP_tar_adj$Median 
+		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$SREP_tar_adj$LQ_5)) / 1.96 
+		SREP_SE <- (SREP - derived_obj$deripost_summary$SREP_tar_adj$LQ_5) / 1.96
     } else {
-		SREP <- derived_obj$deripost_summary$E_tar$Median
-		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$E_tar$LQ_5)) / 1.96 
-		SREP_SE <- (SREP - derived_obj$deripost_summary$E_tar$LQ_5) / 1.96 
+		SREP <- derived_obj$deripost_summary$SREP_tar$Median
+		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$SREP_tar$LQ_5)) / 1.96 
+		SREP_SE <- (SREP - derived_obj$deripost_summary$SREP_tar$LQ_5) / 1.96 
     }
   
     # Steps not included in this bootstrapping function
@@ -180,8 +180,9 @@ set.seed(1) ; if (BS == TRUE) {
     # oute <- list(bench = select(SGENcalcs_e, -apar, -bpar))
     # outBenche[[k]] <- oute$bench
     
-    if (prod == "Parken" & MCMC == F) outA <- list(alpha = exp(median(lnalpha_Parkin$loga))) else
-		outA <- list(alpha = exp(median(lnalphamc)))
+    if (prod == "Parken" & MCMC == F) outA <- list(alpha = exp(median(lnalpha_Parkin$loga))) # else
+	if (prod == "Parken" & MCMC ==T) outA <- list(alpha = exp(median(lnalphamc)))
+	
     if (prod == "LifeStageModel") outA <- list(alpha = Ric.A)
     if (prod == "Parken") outAlpha <- outA
     if (prod == "LifeStageModel") outAlpha[[k]] <- outA
@@ -271,3 +272,4 @@ set.seed(1) ; if (BS == TRUE) {
 # BS.dfout.LSM <- BS.dfout
 # BS.dfout.parken <- BS.dfout
 
+# save(BS.dfout, file = "BSdfout.RData")

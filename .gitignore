@@ -419,3 +419,8 @@ DataOut/lsm250k_dataout_target_ocean_noEnh.csv
 derived_obj.RData
 R/HiearchicalRicker.r
 R/comparealphas.R
+R/BSdfout.RData
+R/derived_obj_prioronly.RData
+R/fitstan.RData
+R/fitstan_prioronly.RData
+R/figure.png

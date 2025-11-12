@@ -3,6 +3,7 @@
 # Libaries ####
 library(RTMB)
 library(ggplot2)
+library(gridExtra)
 library(dplyr)
 library(tidyverse) 
 library(progress) # Progress bar
@@ -40,8 +41,8 @@ WAin <- c("DataIn/Parken_evalstocks.csv") # c("DataIn/WCVIStocks.csv")
     # And make sure to change type_tar to fit the expected 0:1 indexing
 
 # Data Manipulations ####
-srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
-WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
+srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # Consider _TK
+WAbase <- read.csv(here::here("DataIn/WatershedArea.csv")) # NOW INCLUDING LATITUDE
 WAin <- read.csv(here::here(WAin))
 
 # Data setup ####
@@ -95,6 +96,7 @@ dat <- list(srdat = srdat,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), 
                           max(WAbase$logWAshifted), 0.1), # Not added to NLL
+			mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 0) # 0-run with data, 1-prior prediction mode
 
@@ -187,7 +189,7 @@ f_srep <- function(par){
   for (i in 1:N_Stk){
     nll <- nll - dnorm(logSREP_re[i], 0, sd = 1, log = TRUE) # Median of E
 	
-    logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd + biaslogSREP
+    logSREP[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd + biaslogSREP
     SREP[i] <- exp(logSREP[i])
     
     # nll <- nll - dnorm(logAlpha_re[i], 0, sd  = logAlpha_sd, log = TRUE) # Prior (hj)
@@ -215,7 +217,7 @@ f_srep <- function(par){
   BETA_r = numeric(nrow(WAbase))
   
   for (i in 1:N_Stk){
-    BETA_r[i] <- logAlpha[i] / E[i]
+    BETA_r[i] <- logAlpha[i] / SREP[i]
     SMSY_r[i] <- (1 - LambertW0(exp(1 - logAlpha[i]))) / BETA_r[i]
   }
 
@@ -232,7 +234,7 @@ f_srep <- function(par){
     if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
     else logAlpha_tar[i] <- logAlpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
 
-    logE_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP # + biaslogE + logSREP_sd^2/2
+    logSREP_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP # + biaslogSREP + logSREP_sd^2/2
 		# add -0.5*logSREP_sd^2 OR 
 		# do the random normal when extracting the posterior
     SREP_tar[i] <- exp(logSREP_tar[i])
@@ -247,16 +249,14 @@ f_srep <- function(par){
   
   # Create predictions on an simulated line
   for (i in 1:line){
-    logSREP_line_ocean[i] <- b0[1] + b0[2] + (bWA[1] + bWA[2])*lineWA[i] # DATA - not in likelihood
+    logSREP_line_ocean[i] <- b0[1] + b0[2] + (bWA[1] + bWA[2])*lineWA[i] + biaslogSREP # DATA - not in likelihood
     SREP_line_ocean[i] <- exp(logSREP_line_ocean[i])
     
-    logSREP_line_stream[i] <- b0[1] + (bWA[1])*lineWA[i] # DATA - not in likelihood
+    logSREP_line_stream[i] <- b0[1] + (bWA[1])*lineWA[i] + biaslogSREP # DATA - not in likelihood
     SREP_line_stream[i] <- exp(logSREP_line_stream[i])
   }
   
-  ## ADREPORT - internal values (synoptic specific/Ricker)
-  alpha <- exp(logAlpha)
-  
+  ## ADREPORT - internal values (synoptic specific/Ricker)  
   REPORT(b0) # Testing simulate()
   REPORT(bWA) # Testing simulate()
   
@@ -272,9 +272,12 @@ f_srep <- function(par){
   # ADREPORT(BETA_r)
   # ADREPORT(tauobs)
   
+  alpha <- exp(logAlpha)
   # REPORT(logRS) # logRS for all 501 data points
   REPORT(logSREP_re)
+  REPORT(logSREP_sd)
   REPORT(SREP) # E (Srep) for all synoptic data set rivers (25)
+  REPORT(logSREP)
   REPORT(logAlpha) # model logAlpha (25)
   REPORT(logAlpha0)
   REPORT(logAlpha02)
@@ -309,12 +312,11 @@ f_srep <- function(par){
   
   # Simulated line values for plotting
   REPORT(SREP_line_stream) 
+  REPORT(logSREP_line_stream) 
   # ADREPORT(SREP_line_stream)
   REPORT(SREP_line_ocean) 
+  REPORT(logSREP_line_ocean)
   # ADREPORT(SREP_line_ocean)
-  
-  REPORT(logAlpha_sd)
-  REPORT(logSREP_sd)
   
   nll # output of negative log-likelihood
 }
@@ -419,6 +421,7 @@ if(randomgenmethod == T){
       
       return(listinitprior) # listinitprior or listinitialternate
     }
+	
     parpar <- parp()
     
     # enter parpar into model function with MakeADFun
@@ -561,7 +564,9 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # tmbstan operates by default with NUTS MCMC sampler
 # See: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
-
+# Save stan fit object
+# save(fitstan, file = "fitstan.RData")
+# if(dat$prioronly == 1) {save(fitstan, file = "fitstan_prioronly.RData")} else {save(fitstan, file = "fitstan.RData")}
 
 # Test and diagnostic plots ####
 # names(fitstan) for complete list of parameters from stan object
@@ -571,8 +576,12 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 
   # PAIRS PLOTS
-# pairs_pars <- c("b0", "bWA", "logAlpha0", "logSREP_sd", "logAlpha_sd")
-# pairs(fitstan, pars = pairs_pars) # for specific par names from above
+pairs_pars <- c("b0", "bWA", "logAlpha0") # "logAlpha_sd" "logSREP_sd"
+pairs(fitstan, pars = pairs_pars) # for specific par names from above
+bayesplot::mcmc_pairs(fitstan, regex_pars = pairs_pars)
+# bayesplot::mcmc_pairs(fitstan, regex_pars = c("tauobs"))
+# bayesplot::mcmc_pairs(fitstan, regex_pars = c("logSREP_re"))
+# bayesplot::mcmc_pairs(fitstan, regex_pars = c("logAlpha_re"))
 
   # ACF
 # bayesplot::mcmc_acf(fitstan, regex_pars = "b0") # ACF plot for b0
@@ -592,7 +601,7 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # print(geweke_results)
 # par(mfrow = c(2, 2))  # adjust depending on number of chains
 # for (i in 1:length(mcmc_chains)) {
-#   geweke.plot(mcmc_chains[[i]], main = paste("Chain", i))
+  # geweke.plot(mcmc_chains[[i]], main = paste("Chain", i))
 # }
 # heidel_results <- heidel.diag(mcmc_chains)
 # print(heidel_results)
@@ -606,7 +615,8 @@ derived_obj <- derived_post(fitstan); beep(2)
 
 # SAVING R OBJECTS: ####
 # In script_A.R
-save(derived_obj, file = "derived_obj.RData")
+# save(derived_obj, file = "derived_obj.RData")
+# if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else {save(derived_obj, file = "derived_obj.RData")}
 
 if(dat$prioronly == 1){print("Prior Prediction Mode")} else {print("Posterior Prediction Mode")}
 
@@ -655,16 +665,39 @@ nsim <- 9
 draws <- sample(1:dim(slogRS_pred)[1], nsim)
 savedsims <- simlogRS[draws,] # [1:9,]
 
-# Plot
-par(mfrow = c(5, 2)) # 5 x 2 grid
-plot(dat$logRS, xlab = "", ylab = "") # , col = stk - if you want stocks colored
-    # Do I want to set xlim, ylim for visualization?
-for (i in 1:nsim) {
-  plot(simlogRS[i, ], xlab = "", ylab = "")
-} 
-mtext("Observation Index", side = 1, outer = TRUE, line = -2)
-mtext("log(R/S)", side = 2, outer = TRUE, line = -1.5)
-par(mfrow = c(1, 1))
+# Plot with BASE R
+# par(mfrow = c(5, 2)) # 5 x 2 grid
+# plot(dat$logRS, xlab = "", ylab = "") # , col = stk - if you want stocks colored
+# for (i in 1:nsim) {
+  # plot(simlogRS[i, ], xlab = "", ylab = "")
+# } 
+# mtext("Observation Index", side = 1, outer = TRUE, line = -2)
+# mtext("log(R/S)", side = 2, outer = TRUE, line = -1.5)
+# par(mfrow = c(1, 1))
+
+# GGPLOT version
+ppcheckdata0 <- data.frame(index = seq_along(dat$logRS), value = dat$logRS) # data.frame(dat$logRS)
+ppcheckplot0 <- ggplot(ppcheckdata0, aes(x = index, y = value)) + 
+	geom_point(alpha = 0.4) + 
+	ylab("") + 
+	xlab("") + 
+	theme_classic() + 
+	theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+ppcheckdata <- lapply(1:9, function(i) data.frame())
+ppcheckplot <- c()
+for (i in 1:nsim){
+	ppcheckdata[[i]] <- data.frame(index = seq_along(simlogRS[i, ]), value = simlogRS[i, ]) # or just data.frame(simlogRS[i,])
+	ppcheckplot[[i]] <- ggplot(ppcheckdata[[i]], aes(x = index, y = value)) + 
+		geom_point(alpha = 0.4) + 
+		ylab("") + 
+		xlab("") + 
+		theme_classic() + 
+		theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+}
+do.call(grid.arrange, c(list(ppcheckplot0), ppcheckplot[1:nsim], ncol = 2, 
+		bottom = "Observation Order",
+		left = "log(R/S)"))
 
 # POSTERIOR P-VALUES
     # Take the mean and sd of each of the iterations e.g. do more than 9 in this case
@@ -677,10 +710,19 @@ par(mfrow = c(1, 1))
 # Mean value of simulations: simlogRS
 # Mean value of observed data: dat$logRS
 mean_simlogRS <- apply(simlogRS, 1, mean) # Mean of all simulated logRS
+mean_simlogRS <- data.frame(mean_simlogRS)
+
   # this should produce 10,000 means
-hist(mean_simlogRS, xlab = "Mean of Log(R/S)", 
+hist(data.frame(mean_simlogRS), xlab = "Mean of Log(R/S)", 
      main = "Visualization of Posterior Predictive P-Value")
 abline(v = mean(dat$logRS), col = "red", lwd = 3) # Mean of observed logRS
+
+ggplot(mean_simlogRS, aes(x = mean_simlogRS)) + 
+	geom_density(fill = "grey") +
+	geom_vline(xintercept = mean(dat$logRS), color = "red", linetype = "dashed") + 
+	xlab("Mean of Simulated log(R/S)") + 
+	ylab("Density") + 
+	theme_classic()
 
 pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS) # Proportion of simulated means above observed mean
 print(paste0("Posterior Predictive P-Value = ", pvalpp))
@@ -711,7 +753,7 @@ for (i in 1:dim(slogAlpha0)[1]){
 
 ggplot() +
   geom_density(aes(x = simlogAlpha_s), # For a new STREAM observation
-               fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+               fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
   geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
@@ -722,10 +764,10 @@ ggplot() +
 
 # Pushforward (under prior predictive): logAlpha ####
 ggplot() +
-  geom_density(aes(x = slogAlpha0), # For a pushforward alpha?
-               fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+  geom_density(aes(x = slogAlpha02), # For a pushforward alpha?
+               fill = "grey", alpha = 0.4, color = "grey", linewidth = 1.2) +
   theme_classic() +
-  labs(x = "logAlpha Prior Pushforward Distribution", y = "Density")
+  labs(x = "Hierarchical Mean logAlpha_LH Prior Pushforward Distribution", y = "Density")
 
 # Posterior OR Prior Distribution ridge plot: logAlpha ####
   # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
@@ -774,7 +816,7 @@ ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, 
 # Posterior Distributions of b0 and bWA
 ggplot() +
   geom_density(aes(x = derived_obj$deripost_full$b0[,1]), 
-               fill = "skyblue", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+               fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
   geom_density(aes(x = (derived_obj$deripost_full$b0[,2] + derived_obj$deripost_full$b0[,1])),
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
@@ -782,7 +824,7 @@ ggplot() +
 
 ggplot() +
   geom_density(aes(x = derived_obj$deripost_full$bWA[,1]), 
-               fill = "skyblue", alpha = 0.4, color = "forestgreen", size = 1.2) +
+               fill = "forestgreen", alpha = 0.4, color = "forestgreen", size = 1.2) +
   geom_density(aes(x = (derived_obj$deripost_full$bWA[,2] + derived_obj$deripost_full$bWA[,1])),
               fill = "skyblue", alpha = 0.4, color = "skyblue", size = 1.2) +
   theme_classic() +
@@ -844,48 +886,48 @@ RRmedian <- lineAlphamedian <- lineSREPmedian <- SSmedian <- NA
 
 rowsample <- sample(1:10000, 1000)
 
-par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1))
+# par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1))
 
-for (i in 1:25){
-	for (k in 1:10000){ # length(rowsample)
-		for (j in 1:100){
-			SSdraws[k, j] <- j*(max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])/100) # srdat$Name == 'Harrison'
-			RRdraws[k, j] <- SSdraws[k, j] * lineAlphadraws[k, i] ^ (1 - SSdraws[k, j] / lineSREPdraws[k, i])
-		}
-	}
+# for (i in 1:25){
+	# for (k in 1:10000){ # length(rowsample)
+		# for (j in 1:100){
+			# SSdraws[k, j] <- j*(max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])/100) # srdat$Name == 'Harrison'
+			# RRdraws[k, j] <- SSdraws[k, j] * lineAlphadraws[k, i] ^ (1 - SSdraws[k, j] / lineSREPdraws[k, i])
+		# }
+	# }
 
-	lineAlphamedian <- median(lineAlphadraws[,i]) # Per stock median (single value)
-	lineSREPmedian <- median(lineSREPdraws[,i])
+	# lineAlphamedian <- median(lineAlphadraws[,i]) # Per stock median (single value)
+	# lineSREPmedian <- median(lineSREPdraws[,i])
 	
-	for (j in 1:100){
-		SSmedian[j] <- median(SSdraws[,j]) # single over-written value
-		RRmedian[j] <- SSmedian[j] * lineAlphamedian ^ (1 - SSmedian[j] / lineSREPmedian) # I need 100 of these for a line
-	}
+	# for (j in 1:100){
+		# SSmedian[j] <- median(SSdraws[,j]) # single over-written value
+		# RRmedian[j] <- SSmedian[j] * lineAlphamedian ^ (1 - SSmedian[j] / lineSREPmedian) # I need 100 of these for a line
+	# }
 
-	plot(x = srdat$Sp[srdat$Name == unique(srdat$Name)[i]], 
-		y = srdat$Rec[srdat$Name == unique(srdat$Name)[i]],
-		xlim=c(0,max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])), 
-		ylim=c(0,max(srdat$Rec[srdat$Name == unique(srdat$Name)[i]]) ) ) # Stock 1 of synoptic set
+	# plot(x = srdat$Sp[srdat$Name == unique(srdat$Name)[i]], 
+		# y = srdat$Rec[srdat$Name == unique(srdat$Name)[i]],
+		# xlim=c(0,max(srdat$Sp[srdat$Name == unique(srdat$Name)[i]])), 
+		# ylim=c(0,max(srdat$Rec[srdat$Name == unique(srdat$Name)[i]]) ) ) # Stock 1 of synoptic set
 	
-	mtext(unique(srdat$Name[srdat$Name == unique(srdat$Name)[i]]), side=3, cex=0.8)
+	# mtext(unique(srdat$Name[srdat$Name == unique(srdat$Name)[i]]), side=3, cex=0.8)
 	
-	# subset matrix of draws
-	SSsubdraws <- SSdraws[rowsample,]
-	RRsubdraws <- RRdraws[rowsample,]
+	# # subset matrix of draws
+	# SSsubdraws <- SSdraws[rowsample,]
+	# RRsubdraws <- RRdraws[rowsample,]
 	
-	for (k in 1:1000){ # subset for 1000 out of 10,000
-		lines(SSsubdraws[k,], RRsubdraws[k,], col=rgb(0, 0, 0, alpha=0.1))
-		lines(x = SSmedian, y = RRmedian, col = c("red")) # Median line
-	}
+	# for (k in 1:1000){ # subset for 1000 out of 10,000
+		# lines(SSsubdraws[k,], RRsubdraws[k,], col=rgb(0, 0, 0, alpha=0.1))
+		# lines(x = SSmedian, y = RRmedian, col = c("red")) # Median line
+	# }
 	
-	mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
-	mtext("Recruitment", side = 2, line  = 1, outer = TRUE, cex = 1.3, las = 0)
-}
+	# mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
+	# mtext("Recruitment", side = 2, line  = 1, outer = TRUE, cex = 1.3, las = 0)
+# }
 
 # Optimized version of the above
 lineSREPdraws <- derived_obj$deripost_full$SREP # 10000, 25
 lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
-rowsample <- sample(1:10000, 1000)
+rowsample <- sample(1:10000, 100) # 1:10000, 1000
 par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
 
 for (i in 1:25) {
@@ -919,26 +961,269 @@ mtext("Recruitment", side = 2, line = 1, outer = TRUE, cex = 1.3)
 
 # Plot generated logRS vs. logRS from data?
 # plot(exp(dat$logRS), exp(derived_obj$deripost_summary$logRS_pred$Median))
-plot(dat$logRS, derived_obj$deripost_summary$logRS_pred$Median)
-points(dat$logRS, simlogRS[1,])
+# plot(dat$logRS, derived_obj$deripost_summary$logRS_pred$Median)
+# points(dat$logRS, simlogRS[1,])
 
-# OR plot observed vs. generated logRS by stock? Can you see a difference?
-compRS <- cbind(dat$srdat, logRS = dat$logRS)
-compRS <- cbind(compRS, genMedianlogRS = derived_obj$deripost_summary$logRS_pred$Median)
+# # OR plot observed vs. generated logRS by stock? Can you see a difference?
+# compRS <- cbind(dat$srdat, logRS = dat$logRS)
+# compRS <- cbind(compRS, genMedianlogRS = derived_obj$deripost_summary$logRS_pred$Median)
 
-par(mfrow=c(1,2))
-plot(compRS$logRS, ylab = "logRS", ylim = c(-10, 10))
-plot(compRS$genMedianlogRS, ylab = "genMedianlogRS", ylim = c(-10, 10))
-points(
-  x = rep(1:501, each = 4000),
-  y = as.vector(t(derived_obj$deripost_full$logRS_pred)),
-  col = rgb(0, 0, 0, alpha = 0.02),  # transparent black
-  pch = 16,
-  cex = 0.3
-)
+# par(mfrow=c(1,2))
+# plot(compRS$logRS, ylab = "logRS", ylim = c(-10, 10))
+# plot(compRS$genMedianlogRS, ylab = "genMedianlogRS", ylim = c(-10, 10))
+# points(
+  # x = rep(1:501, each = 4000),
+  # y = as.vector(t(derived_obj$deripost_full$logRS_pred)),
+  # col = rgb(0, 0, 0, alpha = 0.02),  # transparent black
+  # pch = 16,
+  # cex = 0.3
+# )
 # plot(priorlogRS, ylab = "priorlogRS", ylim = c(-4, 4)) 
 # Coming from original tmb obj$ no sampling, no nlminb
 
 # Tor: this would make it seem like the model is not working great in terms
   # of generating observations from the Ricker model. It is more restricted
   # than the observed data.
+
+
+# Liermann Residuals Plot -- TO BE MOVED to _Plots.R
+
+# For the relationship between capacity and watershed size,
+# the posterior distributions of the k values 
+	# logSREP_re # posterior distribution
+	# derived_obj$deripost_full$logSREP_re - dim(10000, 25)
+	# therefore 10,000 iters per STOCK
+	# Therefore create a df such that for 10,0000 rows there is stock, and associated WAbase$logWAshifted
+	# Then plot iters of posterior against WA - which will create 25 base line whisker plots
+	# Provided WA is numeric - will be ascending
+savelogSREP_re <- as.data.frame(derived_obj$deripost_full$logSREP_re) # dim 10000 25 (per stock)
+savelogSREP_sd <- as.data.frame(derived_obj$deripost_full$logSREP_sd) # dim 10000 1 (single)
+
+saveresiduals <- as.data.frame(derived_obj$deripost_full$logSREP_re * derived_obj$deripost_full$logSREP_sd[,1])
+
+dflogSREP_re <- savelogSREP_re %>%
+  mutate(iteration = row_number()) %>%
+  pivot_longer(
+    cols = starts_with("V"),
+	names_prefix = "V", 	
+    names_to = "chain",
+    values_to = "value"
+  ) %>% 
+  mutate(chain = as.numeric(chain))
+  
+dfresiduals <- saveresiduals %>%
+  mutate(iteration = row_number()) %>%
+  pivot_longer(
+    cols = starts_with("V"),
+	names_prefix = "V", 	
+    names_to = "chain",
+    values_to = "value"
+  ) %>% 
+  mutate(chain = as.numeric(chain))
+
+inter <- WAbase %>%
+  mutate(chain = row_number())  # give it a chain number 1:25
+
+dflogSREP_re <- dflogSREP_re %>%
+  left_join(inter, by = "chain")
+  
+dfresiduals <- dfresiduals %>%
+  left_join(inter, by = "chain")
+
+# plot(df_long$logWAshifted, df_long$value)
+# were plotted against watershed size and latitude
+	# against log-centered WA
+	# latitude not available
+# to investigate potential patterns as in a standard regression (i.e. patterns in the mean or variance of
+# the residuals).
+
+# DO MEDIAN
+res1 <- ggplot(data = dflogSREP_re, aes(x = logWAshifted, y = value)) + 
+	geom_point(alpha = 0.1) + 
+	theme_classic() + 
+	labs(y = "Residual of WA Relationship", x = "Log Centered WA")
+	
+res2 <- ggplot(data = dflogSREP_re, aes(x = Latitude, y = value)) + 
+	geom_point(alpha = 0.1) + 
+	theme_classic() + 
+	labs(y = "Residual of WA Relationship", x = "Latitude")
+
+grid.arrange(res1, res2, nrow = 1)
+
+# ggplot(data = dfresiduals, aes(x = logWAshifted, y = value)) + 
+	# geom_point(alpha = 0.5) + 
+	# labs(y = "Raw Residual of WA Relationship", x = "Log Centered WA")
+
+
+
+# The residuals from the spawner-recruit relationship (the Ricker model) 
+	# tauobs - watch transform out of precision?
+	# or residuals of logRS? calculated manually?
+		# e.g. observed logRS - posterior
+residlogRS <- matrix(0, nrow = 10000, ncol = 501)
+for (i in 1:501){
+	residlogRS[,i] <- dat$logRS[i] - derived_obj$deripost_full$logRS_pred[,i]
+}
+
+df_residlogRS <- as.data.frame(residlogRS)
+
+dfresidlogRS <- df_residlogRS %>%
+  mutate(iteration = row_number()) %>%
+  pivot_longer(
+    cols = starts_with("V"),
+	names_prefix = "V", 	
+    names_to = "chain",
+    values_to = "value"
+  ) %>% 
+  mutate(chain = as.numeric(chain))
+  
+# dfresidlogRSmedian <- as.data.frame(df_residlogRSmedian) %>%
+  # mutate(iteration = row_number()) %>%
+  # pivot_longer(
+    # cols = starts_with("V"),
+    # names_prefix = "V",
+    # names_to = "chain",
+    # values_to = "value"
+  # ) %>%
+  # mutate(chain = as.numeric(chain))
+  
+# dfresidlogRSmedian <- as.data.frame(df_residlogRSmedian) %>% # NOW A MEDIAN PER STOCK
+  # make sure it's a tibble so rownames are easier to work with
+  # rownames_to_column(var = "chain") %>%
+  # rename(value = 2) %>%
+  # mutate(
+    # strip "V" prefix and convert to number
+    # chain = as.numeric(sub("^V", "", chain)),
+    # iteration = 1
+  # ) %>%
+  # select(iteration, chain, value)
+  
+# were plotted against year and spawners.
+	# By year or observation
+	# logRS is by observation
+# connect to dat$srdat? In order to plot by year?
+tempnumbersrdat <- dat$srdat %>%
+  mutate(chain = row_number())
+residplot <- dfresidlogRS %>%
+  left_join(tempnumbersrdat, by = "chain")
+
+residplot_median <- residplot %>%
+  group_by(Name, chain, Stocknumber, Yr, Sp, Rec, Stream, yr_num, Comments, lh) %>%
+  summarise(median_value = median(value), .groups = "drop")
+
+# dfresidlogRSmedian <- dfresidlogRSmedian %>%
+	# left_join(tempnumbersrdat, by = "chain")
+ 
+# RE-ARRANGE BY Stock
+# .........................................................
+# individual plot per stock - BY YEAR
+# ggplot(data = residplot, aes(x = Yr, y = value)) + 
+	# geom_point(alpha = 0.5) + 
+	# theme_classic() + 
+	# labs(x = "Observation Year", y = "Residual of logRS")
+	
+# individual plot per stock - BY SPAWNER
+# ggplot(data = residplot, aes(x = Sp, y = value)) + 
+	# geom_point(alpha = 0.5) + 
+	# theme_classic() + 
+	# labs(x = "Observation Year", y = "Residual of logRS")
+	
+# plot_listSp = list()
+# for (i in 1:25) {
+	# plot_listSp[[i]] <- ggplot(data = residplot[residplot$Stocknumber == i - 1,], aes(x = Sp, y = value)) + 
+		# geom_point(alpha = 0.1) + 
+		# theme_classic() + 
+		# ggtitle(unique(residplot$Name[residplot$Stocknumber == i - 1])) + 
+		# labs(x = "Raw Observed Spawners", y = "Residual of logRS")
+# }
+
+# grid.arrange(grobs = plot_listSp, nrow = 5) # for a 5 x 5 grid of 25 synoptic stocks
+
+plot_listSp = list()
+for (i in 1:25) {
+	plot_listSp[[i]] <- ggplot(data = residplot_median[residplot_median$Stocknumber == i - 1,], aes(x = Sp, y = median_value)) + 
+		geom_point(alpha = 0.5) + 
+		theme_classic() + 
+		ggtitle(unique(residplot_median$Name[residplot_median$Stocknumber == i - 1])) + 
+		labs(x = "Raw Observed Spawners", y = "Residual of logRS")
+}
+
+grid.arrange(grobs = plot_listSp, nrow = 5) # for a 5 x 5 grid of 25 synoptic stocks
+
+# plot_listYr = list()
+# for (i in 1:25) {
+	# plot_listYr[[i]] <- ggplot(data = residplot[residplot$Stocknumber == i - 1,], aes(x = Yr, y = value)) + 
+		# geom_point(alpha = 0.1) + 
+		# theme_classic() + 
+		# ggtitle(unique(residplot$Name[residplot$Stocknumber == i - 1])) + 
+		# labs(x = "Year", y = "Residual of logRS")
+# }
+
+# grid.arrange(grobs = plot_listYr, nrow = 5) # for a 5 x 5 grid of 25 synoptic stocks
+
+plot_listYr = list()
+for (i in 1:25) {
+	plot_listYr[[i]] <- ggplot(data = residplot_median[residplot_median$Stocknumber == i - 1,], aes(x = Yr, y = median_value)) + 
+		geom_point(alpha = 0.5) + 
+		theme_classic() + 
+		ggtitle(unique(residplot_median$Name[residplot_median$Stocknumber == i - 1])) + 
+		labs(x = "Observation Year", y = "Residual of logRS")
+}
+
+grid.arrange(grobs = plot_listYr, nrow = 5) # for a 5 x 5 grid of 25 synoptic stocks
+
+# ALTERNATIVES 
+# ggplot(residplot, aes(x = Sp, y = value)) +
+  # geom_point(alpha = 0.1) +
+  # theme_classic() +
+  # facet_wrap(~ Name, nrow = 5, scales = "free") +
+  # labs(x = "Raw Observed Spawners", y = "Residual of logRS")
+
+# library(ggpointdensity)
+# ggplot(residplot, aes(x = Sp, y = value)) +
+  # geom_pointdensity() +
+  # scale_color_viridis_c() +
+  # theme_classic() +
+  # facet_wrap(~ Name, nrow = 5) +
+  # labs(x = "Raw Observed Spawners", y = "Residual of logRS")
+
+
+
+# ACF PLOT PER STOCK OF Residuals
+# EXAMPLE line: acf(residplot$value[residplot$Name == 'Harrison'])
+
+	# median of posterior - and then subtract to calculate the residual
+	# calculate residual for each of 25 stocks
+
+par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
+
+for (i in 1:25) {
+	acf(residplot_median$median_value[residplot$Stocknumber == i - 1])  
+}
+
+mtext("Lag", side = 1, line = 1, outer = TRUE, cex = 1.3)
+mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
+
+
+# Option 2: Residual from posterior median prediction
+# Calculate median prediction across iterations for each observation
+median_logRS_pred <- apply(derived_obj$deripost_full$logRS_pred, 2, median)
+
+# Calculate residuals
+residlogRS_opt2 <- dat$logRS - median_logRS_pred
+
+# Create dataframe matching your structure - ASSUMING ORDER HASN'T CHANGED
+residplot_median_opt2 <- dat$srdat %>%
+  mutate(
+    chain = row_number(),
+    median_value = residlogRS_opt2
+  )
+
+# Plot ACF per stock (matching your current code)
+par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
+for (i in 1:25) {
+  acf(residplot_median_opt2$median_value[residplot_median_opt2$Stocknumber == i - 1])  
+}
+mtext("Lag", side = 1, line = 1, outer = TRUE, cex = 1.3)
+mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
+
