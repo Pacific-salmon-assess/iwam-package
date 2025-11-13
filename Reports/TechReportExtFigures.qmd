@@ -75,9 +75,6 @@ load(here::here("R/fitstan.RData"))
 mcmc_chains <- As.mcmc.list(fitstan)
 derived_obj_prioronly <- get(load(here::here("R/derived_obj_prioronly.RData")))
 derived_obj <- get(load(here::here("R/derived_obj.RData")))
-
-# fitstan_prioronly <- load(here::here("R/fitstan_prioronly.RData"))
-# derived_obj_prioronly <- get(load(here::here("R/derived_obj_prioronly.RData")))
 ```
 
 ```{r data, echo = FALSE}
@@ -127,7 +124,7 @@ dat <- list(srdat = srdat,
             WAbase = WAbase,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), 
-                          max(WAbase$logWAshifted), 0.1), # Not added to NLL
+                          max(WAbase$logWAshifted), 0.1), 
 			mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 1) # 0-run with data, 1-prior prediction mode
@@ -288,7 +285,7 @@ f_srep <- function(par){
     if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] + biaslogAlpha 
     else logAlpha_tar[i] <- logAlpha0 + biaslogAlpha
 
-    logSREP_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP logSREP_sd^2/2
+    logSREP_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP
     SREP_tar[i] <- exp(logSREP_tar[i])
     
     # Predict BETA
@@ -356,10 +353,6 @@ f_srep <- function(par){
 ## 1. Model Parameter Trace Plots
 
 ```{r trace plot, echo = FALSE, results='asis', fig.width=6, fig.height=3}
-#| code-fold: true
-#| code-summary: "Show the code"
-
-
 # Convert to draws array if not already
 draws <- as_draws_array(fitstan)
 
@@ -390,7 +383,6 @@ for (gname in names(groups)) {
     cat("<br><br>\n")
   }
   
-  # Close collapsible section
   cat("</details>\n\n")
 }
 ```
@@ -398,10 +390,6 @@ for (gname in names(groups)) {
 ## 2. Model Parameter Autocorrelation Plots
 
 ```{r acf plot, echo = FALSE, results = 'asis', fig.width=6, fig.height=3}
-#| code-fold: true
-#| code-summary: "Show the code"
-
-
 # Loop through groups and build HTML structure safely
 for (gname in names(groups)) {
 
@@ -427,9 +415,6 @@ for (gname in names(groups)) {
 ## 3. Model Parameter Pairs Plots
 
 ```{r pairs plot, echo = FALSE, results = 'asis', warning = FALSE, error = FALSE}
-#| code-fold: true
-#| code-summary: "Show the code"
-
 cat("<details><summary><strong>Show figure: Pairs Plots</strong></summary>\n")
 
 pairs_pars <- c("b0", "bWA", "logAlpha0") # "logAlpha_sd" "logSREP_sd"
@@ -444,10 +429,6 @@ cat("</details>\n\n")
 ### Geweke Statistics
 
 ```{r geweke table, results = 'asis', echo = FALSE, warning = FALSE, message = FALSE}
-#| code-fold: true
-#| code-summary: "Show the code"
-
-
 geweke_results <- geweke.diag(mcmc_chains)
 
 # Table (4 - 1 per chain)
@@ -512,7 +493,6 @@ cat("</details>\n\n")
 
 ```{r heidel prep, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 heidel_results <- heidel.diag(mcmc_chains)
-# print(heidel_results)
 
 htable1 <- as.data.frame(heidel_results[[1]][,])
 htable2 <- as.data.frame(heidel_results[[2]][,])
@@ -525,8 +505,6 @@ htable4 <- as.data.frame(heidel_results[[4]][,])
 cat("<details><summary><strong>Show Chain 1</strong></summary>\n")
 kable(htable1, digits = 3)
 cat("</details>\n\n")
-
-# heidel_results[[1]][,] # produces the raw output of heidel.diag() from coda
 ```
 
 ```{r heidel table2, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
@@ -534,8 +512,6 @@ cat("</details>\n\n")
 cat("<details><summary><strong>Show Chain 2</strong></summary>\n")
 kable(htable2, digits = 3)
 cat("</details>\n\n")
-
-# heidel_results[[1]][,] # produces the raw output of heidel.diag() from coda
 ```
 
 ```{r heidel table3, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
@@ -543,8 +519,6 @@ cat("</details>\n\n")
 cat("<details><summary><strong>Show Chain 3</strong></summary>\n")
 kable(htable3, digits = 3)
 cat("</details>\n\n")
-
-# heidel_results[[1]][,] # produces the raw output of heidel.diag() from coda
 ```
 
 ```{r heidel table4, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
@@ -552,8 +526,6 @@ cat("</details>\n\n")
 cat("<details><summary><strong>Show Chain 4</strong></summary>\n")
 kable(htable4, digits = 3)
 cat("</details>\n\n")
-
-# heidel_results[[1]][,] # produces the raw output of heidel.diag() from coda
 ```
 
 ### Effective Sample Size
@@ -685,7 +657,6 @@ cat("</details>\n\n")
 ```{r residlogSREP prep, echo = FALSE, results = 'asis', message = FALSE, warning = FALSE}
 savelogSREP_re <- as.data.frame(derived_obj$deripost_full$logSREP_re) # dim 10000 25 (per stock)
 # savelogSREP_sd <- as.data.frame(derived_obj$deripost_full$logSREP_sd) # dim 10000 1 (single)
-
 # saveresiduals <- as.data.frame(derived_obj$deripost_full$logSREP_re * derived_obj$deripost_full$logSREP_sd[,1])
 
 dflogSREP_re <- savelogSREP_re %>%
@@ -712,38 +683,19 @@ logSREP_remedians <- dflogSREP_re %>%
   lh = first(lh))
 ```
 
-```{r residpost plot1 RAW, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-# cat("<details><summary><strong>Show figure: Residuals (logSREP_re x logSREP_sd)</strong></summary>\n")
-
-# ggplot(data = dfresiduals, aes(x = logWAshifted, y = value)) + 
-# 	geom_point(alpha = 0.5) + 
-#   theme_classic() + 
-# 	labs(y = "Raw Residual of WA Relationship", x = "Log Centered WA")
-
-# cat("</details>\n\n")
-```
-
-```{r residpost plot2 RAW, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-# cat("<details><summary><strong>Show figure: Residuals (logSREP_re)</strong></summary>\n")
-
-# ggplot(data = dflogSREP_re, aes(x = logWAshifted, y = value)) + 
-# 	geom_point(alpha = 0.5) + 
-#   theme_classic() + 
-# 	labs(y = "Standardized Residual of WA Relationship", x = "Log Centered WA")
-
-# cat("</details>\n\n")
-```
-
 ```{r residplot dual ocean, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 cat("<details><summary><strong>Show figure: Residuals of logSREP_re: Ocean Type</strong></summary>\n")
 
-res1oc <- ggplot(data = dflogSREP_re[dflogSREP_re$lh == 'ocean',], aes(x = logWAshifted, y = value)) + 
+sample_iters <- sample(1:10000, 500)
+sampled_logSREPoc <- dflogSREP_re[dflogSREP_re$lh == 'ocean',] %>% filter(iteration %in% sample_iters)
+
+res1oc <- ggplot(data = sampled_logSREPoc, aes(x = logWAshifted, y = value)) + 
 	geom_point(alpha = 0.1, color = 'skyblue') + 
   geom_point(data = logSREP_remedians[logSREP_remedians$lh == 'ocean',], aes(x = logWAshifted, y = median_value), color = 'black', show.legend = FALSE) + 
 	theme_classic() + 
 	labs(y = "", x = "Log Centered Watershed Area")
 	
-res2oc <- ggplot(data = dflogSREP_re[dflogSREP_re$lh == 'ocean',], aes(x = Latitude, y = value)) + 
+res2oc <- ggplot(data = sampled_logSREPoc, aes(x = Latitude, y = value)) + 
 	geom_point(alpha = 0.1, color = 'skyblue') + 
   geom_point(data = logSREP_remedians[logSREP_remedians$lh == 'ocean',], aes(x = Latitude, y = median_value), color = 'black', show.legend = FALSE) + 
 	theme_classic() + 
@@ -761,13 +713,15 @@ cat("</details>\n\n")
 ```{r residplot dual stream, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 cat("<details><summary><strong>Show figure: Residuals of logSREP_re: Stream Type</strong></summary>\n")
 
-res1st <- ggplot(data = dflogSREP_re[dflogSREP_re$lh == 'stream',], aes(x = logWAshifted, y = value)) + 
+sampled_logSREPst <- dflogSREP_re[dflogSREP_re$lh == 'stream',] %>% filter(iteration %in% sample_iters)
+
+res1st <- ggplot(data = sampled_logSREPst, aes(x = logWAshifted, y = value)) + 
 	geom_point(alpha = 0.1, color = 'forestgreen') + 
   geom_point(data = logSREP_remedians[logSREP_remedians$lh == 'stream',], aes(x = logWAshifted, y = median_value), color = 'black', show.legend = FALSE) + 
 	theme_classic() + 
 	labs(y = "", x = "Log Centered Watershed Area")
 	
-res2st <- ggplot(data = dflogSREP_re[dflogSREP_re$lh == 'stream',], aes(x = Latitude, y = value)) + 
+res2st <- ggplot(data = sampled_logSREPst, aes(x = Latitude, y = value)) + 
 	geom_point(alpha = 0.1, color = 'forestgreen') + 
   geom_point(data = logSREP_remedians[logSREP_remedians$lh == 'stream',], aes(x = Latitude, y = median_value), color = 'black', show.legend = FALSE) + 
 	theme_classic() + 
@@ -870,56 +824,25 @@ grid.arrange(grobs = plot_listSp, nrow = 5, # for a 5 x 5 grid of 25 synoptic st
 cat("</details>\n\n")
 ```
 
-### QQNorm Plot
+### Q-Q Norm Plot of Residuals
 
 ```{r qqnorm residlogRS, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-# cat("<details><summary><strong>Show figure: QQNorm Plot of logRS</strong></summary>\n")
+par(mfrow = c(1,1), mar = c(5.1, 4.1, 4.1, 2.1), mgp = c(3, 1, 0))  # Reset to single plot layout
 
-# qqnorm(residplot$value)
-# # qqline(residplot$value, col = 'red')
-# abline(0,1)
+cat("<details><summary><strong>Show figure: QQNorm Plot of logRS</strong></summary>\n")
 
-# cat("</details>\n\n")
+qqnorm(residplot$value)
+qqline(residplot$value, col = 'red') # QQ norm's expected line:
+  # Fits line through 1st and 3rd quartiles of your data
+abline(0,1, lty = 'dashed') # a 1:1 perfect line
+
+cat("</details>\n\n")
 ```
 
 ## 8. Residual Autocorrelation Plots
 
-```{r resid logSREP_re acf plot, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-# ACF plot for residual: logSREP_re
-
-# resid_mcmc_list <- mcmc.list(lapply(chains_list, as.mcmc))
-# autocorr.plot(resid_mcmc)
-# mcmc_acf(resid_draws, lags = 50)
-
-# drawslogSREP_re <- as_draws_matrix(derived_obj$deripost_full$logSREP_re)
-
-# cat("<details><summary><strong>Show figure: Residuals ACF of Watershed Area Model</strong></summary>\n")
-# bayesplot::mcmc_acf(drawslogSREP_re)
-# cat("</details>\n\n")
-```
-
-```{r resid logRS acf prep, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-# ACF plot for residual: logRS(observed) - logRS_pred
-# Autocorrelation - one plot for each stock --> Autocorrelation of that timeseries
-# Needs to be divided up into folds depending on what stock it is related to?
-
-# Data Extraction:
-# drawslogRS <- as_draws_matrix(residlogRS) OR could use 'residplot'
-```
-
 ```{r resid logRS acf plot, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
-# a 5x5 grid of PER stock plots
-# PER stock - will be one ACF plot for the XXX number of observations for that stock - out of the 501 total
-
 cat("<details><summary><strong>Show figure: Residuals ACF of Spawner-Recruit Relationship</strong></summary>\n")
-
-# par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
-
-# for (i in 1:25) {
-# 	acf(residplot_median$median_value[residplot_median$Stocknumber == i - 1])  
-# }
-# mtext("Lag", side = 1, line = 1, outer = TRUE, cex = 1.3)
-# mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
 
 # Option 2: Residual from posterior median prediction
 # Calculate median prediction across iterations for each observation

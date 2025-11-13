@@ -99,7 +99,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#posterior-distribution-of-logsrep-residuals-against-wa-and-latitude" id="toc-posterior-distribution-of-logsrep-residuals-against-wa-and-latitude" class="nav-link" data-scroll-target="#posterior-distribution-of-logsrep-residuals-against-wa-and-latitude">Posterior Distribution of logSREP residuals against WA and latitude</a></li>
   <li><a href="#residuals-of-posterior-predictive-against-years-and-observed-spawners" id="toc-residuals-of-posterior-predictive-against-years-and-observed-spawners" class="nav-link" data-scroll-target="#residuals-of-posterior-predictive-against-years-and-observed-spawners">Residuals of Posterior Predictive against Years and Observed Spawners</a></li>
-  <li><a href="#qqnorm-plot" id="toc-qqnorm-plot" class="nav-link" data-scroll-target="#qqnorm-plot">QQNorm Plot</a></li>
+  <li><a href="#q-q-norm-plot-of-residuals" id="toc-q-q-norm-plot-of-residuals" class="nav-link" data-scroll-target="#q-q-norm-plot-of-residuals">Q-Q Norm Plot of Residuals</a></li>
   </ul></li>
   <li><a href="#residual-autocorrelation-plots" id="toc-residual-autocorrelation-plots" class="nav-link" data-scroll-target="#residual-autocorrelation-plots">8. Residual Autocorrelation Plots</a></li>
   </ul></li>
@@ -275,7 +275,7 @@ summary {
 <span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(lhdiston) logAlpha_tar[i] <span class="ot">&lt;-</span> logAlpha0 <span class="sc">+</span> logAlpha02<span class="sc">*</span>type_tar[i] <span class="sc">+</span> biaslogAlpha </span>
 <span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span> logAlpha_tar[i] <span class="ot">&lt;-</span> logAlpha0 <span class="sc">+</span> biaslogAlpha</span>
 <span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a>    logSREP_tar[i] <span class="ot">&lt;-</span> b0[<span class="dv">1</span>] <span class="sc">+</span> b0[<span class="dv">2</span>]<span class="sc">*</span>type_tar[i] <span class="sc">+</span> (bWA[<span class="dv">1</span>] <span class="sc">+</span> bWA[<span class="dv">2</span>]<span class="sc">*</span>type_tar[i])<span class="sc">*</span>WAin<span class="sc">$</span>logWAshifted_t[i] <span class="sc">+</span> biaslogSREP logSREP_sd<span class="sc">^</span><span class="dv">2</span><span class="sc">/</span><span class="dv">2</span></span>
+<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a>    logSREP_tar[i] <span class="ot">&lt;-</span> b0[<span class="dv">1</span>] <span class="sc">+</span> b0[<span class="dv">2</span>]<span class="sc">*</span>type_tar[i] <span class="sc">+</span> (bWA[<span class="dv">1</span>] <span class="sc">+</span> bWA[<span class="dv">2</span>]<span class="sc">*</span>type_tar[i])<span class="sc">*</span>WAin<span class="sc">$</span>logWAshifted_t[i] <span class="sc">+</span> biaslogSREP</span>
 <span id="cb1-127"><a href="#cb1-127" aria-hidden="true" tabindex="-1"></a>    SREP_tar[i] <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSREP_tar[i])</span>
 <span id="cb1-128"><a href="#cb1-128" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb1-129"><a href="#cb1-129" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Predict BETA</span></span>
@@ -5728,8 +5728,14 @@ tauobs[25]
 <img src="TechReportExtFigures_files/figure-html/residlogRS%20by%20Sp-1.png" class="img-fluid" width="1152">
 </details>
 </section>
-<section id="qqnorm-plot" class="level3">
-<h3 class="anchored" data-anchor-id="qqnorm-plot">QQNorm Plot</h3>
+<section id="q-q-norm-plot-of-residuals" class="level3">
+<h3 class="anchored" data-anchor-id="q-q-norm-plot-of-residuals">Q-Q Norm Plot of Residuals</h3>
+<details>
+<summary>
+<strong>Show figure: QQNorm Plot of logRS</strong>
+</summary>
+<img src="TechReportExtFigures_files/figure-html/qqnorm%20residlogRS-1.png" class="img-fluid" width="672">
+</details>
 </section>
 </section>
 <section id="residual-autocorrelation-plots" class="level2">
