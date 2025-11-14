@@ -10,11 +10,15 @@ Authors: Carrie Holt, Kendra Holt, Brooke Davis, and Tor Kitching, adapted from 
 
 # Summary
 
+Please find the [model executive summary](https://pacific-salmon-assess.github.io/iwam-package/Execsummary.html) on the IWAM website.
+
 # Documentation
 
-## Wiki Pages
+Please see the project's GitHub homepage [linked here](https://pacific-salmon-assess.github.io/iwam-package/).
 
 ## Installation
+
+The IWAM package is not yet built. Please stay tuned.
 
 ## Worked Examples and Vignettes
 
