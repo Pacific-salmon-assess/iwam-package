@@ -29,7 +29,7 @@ summary {
 
 # Document Introduction
 
-This will instead include a document summary section.
+This will instead include a document summary section, a project summary, and links to other important documentation.
 
 ```{r library, echo = FALSE, message = FALSE, warning = FALSE}
 # Libaries ####
