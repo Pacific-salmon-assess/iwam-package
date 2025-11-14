@@ -6,7 +6,6 @@ format:
         toc-title: Contents
         toc-depth: 3
         toc-expand: 1
-        toc-location: left
         embed-resources: true
 ---
 

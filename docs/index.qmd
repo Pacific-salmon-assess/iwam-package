@@ -1,0 +1,24 @@
+---
+title: "IWAM Package Website"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+---
+
+# Integrated Watershed Area Model (IWAM) Package
+
+Welcome to the IWAM package documentation homepage.
+
+## Documentation
+
+- [Executive Summary](Execsummary.html) - Overview of the IWAM model, key equations, and applications
+- [Extended Figures Section](TechReportExtFigures.qmd) - The Technical Report (Pending Publication) Extended Figures Section
+
+## Repository
+
+Visit the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package) for source code and development.
+
+---
+
+*Last updated: `r format(Sys.Date(), "%B %d, %Y")`*

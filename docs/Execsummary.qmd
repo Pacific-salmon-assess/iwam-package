@@ -1,0 +1,31 @@
+---
+title: "Executive Summary"
+format: 
+  html:
+    toc: true
+    embed-resources: true
+---
+
+# Integrated Watershed Area Model (IWAM) Package Executive Sumary
+
+## Model Objectives
+
+The Integrated Watershed Area Model (IWAM) is designed for [brief description of what your model does - add your text here].
+
+## Model Summary
+
+
+
+## Brief Example
+
+
+
+## Links to be embedded above
+
+[Executive Summary](Execsummary.html) 
+[Extended Figures Section](TechReportExtFigures.qmd)
+[GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package)
+
+---
+
+*Last updated: `r format(Sys.Date(), "%B %d, %Y")`*
