@@ -6,26 +6,22 @@ format:
     embed-resources: true
 ---
 
-# Integrated Watershed Area Model (IWAM) Package Executive Sumary
+# Integrated Watershed Area Model (IWAM)
 
-## Model Objectives
+## Executive Summary
 
-The Integrated Watershed Area Model (IWAM) is designed for [brief description of what your model does - add your text here].
+In summary, the accessible watershed-area model harnesses the relationship between accessible watershed areas for Chinook salmon and the biological quantities, and spawner abundances at replacement, $S_{REP}$ (also called spawner abundances at equilibrium, $S_{EQ}$), to predict those biological quantities where spawner-recruitment time-series are not available, and to further derive the additional benchmark, $S_{GEN}$. While other habitat variables, such as stream length and gradient may better correlate with population abundances, accessible watershed area was chosen because it is relatively easy to calculate over the broad geographic range of populations considered and performed well in predicting biological quantities (Parken et al. 2006). Watershed area was defined as the drainage area contributing to a series of channels and characterized based on their downstream order and confluence (Leopold et al. 1992, Horton 1945, Strahler 1957). Accessibility was defined by the presence and positioning of barriers. Criteria used to define accessible watershed area is subject to ongoing investigations. These habitat-based benchmarks, $S_{GEN}$ and $S_{MSY}$, have been used for the biological assessment of Chinook CUs (DFO 2016, Holt, et al. 2023).
 
-## Model Summary
+-   Ricker equation
 
+-   Example regression model equation
 
+The accessible watershed-area model predicts $S_{REP}$ for WCVI Chinook escapement indicator populations, and then calculates $S_{MSY}$ and $S_{GEN}$ for those populations using values of $S_{REP}$ and independent estimates productivity derived from a life-cycle model for WCVI Chinook. The model was updated from the model of Parken et al. (2006) in two main ways. First, following Liermann et al. (2010), the model was statistically integrated in that the spawner-recruitment relationships for individual populations and the relationship between accessible watershed area and $log_e S_{REP}$ were estimated simultaneously instead of sequentially to allow uncertainties to be propagated from spawner-recruitment analyses to the estimation of benchmarks. Second, following Liermann et al. (2010), we included hierarchical structure in spawner-recruitment analyses accounting for similarities in productivity within ocean-type and stream-type populations within the synoptic time-series (Liermann et al. 2010). Model estimation specification and diagnostics were further updated from those used in Liermann et al. (2010).
 
-## Brief Example
+To fully document IWAM, we are working to publish a Technical Report that will outline each model step, the choices in model selection, and the caveats to the model’s usage. The report will document the estimation of a habitat-based benchmarks derived from accessible watershed areas for Chinook salmon (Parken et al. 2006; Liermann et al. 2010) and further updated in Holt et al (2023). An extended Results Section is available here: [Extended Figures Section](TechReportExtFigures.qmd), as a part of the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package).
 
+-   Regression model example
 
-
-## Links to be embedded above
-
-[Executive Summary](Execsummary.html) 
-[Extended Figures Section](TechReportExtFigures.qmd)
-[GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package)
-
----
+------------------------------------------------------------------------
 
 *Last updated: `r format(Sys.Date(), "%B %d, %Y")`*
