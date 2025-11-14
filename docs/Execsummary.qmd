@@ -14,7 +14,11 @@ In summary, the accessible watershed-area model harnesses the relationship betwe
 
 -   Ricker equation
 
+$R = \alpha Se^{(\alpha(1 - S / S_{REP} )}+w)$, 
+
 -   Example regression model equation
+
+$log⁡(S_{REP}) = b0 + b0_2 * LH + (b_{WA} + (b_{WA_2} × LH )) * WA + log(S_{REP_{RE}})$
 
 The accessible watershed-area model predicts $S_{REP}$ for WCVI Chinook escapement indicator populations, and then calculates $S_{MSY}$ and $S_{GEN}$ for those populations using values of $S_{REP}$ and independent estimates productivity derived from a life-cycle model for WCVI Chinook. The model was updated from the model of Parken et al. (2006) in two main ways. First, following Liermann et al. (2010), the model was statistically integrated in that the spawner-recruitment relationships for individual populations and the relationship between accessible watershed area and $log_e S_{REP}$ were estimated simultaneously instead of sequentially to allow uncertainties to be propagated from spawner-recruitment analyses to the estimation of benchmarks. Second, following Liermann et al. (2010), we included hierarchical structure in spawner-recruitment analyses accounting for similarities in productivity within ocean-type and stream-type populations within the synoptic time-series (Liermann et al. 2010). Model estimation specification and diagnostics were further updated from those used in Liermann et al. (2010).
 
