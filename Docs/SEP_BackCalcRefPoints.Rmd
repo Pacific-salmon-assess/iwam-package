@@ -1,0 +1,316 @@
+---
+title: "SEP_WArefestimates"
+author: "Tor Kitching"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r libraries, include=FALSE, echo=FALSE, message=FALSE}
+# library(rsample)
+# library(cowplot)
+# library(gridExtra)
+# library(reshape2)
+# # library(TMB) # Originally coded in TMB - not in RTMB, see below depend.
+# library(zoo)
+# library(viridis)
+# library(hrbrthemes)
+# library(gsl)
+library(knitr) # --> kable
+# library(plotly)
+# library(geomtextpath)
+
+library(RTMB)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(progress)
+# library(tidybayes) # Only if using bayesian estimates
+# library(tmbstan) # Only if using bayesian estimates
+```
+
+```{r source files, include=FALSE, echo=FALSE, message=FALSE}
+source (here::here("R/helperFunctions.R"))
+source(here::here("R/PlotFunctions.R"))
+# source(here::here("R/IWAM_model.R"))
+source(here::here("R/IWAMsmax_RTMB_model.R"))
+source(here::here("R/IWAMsrep_RTMB_model.R"))
+```
+
+``` {r sizing options, include=FALSE}
+options(scipen=999) # This stops scientific notation - this is for the tables
+# opts_chunk$set(out.width='750px', dpi=200)
+```
+
+<!--TK: The Lambert W function is now within the IWAMsmax_RTMB_model code itself. All usage of LW should be contained.-->
+
+## Check for Back-Calculated Watershed Areas
+
+The purpose of this document is to provide stock-assessment reference points to the SEP team for back-calculated watershed areas. All code will be drawn from the IWAM function vignette. The following document is originally sourced from "backcalculation_test.RMD" within the IWAM repository. A new version has been made to reflect major updates to the model languages used.
+
+## S1. Data Map
+
+The following function vignette/example is from the IWAM Package Repo hosted publicly through the Pacific Salmon Assess organization available at [this link.](https://github.com/Pacific-salmon-assess/iwam-package)
+
+The package currently utilizes the following data sets:
+
+-   *SRinputfile (Private)*: Private data-sets developed by Parken et al. (2006). Required to run the complete function and is available upon request. To be updated with publicly available data. Life histories are included: 1 = ocean type, 0 = stream type. Contains stock names, year, spawners, recruits, and life history identification. 
+-   *WatershedArea (Public)*: Internal input containing watershed areas per stock.
+-   *CUPars_nBC (Public)*: Input file with Ricker $\alpha$'s without bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *CUPars_wBC (Public)*: Input file with Ricker $\alpha$'s with bias correction (CITATION) from Diana Dobson's Run Reconstruction coded in TMB. Has a higher estimate of Ricker $\alpha$ (lower Sgen).
+-   *Backcalc_targetstocks (Public)*: Back-calculated user watershed area input file. Watershed areas calculated based on Parken estimates of SMSY and SREP. All aggregate information; CU, and Inlet, have been removed. PLEASE NOTE: All WCVI stocks use watershed areas with input from WCVI Staff: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River. PLEASE NOTE: duplicate stock/river names are no acceptable for example in the case of Seymour river - please specify their difference - Georgia Strait vs. South Thompson origins in the river name itself. Duplicate river names will result in a invalid object lengths error when running the IWAM function.
+
+## S2. Models
+
+### S2.a $S_{MAX}$ Model Run
+
+All setup is internal to the IWAM function.
+
+``` {r iwam smax rtmb function, echo=TRUE, warning=FALSE}
+IWAM_smax <- IWAMsmax_rtmb(WAin = c("DataIn/Ordered_backcalculated_noagg.csv"), # Data (INPUT)
+                       remove.EnhStocks = FALSE, # Remove Enhancement stocks (INPUT) - DEFAULT
+                       run.bootstrap = TRUE, # TRUE/FALSE for running the bootstrap process - DEFAULT
+                       bs_seed = 1, # Change the internal seed for the bootstrap (INPUT) - DEFAULT
+                       bs_nBS = 10, # Change the internal number of trials for the bootstrap (INPUT) - DEFAULT
+                       # Run 10 for testing purposes - otherwise 20000
+                       plot = FALSE # Print plots to DataOut/
+)
+```
+
+### S2.b $S_{REP}$ Model Run
+
+All setup is internal to the IWAM function.
+
+``` {r iwam srep rtmb function, echo=TRUE, warning=FALSE}
+IWAM_srep <- IWAMsrep_rtmb(WAin = c("DataIn/Ordered_backcalculated_noagg.csv"), # Data (INPUT)
+                           nsim = 10
+)
+```
+
+## S3. Tables
+
+This code is a direct lift from the IWAM function vignette. Once the model and bootstrapping has completed, the function will store the following objects:
+
+- ```dfout```: A complete data frame containing the SGEN, SREP, and SMSY estimates for each stock and their upper and lower quantiles.
+
+The following tables (1-3) have been prepared for comparison to Holt et al. (2023) Res Doc (Table 9). The table will also be stored in your repository folder under the name of "Backcalculation_stockestimates_table.csv".
+
+
+
+### S3.a IWAM Smax Reference Points Table
+
+```{r prep iwam table, echo=FALSE, message=FALSE}
+SREP <- IWAM_smax[[3]] %>%
+  filter(RP=='SREP') %>%
+  rename('Lower Quantile'=lwr, 'SREP'=Value, 'Upper Quantile'=upr) %>%
+  mutate(RP = NULL) %>%
+  relocate(Stock)
+SMSY <- IWAM_smax[[3]] %>%
+  filter(RP=='SMSY') %>%
+  rename('Lower Quantile'=lwr, 'SMSY'=Value, 'Upper Quantile'=upr) %>%
+  mutate(RP = NULL) %>%
+  relocate(Stock)
+SGEN <- IWAM_smax[[3]] %>%
+  filter(RP=='SGEN') %>%
+  rename('Lower Quantile'=lwr, 'SGEN'=Value, 'Upper Quantile'=upr) %>%
+  mutate(RP = NULL) %>%
+  relocate(Stock)
+
+# WAin <- read.csv(here::here("DataIn/Backcalc_targetstocks_NoAgg.csv")) %>%
+WAin <- read.csv(here::here("DataIn/Ordered_backcalculated_noagg.csv")) %>%
+  # filter(Stock != "Cypre") %>% # remove Cypre - see Get_LRP_bs.R
+  mutate(WA = round(WA,0))
+```
+
+*Table 1. IWAM: SGEN, SREP, and SMSY estimates including 0.25% and 97.5% quantiles for all listed stocks. Watershed areas are back-calculated from Parken estimates with the exception of all WCVI stocks, which use original watershed areas: Nahmint, Sarita, Somass, Bedwell/Ursus, Cypre, Megin, Moyeha, Tranquil, Artlish, Kaouk, Tahsish, Nitinat, Burman, Conuma, Gold, Leiner, Tahsis, Zeballos, Cayeghle, Marble, San Juan,	Canton Creek, Espinosa, Kauwinch River, Kleeptee, Little Zeballos River, Malksope River, McKay Cove Creek, Mooyah River, Ououkinsh River, Sucwoa River, Tlupana River, Tsowwin River.*
+``` {r smax table, echo=FALSE, message=FALSE}
+complete <- data.frame(SGEN, SREP, SMSY) %>%
+  # confirm that all stocks line-up
+  select(-Stock.1, -Stock.2) %>%
+  rename("SGEN LQ" = Lower.Quantile, "SGEN UQ" = Upper.Quantile, "SREP LQ" = Lower.Quantile.1, "SREP UQ" = Upper.Quantile.1,
+         "SMSY LQ" = Lower.Quantile.2, "SMSY UQ" = Upper.Quantile.2)
+
+complete <- complete %>% left_join(WAin, by=join_by(Stock)) %>%
+  select(-lh, -CU_INDEX, -PA_SMSY, -PA_SE_SMSY, -PA_SREP, -PA_SE_SREP, -Comments)  %>% # remove life histories ID's
+  relocate(WA, .after=Stock) %>%
+  mutate_at(vars(SGEN, "SGEN LQ", "SGEN UQ", SMSY, "SMSY UQ", "SMSY LQ"), round, 0)
+  # rename("LH" = type)
+  # arrange(Stock)
+
+kable(complete, caption = "IWAM Smax Model: SGEN, SREP, and SMSY Estimates for All Stocks",
+      format.args = list(big.mark = ","))
+```
+
+### S3.b IWAM Srep Reference Points Table
+
+*Table 2. IWAM Srep Model: SGEN, SREP, and SMSY estimates including quantiles for all listed stocks. (See above Table 1 description.*
+```{r srep table, echo=FALSE, message=FALSE}
+tdf_srep <- IWAM_srep$refpoints
+
+table_srep <- tdf_srep %>% 
+  select(Stock, WA, lh, 
+         SGEN.Median, SGEN.LQ, SGEN.UQ, 
+         E_tar, E_LQ, E_UQ, 
+         SMSY.Median, SMSY.LQ, SMSY.UQ,) %>% 
+  mutate_at(vars(WA, SGEN.Median, SGEN.UQ, SGEN.LQ, SMSY.Median, SMSY.UQ, SMSY.LQ, E_tar, E_LQ, E_UQ), round, 0) %>%  # rounding
+  rename("LH" = lh, "SREP" = E_tar, "SREP UQ" = E_UQ, "SREP LQ" = E_LQ,
+         "SGEN" = SGEN.Median, "SGEN UQ" = SGEN.UQ, "SGEN LQ" = SGEN.LQ,
+         "SMSY" = SMSY.Median, "SMSY UQ" = SMSY.UQ, "SMSY LQ" = SMSY.LQ)
+
+# get rid of rownames
+rownames(table_srep) <- NULL
+
+kable(table_srep, caption = "IWAM Smax Model: SGEN, SREP, and SMSY Estimates",
+      format.args = list(big.mark = ","))
+  # Can you add SMAX?
+```
+
+
+``` {r Table output, echo=FALSE, message=FALSE}
+# output the above kable table into a csv in DataOut
+table_write <- left_join(x = table_srep, y = complete, by = c("Stock", "WA"),
+                         suffix = c(".SREP", ".SMAX"))
+
+write.csv(table_write, here::here("DataOut/Backcalculation_stockestimates_table.csv"))
+```
+
+## S4. Comparative Plotting
+
+The objective of this section is to provide comparison figures between the IWAM function's estimates of SMSY and SREP to the Parken model estimates. The following plots have been limited to a maximum Smsy and Srep value of 25,000 in order to match those of the technical working group presentations. 
+
+```{r figure setup, echo=FALSE, message=FALSE}
+# load in iwam_model estimates for SREP and SMSY as two separate objects
+# SMSY and SGEN already loaded
+
+# Add Parken estimates (coming from WAin)
+Parken_eval <- data.frame(SGEN, SREP, SMSY) %>% 
+  # confirm that all stocks line-up
+  select(-Stock.1, -Stock.2) %>% 
+  rename("SGEN LQ" = Lower.Quantile, "SGEN UQ" = Upper.Quantile, "SREP LQ" = Lower.Quantile.1, "SREP UQ" = Upper.Quantile.1, 
+         "SMSY LQ" = Lower.Quantile.2, "SMSY UQ" = Upper.Quantile.2)
+
+Parken_eval <- Parken_eval %>% left_join(WAin, by=join_by(Stock))
+
+eval_data <- Parken_eval %>% 
+  mutate(PA_UL_SMSY = PA_SMSY + (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_LL_SMSY = PA_SMSY - (1.96 * PA_SE_SMSY)) %>% 
+  mutate(PA_UL_SREP = PA_SREP + (1.96 * PA_SE_SREP)) %>% 
+  mutate(PA_LL_SREP = PA_SREP - (1.96 * PA_SE_SREP))
+```
+
+### S4.a Stockwise
+
+``` {r Parken stockwise SMSY, echo=FALSE, message=FALSE, fig.align = 'centre', fig.width = 16, fig.height = 9}
+# out.width="100%"
+SMSY_pl <- ggplot(eval_data, aes(x=Stock, y = SMSY)) +
+  geom_errorbar(aes(ymax = `SMSY UQ`, ymin = `SMSY LQ`), 
+                width = 0.2, 
+                color='red', 
+                position = position_nudge(0.3)) +
+  geom_point(color = 'red', position = position_nudge(0.3)) +
+  theme_classic() + 
+  ylab("SMSY Estimate") + 
+  xlab("") +
+  coord_cartesian(ylim = c(0,25000)) + # this is completely subjective based on what you want to see
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1))
+
+SMSY_parken <- SMSY_pl + 
+  geom_point(eval_data, mapping = aes(x = Stock, y = PA_SMSY), 
+             position = position_nudge(-0.3)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_SMSY + (1.96 * PA_SE_SMSY) , ymin = PA_SMSY - (1.96 * PA_SE_SMSY)), 
+                width = 0.2,                     
+                position = position_nudge(-0.3), 
+                inherit.aes = FALSE) 
+
+# SMSY_parken 
+
+final_SMSY <- SMSY_parken +
+  geom_point(data = table_srep, mapping = aes(x = Stock, y = SMSY),
+             color = 'blue') + 
+  geom_errorbar(data = table_srep, aes(x = Stock, ymax = `SMSY UQ`, ymin = `SMSY LQ`), 
+                width = 0.2,                     
+                inherit.aes = FALSE,
+             color = 'blue') 
+
+final_SMSY
+```
+
+``` {r Parken stockwise SREP, echo=FALSE, message=FALSE, fig.align = 'centre', fig.width = 16, fig.height = 9}
+# out.width="100%"
+SREP_pl <- ggplot(eval_data, aes(x=Stock, y = SREP)) +
+  geom_errorbar(aes(ymax = `SREP UQ`, ymin = `SREP LQ`), 
+                width = 0.2, 
+                color='red', 
+                position = position_nudge(0.3)) +
+  geom_point(color = 'red', position = position_nudge(0.3)) +
+  theme_classic() + 
+  ylab("SREP Estimate") + 
+  xlab("") +
+  coord_cartesian(ylim = c(0,25000)) + # this is completely subjective based on what you want to see
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3, hjust = 1))
+
+# SREP_pl
+
+SREP_parken <- SREP_pl + 
+  geom_point(eval_data, mapping = aes(x = Stock, y = PA_SREP), 
+             position = position_nudge(-0.3)) + 
+  geom_errorbar(aes(x = Stock, ymax = PA_SREP + (1.96 * PA_SE_SREP) , ymin = PA_SREP - (1.96 * PA_SE_SREP)), 
+                width = 0.2,                     
+                position = position_nudge(-0.3), 
+                inherit.aes = FALSE) 
+ 
+# SREP_parken
+
+final_SREP <- SREP_parken + 
+  geom_point(data = table_srep, mapping = aes(x = Stock, y = SREP),
+             color = 'blue') + 
+  geom_errorbar(data = table_srep, aes(x = Stock, ymax = `SREP UQ`, ymin = `SREP LQ`), 
+                width = 0.2,                     
+                inherit.aes = FALSE,
+             color = 'blue') 
+
+final_SREP
+```
+
+```{Parken stockwise SGEN, include=FALSE}
+```
+
+```{r plotly test, include=FALSE, echo=FALSE, message=FALSE}
+# Plotly test for SREP_pl test plot to allow for zooming
+# Example:
+# fig <- plot_ly(data = iris, x = ~Sepal.Length, y = ~Petal.Length, color = ~Species)
+# fig
+
+# ggplotly(SREP_parken)
+
+# SREP_plotly <- plot_ly(data = eval_data, 
+#                    x = ~Stock, 
+#                    y = ~SREP, 
+#                    name = "IWAM Estimate",
+#                    error_y = list(array = ~((`SREP UQ` - SREP)/1.96)),
+#                    type = 'scatter')
+# 
+# # UL = PA_SREP + (1.96 * PA_SE_SREP)
+# # UL - PA_SREP = (1.96 * PA_SE_SREP)
+# # (UL - PA_SREP) / 1.96 = PA_SE_SREP
+# 
+# fig <- SREP_plotly %>% 
+#   add_markers(data = eval_data, 
+#                    x = ~Stock, 
+#                    y = ~PA_SREP, 
+#                    name = "Parken Estimate",
+#                    error_y = list(array=~(PA_SE_SREP)),
+#                    type = 'scatter')
+# 
+# 
+# fig
+```
+
+### S4.b Regression
+
+The point of this plotting exercise is to show where the back-calculated estimates fall in relation to the "training"/synoptic dataset.
+
+``` {r regression example}
+# copy from IWAM_Nimblemodel.RMD - watch transformations
+
+
+```
