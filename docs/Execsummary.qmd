@@ -19,8 +19,10 @@ R = \alpha Se^{(\alpha(1 - S / S_{REP} )}+w)
 $$ {#eq-ricker-fig} 
 
 $$
-log⁡(S_{REP}) = b0 + b0_2 * LH + (b_{WA} + (b_{WA_2} × LH )) * WA + log(S_{REP_{RE}})
+log⁡(S_{REP}) = b0 + b0_2 * LH + (b_{WA} + (b_{WA_2} × LH )) * WA + log(S_{REP})
 $$ {#eq-watershed}
+
+where R is adult recruitment, S is spawner abundances, w are random normal deviations, LH is the life-history strategy (0 for stream type and 1 for ocean type), b0 is the y-intercept for the watershed-area regression with the subscript 2 indicating an offset for the ocean-type life-history, b is the slope of the watershed-area regression, and WA is accessible watershed area.
 
 ![Watershed Area Regression Figure](figure.png)
 
