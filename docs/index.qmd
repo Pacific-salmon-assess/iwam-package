@@ -21,4 +21,8 @@ Visit the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-pack
 
 ---
 
-*Last updated: `r format(Sys.Date(), "%B %d, %Y")`*
+```{r date, echo = FALSE} 
+dateobj <- format(Sys.Date(), "%B %d, %Y")
+```
+
+*Last updated: `r dateobj`*
