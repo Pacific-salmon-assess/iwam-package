@@ -12,17 +12,17 @@ format:
 
 DFO is tasked with identifying biological benchmarks for data-limited populations of Pacific salmon where time-series of spawner abundances and adult recruits are lacking. The accessible watershed-area model can provide these benchmarks by harnessing the relationship between accessible watershed areas for Chinook salmon and the capacity of the system to sustain salmon populations, spawner abundances at replacement, $S_{REP}$ (also called spawner abundances at equilibrium, $S_{EQ}$). By making informed assumptions about productivity values, benchmarks based on $S_{MSY}$ and $S_{GEN}$ can also be derived. While other habitat variables, such as stream length and gradient may better correlate with population abundances, accessible watershed area was chosen because it is relatively easy to calculate over the broad geographic range of populations considered and performed well in predicting biological quantities (Parken et al. 2006). Watershed area was defined as the drainage area contributing to a series of channels and characterized based on their downstream order and confluence (Leopold et al. 1992, Horton 1945, Strahler 1957). Accessibility was defined by the presence and positioning of barriers. Criteria used to define accessible watershed area is subject to ongoing investigations. These habitat-based benchmarks, $S_{GEN}$ and $S_{MSY}$, have been used for the biological assessment of Chinook CUs (DFO 2016, Holt, et al. 2023).  Future work can consider models that include additional watershed covarites to predict habitat capacity of Chinook.
 
-Here we follow the model formulation described in Liermann et al. (2010), where Ricker spawner-recruit model was fit hierarchically to a set of 25 populations across the NE Pacific where time-series of spawner and recruits were available, with the assumptions of shared information on productivity ($\alpha$) across populations, and $S_{REP}$ informed by a linear regression on accessible watershed area across populations.
+Here we follow the model formulation described in Liermann et al. (2010), where Ricker spawner-recruit model (@eq-ricker-fig) was fit hierarchically to a set of 25 populations across the NE Pacific where time-series of spawner and recruits were available, with the assumptions of shared information on productivity ($\alpha$) across populations, and $S_{REP}$ informed by a linear regression on accessible watershed area across populations (@eq-watershed).
 
--   Ricker equation
+$$
+R = \alpha Se^{(\alpha(1 - S / S_{REP} )}+w)
+$$ {#eq-ricker-fig} 
 
-$R = \alpha Se^{(\alpha(1 - S / S_{REP} )}+w)$, 
+$$
+log⁡(S_{REP}) = b0 + b0_2 * LH + (b_{WA} + (b_{WA_2} × LH )) * WA + log(S_{REP_{RE}})
+$$ {#eq-watershed}
 
--   Example regression model equation
-
-$log⁡(S_{REP}) = b0 + b0_2 * LH + (b_{WA} + (b_{WA_2} × LH )) * WA + log(S_{REP_{RE}})$
-
-<!-- CH comment: suggestion to include WA-regression plot that you gave Brendan-->
+![Watershed Area Regression Figure](figure.png)
 
 For data-limited populations without spawner-recruitment time-series, the accessible watershed-area model can be used to predict $S_{REP}$ (e.g., for WCVI Chinook escapement indicator populations). Then, $S_{MSY}$ and $S_{GEN}$ can be calculated using predictions of $S_{REP}$ and independent estimates productivity (e.g,. derived from a life-cycle model for WCVI Chinook). 
 
@@ -30,13 +30,20 @@ The model was updated from the model of Parken et al. (2006) in two main ways. F
 
 Further, the model has been updated from a previous version from Holt et al. (2023) and documented in Brown et al. (in press) by implementing in a fully Bayesian framework with updated priors consistent with Liermann et al. (2010). This update avoids the inclusion of implausible likelihood penalties that were required for model convergence within TMB. 
 
-To fully document IWAM, we are working to publish a Technical Report that will outline each model step, the choices in model selection, and the caveats to the model’s usage. The report will document the estimation of a habitat-based benchmarks derived from accessible watershed areas for Chinook salmon (Parken et al. 2006; Liermann et al. 2010) and further updated in Holt et al (2023), with a comparison of results. An extended Results Section is available here: [Extended Figures Section](TechReportExtFigures.qmd), as a part of the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package).
+To fully document IWAM, we are working to publish a Technical Report that will outline each model step, the choices in model selection, and the caveats to the model’s usage. The report will document the estimation of a habitat-based benchmarks derived from accessible watershed areas for Chinook salmon (Parken et al. 2006; Liermann et al. 2010) and further updated in Holt et al. (2023), with a comparison of results. An extended Results Section is available here: [Extended Figures Section](TechReportExtFigures.qmd), as a part of the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package).
 
--   Regression model example
-<!-- CH comment: Not sure what the regression model example is? If its the plot of the WA regression, yes do include, though I suggest including it after the equations-->
+## References
 
-<!-- CH comment: please include a reference section-->
+Holt, K.R., Holt, C.A., Warkentin, L., Wor, C., Davis, B., Arbeider, M., Bokvist, J., Crowley, S., Grant, S., Luedke, W., McHugh, D., Picco, C., and Van Will, P. 2023. Case study applications of LRP estimation methods to Pacific salmon stock management units. DFO Can. Sci. Advis. Sec. Res. Doc. 2023/010.
+https://www.dfo-mpo.gc.ca/csas-sccs/Publications/ResDocs-DocRech/2023/2023_010-eng.html
+
+Liermann, M.C., Sharma, R., and Parken, C.K. 2010. Using accessible watershed size to predict management parameters for Chinook salmon, Oncorhynchus tshawytscha, populations with little or no spawner-recruit data: a Bayesian hierarchical modelling approach. Fish. Manag. Ecol. 17(1): 40–51. doi:10.1111/j.1365-2400.2009.00719.x.
+
+Parken, C.K., McNicol, R.E., and Irvine, J.R. 2006. Habitat-based methods to estimate escapement goals for Chinook salmon in British Columbia, 2004. DFO Can. Sci. Advis. Sec. Res. Doc. 2006/083.
 
 ------------------------------------------------------------------------
+```{r date, echo = FALSE} 
+dateobj <- format(Sys.Date(), "%B %d, %Y")
+```
 
-*Last updated: `r format(Sys.Date(), "%B %d, %Y")`*
+*Last updated: `r dateobj`*
