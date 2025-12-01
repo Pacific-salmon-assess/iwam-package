@@ -22,7 +22,7 @@ source(here::here("R/helperFunctions.R")) # For bootstrapping
 # save(derived_obj, file = "derived_obj.RData")
 # In script_B.R
 # load(here::here("derived_obj.RData"))
-WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv") 
 WAin <- read.csv(here::here(WAin))
 
 # Bootstrap Posterior to Match Original IWAM Model ####
@@ -32,7 +32,7 @@ WAin <- read.csv(here::here(WAin))
 
     # 1. SETUP
 BS <- TRUE # default for FALSE
-bsiters <- 250000 # New with Brown et al. CSAS runs
+bsiters <- 2500 # New with Brown et al. CSAS runs
 outBench <- list()
 outAlpha <- list()
 # set.seed <- 1
@@ -44,7 +44,7 @@ outAlpha <- list()
 adj <- F # Default T for conditional - FALSE for Marginal medians - FLIPPED ********************************************
 
 MCMC <- TRUE # Default F to use original method, T takes logA from MCMC samples to estimate SGEN FOR PARKEN METHOD **********************
-prod <- c("LifeStageModel") # "LifeStageModel" or "Parken"
+prod <- c("RunReconstruction") # "LifeStageModel" or "Parken" or "RunReconstruction"
 bias.cor <- F # True to add a bias correction term for sREP
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
@@ -85,6 +85,14 @@ set.seed(1) ; if (BS == TRUE) {
       # - Scaling: not in Liermann at all
       # - Bias correction: not in Liermann at all
       # - Creation of the RPs dataframe
+	  
+	# RPs <- stock_SMSY %>% left_join(stock_SREP, by="Stock")
+	inSREP <- derived_obj$deripost_summary$SREP_tar_adj |>
+		mutate(CU = WAin$CU) |>
+		mutate(Inlet = WAin$Inlet) |>
+		mutate(Stock = WAin$Stock) |>
+		# filter (Stock != "Cypre") |>
+		rename(inlets=Inlet)
     
     # 1. LifeStageModel METHOD
       # Could USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
@@ -164,6 +172,75 @@ set.seed(1) ; if (BS == TRUE) {
       # SGENcalcs_e <- purrr::map2_dfr (exp(median(loga_e)), SREP_e, Sgen.fn2) # Explicit
     }
     
+	# 3. RUN RECONSTRUCTION
+    if(prod == "RunReconstruction"){ # Requires Inlet devisions per stocks
+		lnalpha_inlet <- read.csv(here::here("DataIn/CUPars_wBC.csv")) %>% 
+		  select(alpha,stkName) %>% rename(inlets=stkName, lnalpha=alpha)
+		lnalpha_nBC_inlet <- read.csv(here::here("DataIn/CUPars_nBC.csv")) %>% 
+		  select(alpha,stkName) %>% rename(inlets=stkName, lnalpha_nBC=alpha)
+		targetstocks <- read.csv(here::here("DataIn/WCVIStocks.csv")) %>% # Previously WCVIStocks - Changed to: Parken_evalstocks
+		  # filter (Stock != "Cypre") %>%
+		  rename(inlets=Inlet)
+		Ric.A <- lnalpha_inlet %>% left_join(targetstocks, by="inlets") %>% select(c(lnalpha,inlets,CU,Stock))
+		
+		inSREP <- inSREP %>% left_join(Ric.A, by = join_by(Stock, CU, inlets)) %>% mutate(a.RR = exp(lnalpha))
+		inSREP[inSREP$Stock=="Nitinat",]$a.RR <- exp(1)
+		inSREP[inSREP$Stock=="San Juan",]$a.RR <- exp(1)
+		inSREP[inSREP$Stock=="Nitinat",]$a.RR <- exp(1)
+		
+		# Below needs to create a new row for each inlet AS A STOCK and insert a a.RR value
+		
+		## inSREP[inSREP$Stock=="Barkley",]$a.RR <- inSREP[inSREP$inlets=="Barkley",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "Barkley", inlets = "Barkley", a.RR = inSREP[inSREP$inlets=="Barkley",]$a.RR[1])
+		
+		## inSREP[inSREP$Stock=="Clayoquot",]$a.RR <- inSREP[inSREP$inlets=="Clayoquot",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "Clayoquot", inlets = "Clayoquot", a.RR = inSREP[inSREP$inlets=="Clayoquot",]$a.RR[1])
+
+		## inSREP[inSREP$Stock=="Kyuquot",]$a.RR <- inSREP[inSREP$inlets=="Kyuquot",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "Kyuquot", inlets = "Kyuquot", a.RR = inSREP[inSREP$inlets=="Kyuquot",]$a.RR[1])
+
+		## inSREP[inSREP$Stock=="Nootka/Esperanza",]$a.RR <- inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "Nootka/Esperanza", inlets = "Nootka/Esperanza", a.RR = inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1])
+
+		## inSREP[inSREP$Stock=="Quatsino",]$a.RR <- inSREP[inSREP$inlets=="Quatsino",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "Quatsino", inlets = "Quatsino", a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
+
+		## inSREP[inSREP$Stock=="WCVI South",]$a.RR <- inSREP[inSREP$inlets=="Barkley",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "WCVI South", inlets = "Barkley", a.RR = inSREP[inSREP$inlets=="Barkley",]$a.RR[1])
+
+		## inSREP[inSREP$Stock=="WCVI Nootka & Kyuquot",]$a.RR <- inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "WCVI Nootka & Kyuquot", inlets = "Nootka/Esperanza", a.RR = inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1])
+
+		## inSREP[inSREP$Stock=="WCVI North",]$a.RR <- inSREP[inSREP$inlets=="Quatsino",]$a.RR[1]
+		# inSREP <- inSREP |> add_row(Stock = "WCVI North", inlets = "Quatsino", a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
+		
+		inSREP <- inSREP %>% select(-c(inlets, CU, lnalpha)) %>% rename(a.par=a.RR)
+		
+		# When incorporating uncertainty in Ricker A:
+		Sig.Ric.A <- 0.51 #0.255 for a narrower plausible bound
+		# Sig.Ric.A derived from 95% CL of lower and upper plausible limits = 
+		# 0.5 logA - 1.5 logA (Luedke pers. comm. Dec 2020)
+		# See distribution below:
+		# test <- seq(0,4, len=40)
+		# plot(x=test, y=dnorm(test, 1,0.255), type="l", xlab="LogA", 
+		# ylab="Probability Density", ylim=c(0,5))
+		# # With this sigma, 95% of probablity density is within bounds mean 
+		# +/- 0.50 (assuming range 0.5-1.5, mean=1). 0.255*1.96 = 0.50
+		# lines(x=test, y=dnorm(test, 1,0.51))# With this sigma, 95% of probablity 
+		# density is within bounds mean +/- 1.0 
+		# (assuming range 0-2.0, mean=1). 0.510*1.96 = 1.0
+		
+		Ric.A.hi <- exp(rnorm(length(inSREP$Median), log(inSREP$a.par), Sig.Ric.A))
+		if(min(Ric.A.hi)<0) Ric.A <- exp(rnorm(length(inSREP$Median), inSREP$a.RR, Sig.Ric.A))
+		
+		sREP <- exp(rnorm(length(inSREP$Median), log(inSREP$Median), SREP_logSE))
+		if(min(sREP)<0)   sREP <- exp(rnorm(length(inSREP$Median), inSREP$Median, 
+											SREP_SE))
+		
+		SGENcalcs <- purrr::map2_dfr (Ric.A.hi, sREP, Sgen.fn2)
+
+    } 
+	
     setTxtProgressBar(pb, k)
     # Calculate and display elapsed time dynamically
     current_time <- Sys.time()
@@ -179,15 +256,17 @@ set.seed(1) ; if (BS == TRUE) {
     
     # oute <- list(bench = select(SGENcalcs_e, -apar, -bpar))
     # outBenche[[k]] <- oute$bench
-    
+	
     if (prod == "Parken" & MCMC == F) outA <- list(alpha = exp(median(lnalpha_Parkin$loga))) # else
 	if (prod == "Parken" & MCMC ==T) outA <- list(alpha = exp(median(lnalphamc)))
 	
     if (prod == "LifeStageModel") outA <- list(alpha = Ric.A)
+	if (prod == "RunReconstruction") outA <- list(alpha = Ric.A.hi)
     if (prod == "Parken") outAlpha <- outA
     if (prod == "LifeStageModel") outAlpha[[k]] <- outA
-    
-  } # ; stopCluster(cl)
+	if (prod == "RunReconstruction") outAlpha[[k]] <- outA
+	
+	} # ; stopCluster(cl)
   
   close(pb)
   # End timing
@@ -229,7 +308,7 @@ set.seed(1) ; if (BS == TRUE) {
                           lwr=apply(SREP.bs, 1, quantile, 0.025),
                           upr=apply(SREP.bs, 1, quantile, 0.975) )
   
-  if (prod == "LifeStageModel") {
+  if (prod == "LifeStageModel" | prod == "RunReconstruction") {
     APAR.bs <- select(as.data.frame(outAlpha), starts_with("alpha"))
     rownames(APAR.bs) <- stockNames
     APAR.boot <- data.frame(APAR = apply(APAR.bs, 1, quantile, 0.5), 
@@ -239,7 +318,7 @@ set.seed(1) ; if (BS == TRUE) {
   
   boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
                 SREP.boot=SREP.boot) # , APAR.boot=APAR.boot)
-  if (prod == "LifeStageModel") boot$APAR.boot <- APAR.boot
+  if (prod == "LifeStageModel" | prod == "RunReconstruction") boot$APAR.boot <- APAR.boot
   
   df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
   df1 <- df1 %>% rename(Value=SGEN)
@@ -247,14 +326,14 @@ set.seed(1) ; if (BS == TRUE) {
   df2 <- df2 %>% rename(Value=SREP)
   df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
   df3 <- df3 %>% rename(Value=SMSY)
-  if (prod == "LifeStageModel") {
+  if (prod == "LifeStageModel" | prod == "RunReconstruction") {
     df4 <- data.frame(boot[["APAR.boot"]], Stock=rownames(boot[["APAR.boot"]]), RP="APAR")
     df4 <- df4 %>% rename(Value=APAR)
   }
   
   dfout <- add_row(df1, df2)
   dfout <- add_row(dfout, df3)
-  if (prod == "LifeStageModel") dfout <- add_row(dfout, df4)
+  if (prod == "LifeStageModel" | prod == "RunReconstruction") dfout <- add_row(dfout, df4)
   rownames(dfout) <- NULL
   
   # dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits

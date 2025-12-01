@@ -156,9 +156,9 @@ f_srep <- function(par){
   SREP_line_ocean <- numeric(line)
   
   if (bias.cor) {
-	biaslogSREP <- -0.5*logSREP_sd^2
-	biaslogAlpha <- -0.5*logAlpha_sd^2
-	biaslogRS <- -0.5*(sqrt(1/tauobs))^2
+	biaslogSREP <- -0.5*logSREP_sd^2 # Global
+	biaslogAlpha <- -0.5*logAlpha_sd^2 # Global
+	biaslogRS <- -0.5*(sqrt(1/tauobs))^2 # Stock-specific
   } else {
 	biaslogSREP <- 0
 	biaslogAlpha <- 0
@@ -576,9 +576,9 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
 
   # PAIRS PLOTS
-pairs_pars <- c("b0", "bWA", "logAlpha0") # "logAlpha_sd" "logSREP_sd"
-pairs(fitstan, pars = pairs_pars) # for specific par names from above
-bayesplot::mcmc_pairs(fitstan, regex_pars = pairs_pars)
+# pairs_pars <- c("b0", "bWA", "logAlpha0") # "logAlpha_sd" "logSREP_sd"
+# pairs(fitstan, pars = pairs_pars) # for specific par names from above
+# bayesplot::mcmc_pairs(fitstan, regex_pars = pairs_pars)
 # bayesplot::mcmc_pairs(fitstan, regex_pars = c("tauobs"))
 # bayesplot::mcmc_pairs(fitstan, regex_pars = c("logSREP_re"))
 # bayesplot::mcmc_pairs(fitstan, regex_pars = c("logAlpha_re"))
@@ -757,10 +757,10 @@ ggplot() +
   geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  # labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", 
-         # y = "Density")
-  labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", 
-       y = "Density")
+  labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", 
+         y = "Density")
+  # labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", 
+       # y = "Density")
 
 # Pushforward (under prior predictive): logAlpha ####
 ggplot() +
@@ -773,13 +773,14 @@ ggplot() +
   # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
         # This is trash code - needs revision
 dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
-Stocknames <- WAin$Stock
+Stocknames <- WAbase$Name # ********************************************************************* WAS WAin$Stock???? Why was it WAin????
 colnames(dfalpharidge) <- Stocknames
 alpharidgetable <- as.data.table(dfalpharidge)
 alpharidgetable_long <- melt(alpharidgetable, measure.vars = Stocknames,
                 variable.name = "Stock", value.name = "Value")
+alpharidgetable_long <- as.data.table(alpharidgetable_long)
 TypeLabels <- ifelse(lifehist$lh == 0, "S", "O")
-alpharidgetable_long[, Type := TypeLabels[match(Stock, Stocknames)]]
+	alpharidgetable_long[, Type := TypeLabels[match(Stock, Stocknames)]]
 n_S <- sum(TypeLabels == "S")
 n_O <- sum(TypeLabels == "O")
 
@@ -795,7 +796,7 @@ ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, 
       setNames(colorRampPalette(c("#a3d5ff", "#084a8b"))(n_O),
                paste("O.", Stocknames[TypeLabels == "O"], sep = ""))
     )
-  )
+ )
 
 # ggplot(alpharidge_long, aes(x = Value, y = factor(Index), fill = factor(Index))) +
 #   geom_density_ridges(alpha = 0.5, scale = 1.2, color = "forestgreen") +

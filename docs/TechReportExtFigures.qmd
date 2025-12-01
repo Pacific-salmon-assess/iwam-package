@@ -30,6 +30,16 @@ summary {
 
 This will instead include a document summary section, a project summary, and links to other important documentation.
 
+<!--
+-   trace plot per parameter (HTML): A visual convergence check to determine whether the model has had divergences, difficulties mixing, drift, or other MCMC sampling errors. Show per model parameter.
+-   Autocorrelation plots per parameter (HTML): Shows per parameter, the autocorrelation coefficient against lag (in iterations of sampling). A measure of how much each sample in chain depends on the other. To prove model convergence.
+-   pairs() (HTML): The pairwise comparison of sampled parameters from the MCMC draws. Used to visually determine how related parameters are and whether the chain has explored the posterior space. To prove model convergence.
+-   Geweke, Heidel statistics (in Table for HTML) – matching the convergence diagnostic statistics used by Liermann et al.. Can also include Gelman diagnostic statistics. Described in Methods section. Used to diagnose stability/convergence/accuracy of MCMC chains. Not used a lot in current workflows, but can supply code in HTML file to cover the bases.
+-   Prior predictive of logRS (HTML): To illustrate the importance of prior checks. A representation of how the model simulates observations without seeing the data. In our case, shows how uninformed the priors are.
+-   Posterior distribution of k (logSREP_RE) against WA (See Liermann): To determine if there are patterns in the relationship between capacity and watershed size.
+-   Residuals of posterior predictive against year and spawners (Panel for each synoptic stock) - looking for trends in the residuals with WA (See Liermann): To assess model fit and determine if there are patterns in the relationship. Liermann also used posterior predictive p-values to assess fit.
+-->
+
 ```{r library, echo = FALSE, message = FALSE, warning = FALSE}
 # Libaries ####
 library(here)

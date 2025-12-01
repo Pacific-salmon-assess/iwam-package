@@ -14,7 +14,9 @@ library(beepr) # Sounds
 library(viridis)
 library(latex2exp)
 library(HDInterval)
-# library(scales)
+
+library(scales) 
+library(ggnewscale)
 
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
@@ -65,9 +67,7 @@ targetsAll <- cbind(targets3, derived_obj$deripost_summary$SREP_tar) |>
     "SREP_tar_Mode" = PosteriorMode)
 
 	# SMSY, SGEN, and SREP from bootstrapping
-# bstargets1 <- cbind(targetsAll)
-# bstargets2 <- cbind()
-# pbenchmarks <- cbind()
+# bstargets1 <- cbind(targetsAll), # bstargets2 <- cbind(), # pbenchmarks <- cbind()
 BS_wide <- BS.dfout %>%
   pivot_wider(
     id_cols = c(Stock, WA, lh), 
@@ -77,6 +77,19 @@ BS_wide <- BS.dfout %>%
   )
 targetsAll <- targetsAll %>%
 	left_join(BS_wide, by = c("Stock_name" = "Stock", "WA", "lh"))
+
+	# SREP from IWAM
+# dfout
+dfout_wide <- dfout %>%
+  pivot_wider(
+    id_cols = c(Stock, WA, lh), 
+    names_from = RP, 
+    values_from = c(Value, lwr, upr),
+    names_sep = "_",
+    names_prefix = "IWAM_"
+  )
+targetsAll <- targetsAll %>%
+  left_join(dfout_wide, by = c("Stock_name" = "Stock", "WA", "lh"))
 
 # Ricker sigma for SYNOPTIC STOCKS 
   # Re-order Stocks to be in order of Ricker variance
@@ -124,16 +137,27 @@ ggplot() +
              # position = position_nudge(+0.2),
              # aes(x = fct_reorder(Stock_name, logWA), y = SREP_tar_adj_mean, color = "Liermann MCMC Marg.")) +
   
+  # geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
+                                     # y = Value_SREP,
+                                     # ymax = lwr_SREP, 
+                                     # ymin = upr_SREP,
+                                 # color = "Liermann Bootstrap",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsAll,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = Value_SREP, color = "Liermann Bootstrap")) +
+  
   geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
-                                     y = Value_SREP,
-                                     ymax = lwr_SREP, 
-                                     ymin = upr_SREP,
-                                 color = "Liermann Bootstrap",
+                                     y = Value_IWAM_SREP,
+                                     ymax = lwr_IWAM_SREP, 
+                                     ymin = upr_IWAM_SREP,
+                                 color = "IWAM",
                                  width=.1),
                 position = position_nudge(+0.2)) +
   geom_point(data = targetsAll,
              position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = Value_SREP, color = "Liermann Bootstrap")) +
+             aes(x = fct_reorder(Stock_name, log(WA)), y = Value_IWAM_SREP, color = "IWAM")) +
   
   theme_classic() +
   scale_y_continuous(transform = "log", 
@@ -144,14 +168,20 @@ ggplot() +
   scale_color_manual(name='Model',
                      breaks=c('Parken',
                               # 'RTMB MLE',
+							  'IWAM',
                               'Liermann MCMC Cond.',
                               'Liermann MCMC Marg.',
 							  'Liermann Bootstrap'),
                      values=c('Parken' = "black",
                               # 'RTMB MLE' = "orange",
+							  'IWAM' = 'orange',
                               'Liermann MCMC Cond.' = "skyblue",
                               'Liermann MCMC Marg.' = "darkblue",
-							  'Liermann Bootstrap' = 'forestgreen'))
+							  'Liermann Bootstrap' = 'forestgreen')
+							  )
+							  
+# save
+# ggsave("pointwise_example.png", width = 4, height = 3, dpi = 300) # NEED TO CHANGE WIDTH AND HEIGHT for new save
 
 # Point-wise comparison - SMSY - by logWA ####
 ggplot() +
@@ -337,9 +367,6 @@ posteriorline$hdi_hi1 <- hdi_list1[2, ]
 posteriorline$hdi_lo2 <- hdi_list2[1, ]
 posteriorline$hdi_hi2 <- hdi_list2[2, ]
 
-# library(scales) 
-library(ggnewscale)
-
 ggplot(data = baselinescatter, aes(x = WAreal, y = SREP, color = WAlh)) + # base observation scatter plot ???????????????????????????????
 	geom_point(alpha = 0.8, size = 3) + # colours, etc. for observation scatter plot
 	scale_color_manual(name = "Life History", 
@@ -382,7 +409,7 @@ ggplot(data = baselinescatter, aes(x = WAreal, y = SREP, color = WAlh)) + # base
 	
 	labs(x = "Accessible Watershed Area", y = "SREP (Spawners at Replacement)")
 
-ggsave("figure.png", width = 4, height = 3, dpi = 300)
+ggsave("figure.png", width = 4, height = 3, dpi = 300) # REALLY IMPORTANT VISUAL
 
 
 # OLD VERSION in BASE R PLOT
