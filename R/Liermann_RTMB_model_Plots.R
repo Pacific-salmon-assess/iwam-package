@@ -26,9 +26,7 @@ source(here::here("R/derived_post.R")) # For posterior extraction
     # e.g. derived_obj, WAin, WAbase, srdat, fitstan, pars, names
 
 # SAVING R OBJECTS: ####
-# In script_A.R
-# save(my_object, file = "my_object.RData")
-# In script_B.R
+# save(my_object, file = "my_object.RData") # and then load:
 # load("my_object.RData")
 
 # add stocknames - could add them in to each object of derived_obj?
@@ -36,7 +34,379 @@ source(here::here("R/derived_post.R")) # For posterior extraction
 # Srep_example <- cbind(derived_obj$deripost_summary$SREP_tar_adj, Stocknames) |> 
 #   Srep_example[c(1, 7, 2, 3, 4, 5, 6)]
 
-# Prepare/load datasets for plotting ####
+
+
+# PRIOR PUSHFORWARD/PREDICTIVE CHECKS ####
+# APPROACH - Prior prediction with data exclusion
+	# Make sure dat$prioronly <- 1 to not include data in the nll
+	# Run all the way down to derived_obj
+# Pushforward tests:
+  # Take the Prior Prediction Mode (dat$prioronly == 1)
+  # Then plot desired priors/parameters E.g. logAlpha
+# Predictive tests: 
+  # Exactly the same as for Posterior - just depends on whether data has been included in the likelihood or not.
+  # Note: prior predictive checks (if taking the method of excluding data)
+  # Can be repeated using the below posterior predictive checks.
+  # Specifically: logRS, logAlpha
+
+
+
+#### POSTERIOR PREDICTIVE CHECKS ####################################################################################################################
+  # Run full model with dat$prioronly <- 0 for data included in nll
+  # Run derived_post() to extract posterior from chains
+  # Randomly sample for logRS
+  # Compare logRS with logRS_pred (including observation error)
+  # e.g. rnorm(1, derived_obj$deripost_summary$logRS_pred$Median, 
+             # sd  = sqrt(1/derived_obj$deripost_summary$tauobs$Median))
+slogRS_pred <- derived_obj$deripost_full$logRS_pred
+stauobs <- derived_obj$deripost_full$tauobs
+simlogRS <- matrix(NA, nrow = dim(slogRS_pred)[1], ncol = dim(slogRS_pred)[2])
+for (i in 1:dim(slogRS_pred)[1]){
+  simlogRS[i, ] <- rnorm(dim(slogRS_pred)[2], # 501
+                        mean = slogRS_pred[i, ], 
+                        sd = sqrt(1/stauobs[i, stk]))
+} 
+
+# Retrieve 9 samples out of the 10000 iterations
+nsim <- 9
+draws <- sample(1:dim(slogRS_pred)[1], nsim)
+savedsims <- simlogRS[draws,] # [1:9,]
+
+ppcheckdata0 <- data.frame(index = seq_along(dat$logRS), value = dat$logRS) # data.frame(dat$logRS)
+ppcheckplot0 <- ggplot(ppcheckdata0, aes(x = index, y = value)) + 
+	geom_point(alpha = 0.4) + 
+	ylab("") + 
+	xlab("") + 
+	theme_classic() + 
+	theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+ppcheckdata <- lapply(1:9, function(i) data.frame())
+ppcheckplot <- c()
+for (i in 1:nsim){
+	ppcheckdata[[i]] <- data.frame(index = seq_along(simlogRS[i, ]), value = simlogRS[i, ]) # or just data.frame(simlogRS[i,])
+	ppcheckplot[[i]] <- ggplot(ppcheckdata[[i]], aes(x = index, y = value)) + 
+		geom_point(alpha = 0.4) + 
+		ylab("") + 
+		xlab("") + 
+		theme_classic() + 
+		theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+}
+do.call(grid.arrange, c(list(ppcheckplot0), ppcheckplot[1:nsim], ncol = 2, 
+		bottom = "Observation Order",
+		left = "log(R/S)"))
+
+
+
+#### POSTERIOR P-VALUES #############################################################################################################################
+    # Take the mean and sd of each of the iterations e.g. do more than 9 in this case
+    # Then plot the histogram of these means against the mean of
+    # the observed data
+    # Then the p-value is the proportion of simulated means that are
+    # ABOVE the mean of the observations.
+    # Report this value.
+mean_simlogRS <- apply(simlogRS, 1, mean) # Mean of all simulated logRS
+mean_simlogRS <- data.frame(mean_simlogRS)
+
+hist(data.frame(mean_simlogRS), xlab = "Mean of Log(R/S)", 
+     main = "Visualization of Posterior Predictive P-Value")
+abline(v = mean(dat$logRS), col = "red", lwd = 3) # Mean of observed logRS
+
+ggplot(mean_simlogRS, aes(x = mean_simlogRS)) + 
+	geom_density(fill = "grey") +
+	geom_vline(xintercept = mean(dat$logRS), color = "red", linetype = "dashed") + 
+	xlab("Mean of Simulated log(R/S)") + 
+	ylab("Density") + 
+	theme_classic()
+
+pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS) # Proportion of simulated means above observed mean
+print(paste0("Posterior Predictive P-Value = ", pvalpp))
+  # A slightly higher bias than observed predictions
+
+
+
+#### Posterior Predictive Distribution: logAlpha ####################################################################################################
+slogAlpha0 <- derived_obj$deripost_full$logAlpha0 # dim(10000, 1)
+slogAlpha02 <- derived_obj$deripost_full$logAlpha02 # dim(10000, 1)
+slogAlpha_sd <- derived_obj$deripost_full$logAlpha_sd # dim(10000, 1)
+simlogAlpha_s <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
+simlogAlpha_o <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
+for (i in 1:dim(slogAlpha0)[1]){
+  simlogAlpha_s[i] <- slogAlpha0[i] + rnorm(1, mean = 0, sd = slogAlpha_sd[i])
+  simlogAlpha_o[i] <- simlogAlpha_s[i] + slogAlpha02[i]
+}
+
+ggplot() +
+  geom_density(aes(x = simlogAlpha_s), # For a new STREAM observation
+               fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+  geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
+              fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
+  theme_classic() +
+  labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", 
+         y = "Density")
+  # labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", 
+       # y = "Density")
+
+
+
+#### Pushforward (under prior predictive): logAlpha #################################################################################################
+ggplot() +
+  geom_density(aes(x = slogAlpha02), # For a pushforward alpha?
+               fill = "grey", alpha = 0.4, color = "grey", linewidth = 1.2) +
+  theme_classic() +
+  labs(x = "Hierarchical Mean logAlpha_LH Prior Pushforward Distribution", y = "Density")
+
+# Posterior OR Prior Distribution ridge plot: logAlpha ####
+  # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
+dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
+Stocknames <- WAbase$Name
+colnames(dfalpharidge) <- Stocknames
+alpharidgetable <- as.data.table(dfalpharidge)
+alpharidgetable_long <- melt(alpharidgetable, measure.vars = Stocknames,
+                variable.name = "Stock", value.name = "Value")
+alpharidgetable_long <- as.data.table(alpharidgetable_long)
+TypeLabels <- ifelse(lifehist$lh == 0, "S", "O")
+	alpharidgetable_long[, Type := TypeLabels[match(Stock, Stocknames)]]
+n_S <- sum(TypeLabels == "S")
+n_O <- sum(TypeLabels == "O")
+
+ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, Stock))) +
+  geom_density_ridges(color = "gray20", alpha = 0.8, scale = 1.2) +
+  theme_classic() +
+  labs(x = "logAlpha", y = "Stock") +
+  theme(legend.position = "none") +
+  scale_fill_manual(
+    values = c(
+      setNames(colorRampPalette(c("#a8e6a3", "#0b6e0b"))(n_S),
+               paste("S.", Stocknames[TypeLabels == "S"], sep = "")),
+      setNames(colorRampPalette(c("#a3d5ff", "#084a8b"))(n_O),
+               paste("O.", Stocknames[TypeLabels == "O"], sep = ""))
+    )
+ )
+
+# ggplot(alpharidge_long, aes(x = Value, y = factor(Index), fill = factor(Index))) +
+#   geom_density_ridges(alpha = 0.5, scale = 1.2, color = "forestgreen") +
+#   theme_classic() +
+#   labs(x = "logAlpha Posterior", y = "Stock ID") +
+#   theme(legend.position = "none")
+# Change ordering of stocks e.g. by WA size as with point-wise comp. plots
+# Can I add in ocean/stream-type identifiers and colour via?
+
+# beta?
+
+# Posterior Predictive Calculation for: SREP (E)
+	# logE[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd
+	# Need b0, bWA, WA, and random effects
+	# Will get one for stream and one for ocean
+
+
+
+#### Posterior Distributions of b0 and bWA ##########################################################################################################
+ggplot() +
+  geom_density(aes(x = derived_obj$deripost_full$b0[,1]), 
+               fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
+  geom_density(aes(x = (derived_obj$deripost_full$b0[,2] + derived_obj$deripost_full$b0[,1])),
+              fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
+  theme_classic() +
+  labs(x = "b0", y = "Density")
+
+ggplot() +
+  geom_density(aes(x = derived_obj$deripost_full$bWA[,1]), 
+               fill = "forestgreen", alpha = 0.4, color = "forestgreen", size = 1.2) +
+  geom_density(aes(x = (derived_obj$deripost_full$bWA[,2] + derived_obj$deripost_full$bWA[,1])),
+              fill = "skyblue", alpha = 0.4, color = "skyblue", size = 1.2) +
+  theme_classic() +
+  labs(x = "bWA", y = "Density")
+
+
+
+#### Plot SR Relationship Curves ####################################################################################################################
+lineSREPdraws <- derived_obj$deripost_full$SREP # 10000, 25
+lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
+SSdraws <- matrix(NA, nrow = 10000, ncol = 100) # this needs to be 10,000 by 100?
+RRdraws <- matrix(NA, nrow = 10000, ncol = 100)
+RRmedian <- lineAlphamedian <- lineSREPmedian <- SSmedian <- NA
+
+rowsample <- sample(1:10000, 1000)
+
+lineSREPdraws <- derived_obj$deripost_full$SREP # 10000, 25
+lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
+rowsample <- sample(1:10000, 100) # 1:10000, 1000
+par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
+
+for (i in 1:25) {
+  stock_name <- unique(srdat$Name)[i]
+  spawners   <- srdat$Sp[srdat$Name == stock_name]
+  recruits   <- srdat$Rec[srdat$Name == stock_name]
+  Smax       <- max(spawners)
+
+  SSseq <- seq(Smax/100, Smax, length.out = 100)
+  alpha_draws <- lineAlphadraws[, i]
+  srep_draws  <- lineSREPdraws[, i]
+
+  SSmat <- matrix(SSseq, nrow = 10000, ncol = 100, byrow = TRUE)
+  RRmat <- SSmat * alpha_draws^(1 - SSmat / srep_draws)
+
+  RRmed <- SSseq * median(alpha_draws)^(1 - SSseq / median(srep_draws))
+
+  plot(spawners, recruits, xlim = c(0, Smax), ylim = c(0, max(recruits)))
+  mtext(stock_name, side = 3, cex = 0.8)
+  matlines(t(SSmat[rowsample, ]), t(RRmat[rowsample, ]),
+           col = rgb(0, 0, 0, 0.1), lty = 1)
+  lines(SSseq, RRmed, col = "red", lwd = 2)
+}
+
+mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
+mtext("Recruitment", side = 2, line = 1, outer = TRUE, cex = 1.3)
+
+
+
+#### RESIDUALS ######################################################################################################################################
+#### For the relationship between capacity and watershed size 
+savelogSREP_re <- as.data.frame(derived_obj$deripost_full$logSREP_re) # dim 10000 25 (per stock)
+savelogSREP_sd <- as.data.frame(derived_obj$deripost_full$logSREP_sd) # dim 10000 1 (single)
+
+saveresiduals <- as.data.frame(derived_obj$deripost_full$logSREP_re * derived_obj$deripost_full$logSREP_sd[,1])
+
+dflogSREP_re <- savelogSREP_re %>%
+  mutate(iteration = row_number()) %>%
+  pivot_longer(
+    cols = starts_with("V"),
+	names_prefix = "V", 	
+    names_to = "chain",
+    values_to = "value"
+  ) %>% 
+  mutate(chain = as.numeric(chain))
+  
+dfresiduals <- saveresiduals %>%
+  mutate(iteration = row_number()) %>%
+  pivot_longer(
+    cols = starts_with("V"),
+	names_prefix = "V", 	
+    names_to = "chain",
+    values_to = "value"
+  ) %>% 
+  mutate(chain = as.numeric(chain))
+
+inter <- WAbase %>%
+  mutate(chain = row_number())
+
+dflogSREP_re <- dflogSREP_re %>%
+  left_join(inter, by = "chain")
+  
+dfresiduals <- dfresiduals %>%
+  left_join(inter, by = "chain")
+
+# were plotted against log-centered watershed size and latitude
+# to investigate potential patterns as in a standard regression (i.e. patterns in the mean or variance of the residuals).
+res1 <- ggplot(data = dflogSREP_re, aes(x = logWAshifted, y = value)) + 
+	geom_point(alpha = 0.1) + 
+	theme_classic() + 
+	labs(y = "Residual of WA Relationship", x = "Log Centered WA")
+	
+res2 <- ggplot(data = dflogSREP_re, aes(x = Latitude, y = value)) + 
+	geom_point(alpha = 0.1) + 
+	theme_classic() + 
+	labs(y = "Residual of WA Relationship", x = "Latitude")
+
+grid.arrange(res1, res2, nrow = 1)
+
+#### The residuals from the spawner-recruit relationship (the Ricker model)
+	# tauobs - watch transform out of precision?
+	# or residuals of logRS? calculated manually?
+		# e.g. observed logRS - posterior
+residlogRS <- matrix(0, nrow = 10000, ncol = 501)
+for (i in 1:501){
+	residlogRS[,i] <- dat$logRS[i] - derived_obj$deripost_full$logRS_pred[,i]
+}
+
+df_residlogRS <- as.data.frame(residlogRS)
+
+dfresidlogRS <- df_residlogRS %>%
+  mutate(iteration = row_number()) %>%
+  pivot_longer(
+    cols = starts_with("V"),
+	names_prefix = "V", 	
+    names_to = "chain",
+    values_to = "value"
+  ) %>% 
+  mutate(chain = as.numeric(chain))
+  
+# were plotted against year and spawners.
+	# By year or observation
+	# logRS is by observation
+# connect to dat$srdat? In order to plot by year?
+tempnumbersrdat <- dat$srdat %>%
+  mutate(chain = row_number())
+residplot <- dfresidlogRS %>%
+  left_join(tempnumbersrdat, by = "chain")
+
+residplot_median <- residplot %>%
+  group_by(Name, chain, Stocknumber, Yr, Sp, Rec, Stream, yr_num, Comments, lh) %>%
+  summarise(median_value = median(value), .groups = "drop")
+
+plot_listSp = list()
+for (i in 1:25) {
+	plot_listSp[[i]] <- ggplot(data = residplot_median[residplot_median$Stocknumber == i - 1,], aes(x = Sp, y = median_value)) + 
+		geom_point(alpha = 0.5) + 
+		theme_classic() + 
+		ggtitle(unique(residplot_median$Name[residplot_median$Stocknumber == i - 1])) + 
+		labs(x = "Raw Observed Spawners", y = "Residual of logRS")
+}
+
+grid.arrange(grobs = plot_listSp, nrow = 5) # for a 5 x 5 grid of 25 synoptic stocks
+
+plot_listYr = list()
+for (i in 1:25) {
+	plot_listYr[[i]] <- ggplot(data = residplot_median[residplot_median$Stocknumber == i - 1,], aes(x = Yr, y = median_value)) + 
+		geom_point(alpha = 0.5) + 
+		theme_classic() + 
+		ggtitle(unique(residplot_median$Name[residplot_median$Stocknumber == i - 1])) + 
+		labs(x = "Observation Year", y = "Residual of logRS")
+}
+
+grid.arrange(grobs = plot_listYr, nrow = 5) # for a 5 x 5 grid of 25 synoptic stocks
+
+
+
+#### ACF PLOT PER STOCK OF RESIDUALS ################################################################################################################
+# EXAMPLE line: acf(residplot$value[residplot$Name == 'Harrison'])
+	# median of posterior - and then subtract to calculate the residual
+	# calculate residual for each of 25 stocks
+par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
+
+for (i in 1:25) {
+	acf(residplot_median$median_value[residplot$Stocknumber == i - 1])  
+}
+mtext("Lag", side = 1, line = 1, outer = TRUE, cex = 1.3)
+mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
+
+
+# Option 2: Residual from posterior median prediction
+# Calculate median prediction across iterations for each observation
+median_logRS_pred <- apply(derived_obj$deripost_full$logRS_pred, 2, median)
+
+# Calculate residuals
+residlogRS_opt2 <- dat$logRS - median_logRS_pred
+
+# Create dataframe matching your structure - ASSUMING ORDER HASN'T CHANGED
+residplot_median_opt2 <- dat$srdat %>%
+  mutate(
+    chain = row_number(),
+    median_value = residlogRS_opt2
+  )
+
+# Plot ACF per stock
+par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
+for (i in 1:25) {
+  acf(residplot_median_opt2$median_value[residplot_median_opt2$Stocknumber == i - 1])  
+}
+mtext("Lag", side = 1, line = 1, outer = TRUE, cex = 1.3)
+mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
+
+
+
+#### PLOT: POINT-WISE BENCHMARK COMPARISONS #########################################################################################################
+# Prepare/load datasets for plotting #
 Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
 ParkenCaseStudy <- read.csv(here::here("DataIn/Parken_evalstocks.csv")) # Case study stocks
 
@@ -232,53 +602,10 @@ ggplot() +
                               'Liermann MCMC Cond.' = "skyblue",
                               'Liermann MCMC Marg.' = "darkblue",
 							  'Liermann Bootstrap' = 'forestgreen'))
-							  
-# Point-wise comparison - SGEN ####
+							 
 
 
-
-# Point-wise Benchmark Comparison - UNSORTED ####
-# ggplot() +
-#   
-#   # Re-written as the Parken model is included in WAin - bound to rtmb MLE version
-#   geom_errorbar(data = parken, aes(x = Stock, y = SREPp, ymax = SREPp_95, ymin = SREPp_5,
-#                                        color = "Parken",
-#                                        width=.1),
-#                 # position = position_nudge(-0.4)
-#     ) +
-#   geom_point(data = parken,
-#              # position = position_nudge(-0.4),
-#              aes(x = Stock, y = SREPp, color = "Parken")) +
-#   
-#   # Add in LIERMANN from Liermann_RTMB_model.R as a global object
-#   geom_errorbar(data = targetsAll, aes(x = Stock_name,
-#                                      y = E_tar_median,
-#                                      ymax = E_tar_UQ_95, 
-#                                      ymin = E_tar_LQ_5,
-#                                  color = "Liermann MCMC",
-#                                  width=.1),
-#                 position = position_nudge(+0.2)) +
-#   geom_point(data = targetsAll,
-#              position = position_nudge(+0.2),
-#              aes(x = Stock_name, y = E_tar_median, color = "Liermann MCMC")) +
-#   
-#   theme_classic() +
-#   scale_y_continuous(transform = "log", 
-#                      breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
-#   ylab(TeX("$S_{REP}$ Estimate")) +
-#   xlab("Stock Name") + 
-#   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
-#   scale_color_manual(name='Model',
-#                      breaks=c('Parken',
-#                               # 'RTMB MLE',
-#                               'Liermann MCMC'),
-#                      values=c('Parken' = "black",
-#                               # 'RTMB MLE' = "orange",
-#                               'Liermann MCMC' = "skyblue"))
-
-
-
-# Linear Regression: Liermann vs. Parken model ####
+#### Linear Regression: Liermann vs. Parken model ###################################################################################################
 
 # NEW VERSION: GGPLOT2
 	# - Make a dataframe with:
@@ -412,7 +739,36 @@ ggplot(data = baselinescatter, aes(x = WAreal, y = SREP, color = WAlh)) + # base
 ggsave("figure.png", width = 4, height = 3, dpi = 300) # REALLY IMPORTANT VISUAL
 
 
-# OLD VERSION in BASE R PLOT
+
+#### Bar plot comparison of SYNOPTIC values of SREP #################################################################################################
+  # Compare Parken and Liermann estimates of SREP for the SYNOPTIC STOCKS
+tempSREPpars <- dpars$SREP |> 
+  rename("SREP_stock_temp" = Stock)
+bardf <- cbind(Parkentable1, tempSREPpars)
+bardf_long <- bardf %>%
+  pivot_longer(cols = c(Srep, Mean), names_to = "Category", values_to = "Value")
+
+# Now plot using a single geom_bar()
+bcompare <- ggplot(bardf_long, aes(x = Stock, y = Value, fill = Category)) + 
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +  
+  theme_classic() +
+  scale_fill_manual(
+    name = "Model",  # Custom legend title
+    values = c("Srep" = "black", "Mean" = "skyblue"),  # Custom colors
+    labels = c("Srep" = "Parken", "Mean" = "Liermann")  # Custom category names
+  ) +
+  labs(x = "Stock",
+       y = expression(S[REP])) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+bcompare
+
+
+
+#####################################################################################################################################################
+#### OLD PLOTTING CODE - DEPRECIATED ################################################################################################################
+#####################################################################################################################################################
+
+# OLD VERSION in BASE R PLOT - LINEAR REGRESSION PLOT
     # Step 1. Is the data prepared.
 options(scipen = 5) # for ticks without sci. notation
 col.use <- NA
@@ -499,31 +855,7 @@ lines(x = exp(simWA), y = exp(Predso_Parken), col = alpha("dodgerblue3", 0.5), l
 
 
 
-# Bar plot comparison of SYNOPTIC values of SREP ####
-  # Compare Parken and Liermann estimates of SREP for the SYNOPTIC STOCKS
-tempSREPpars <- dpars$SREP |> 
-  rename("SREP_stock_temp" = Stock)
-bardf <- cbind(Parkentable1, tempSREPpars)
-bardf_long <- bardf %>%
-  pivot_longer(cols = c(Srep, Mean), names_to = "Category", values_to = "Value")
-
-# Now plot using a single geom_bar()
-bcompare <- ggplot(bardf_long, aes(x = Stock, y = Value, fill = Category)) + 
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +  
-  theme_classic() +
-  scale_fill_manual(
-    name = "Model",  # Custom legend title
-    values = c("Srep" = "black", "Mean" = "skyblue"),  # Custom colors
-    labels = c("Srep" = "Parken", "Mean" = "Liermann")  # Custom category names
-  ) +
-  labs(x = "Stock",
-       y = expression(S[REP])) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-bcompare
-
-
-
-# SR Curves for individual stocks - NOT FINISHED ####
+#### SR Curves for individual stocks - DEPRECIATED ##################################################################################################
 Stks <- unique(srdat$Stocknumber)
 NStks <- length(Stks)
 par(mfrow=c(5,5), mar=c(2, 2, 1, 0.1) + 0.1, oma=c(3,3,1,1)) # To fit all the plots on one grid
@@ -696,7 +1028,10 @@ ggplot(edeviation, aes(x = name, y = dev)) +
   labs(y = "Deviation in predicted E (More positive is\n more random effect)", x = "Stock Name") +
   theme_minimal() + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-# Point-wise Benchmark Comparison - BY RICKER VARIANCE - ONLY for re-predicting SYNOPTIC STOCKS ####
+
+
+
+#### Point-wise Benchmark Comparison - BY RICKER VARIANCE - ONLY for re-predicting SYNOPTIC STOCKS ##################################################
 # full <- cbind(targetsAll, parken$Stock, parken$SREPp, parken$SREPp_5, parken$SREPp_95)
 # 
 # ggplot() +
@@ -737,7 +1072,7 @@ ggplot(edeviation, aes(x = name, y = dev)) +
 
 
 
-# Testing deviations when re-predicting SYNOPTIC STOCKS ####
+#### Testing deviations when re-predicting SYNOPTIC STOCKS ##########################################################################################
 smsy_deviation <- derived_obj$deripost_summary$SMSY_r$Median - derived_obj$deripost_summary$SMSY$Median
 smax_deviation <- (1/derived_obj$deripost_summary$BETA_r$Median) - (1/derived_obj$deripost_summary$BETA$Median)
 testdf <- data.frame(name = WAin$Name, smsy_deviation = smsy_deviation, smax_deviation = smax_deviation)
