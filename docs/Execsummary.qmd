@@ -32,7 +32,7 @@ The model was updated from the model of Parken et al. (2006) in two main ways. F
 
 Further, the model has been updated from a previous version from Holt et al. (2023) and documented in Brown et al. (in press) by implementing in a fully Bayesian framework with updated priors consistent with Liermann et al. (2010). This update avoids the inclusion of implausible likelihood penalties that were required for model convergence within TMB. 
 
-To fully document IWAM, we are working to publish a Technical Report that will outline each model step, the choices in model selection, and the caveats to the model’s usage. The report will document the estimation of a habitat-based benchmarks derived from accessible watershed areas for Chinook salmon (Parken et al. 2006; Liermann et al. 2010) and further updated in Holt et al. (2023), with a comparison of results. An extended Results Section is available here: [Extended Figures Section](TechReportExtFigures.qmd), as a part of the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package).
+To fully document IWAM, we are working to publish a Technical Report that will outline each model step, the choices in model selection, and the caveats to the model’s usage. The report will document the estimation of a habitat-based benchmarks derived from accessible watershed areas for Chinook salmon (Parken et al. 2006; Liermann et al. 2010) and further updated in Holt et al. (2023), with a comparison of results. An extended Results Section is available here: [Extended Figures Section](TechReportExtFigures.html), as a part of the [GitHub repository](https://github.com/Pacific-salmon-assess/iwam-package).
 
 ## References
 
