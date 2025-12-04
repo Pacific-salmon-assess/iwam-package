@@ -44,7 +44,7 @@ outAlpha <- list()
 adj <- F # Default T for conditional - FALSE for Marginal medians - FLIPPED ********************************************
 
 MCMC <- TRUE # Default F to use original method, T takes logA from MCMC samples to estimate SGEN FOR PARKEN METHOD **********************
-prod <- c("RunReconstruction") # "LifeStageModel" or "Parken" or "RunReconstruction"
+prod <- c("LifeStageModel") # "LifeStageModel" or "Parken" or "RunReconstruction"
 bias.cor <- F # True to add a bias correction term for sREP
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
@@ -190,45 +190,33 @@ set.seed(1) ; if (BS == TRUE) {
 		
 		# Below needs to create a new row for each inlet AS A STOCK and insert a a.RR value
 		
-		## inSREP[inSREP$Stock=="Barkley",]$a.RR <- inSREP[inSREP$inlets=="Barkley",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "Barkley", inlets = "Barkley", a.RR = inSREP[inSREP$inlets=="Barkley",]$a.RR[1])
+		inSREP[inSREP$Stock=="Barkley",]$a.RR <- inSREP[inSREP$inlets=="Barkley",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "Barkley", inlets = "Barkley", a.RR = inSREP[inSREP$inlets=="Barkley",]$a.RR[1])
 		
-		## inSREP[inSREP$Stock=="Clayoquot",]$a.RR <- inSREP[inSREP$inlets=="Clayoquot",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "Clayoquot", inlets = "Clayoquot", a.RR = inSREP[inSREP$inlets=="Clayoquot",]$a.RR[1])
+		inSREP[inSREP$Stock=="Clayoquot",]$a.RR <- inSREP[inSREP$inlets=="Clayoquot",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "Clayoquot", inlets = "Clayoquot", a.RR = inSREP[inSREP$inlets=="Clayoquot",]$a.RR[1])
 
-		## inSREP[inSREP$Stock=="Kyuquot",]$a.RR <- inSREP[inSREP$inlets=="Kyuquot",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "Kyuquot", inlets = "Kyuquot", a.RR = inSREP[inSREP$inlets=="Kyuquot",]$a.RR[1])
+		inSREP[inSREP$Stock=="Kyuquot",]$a.RR <- inSREP[inSREP$inlets=="Kyuquot",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "Kyuquot", inlets = "Kyuquot", a.RR = inSREP[inSREP$inlets=="Kyuquot",]$a.RR[1])
 
-		## inSREP[inSREP$Stock=="Nootka/Esperanza",]$a.RR <- inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "Nootka/Esperanza", inlets = "Nootka/Esperanza", a.RR = inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1])
+		inSREP[inSREP$Stock=="Nootka/Esperanza",]$a.RR <- inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "Nootka/Esperanza", inlets = "Nootka/Esperanza", a.RR = inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1])
 
-		## inSREP[inSREP$Stock=="Quatsino",]$a.RR <- inSREP[inSREP$inlets=="Quatsino",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "Quatsino", inlets = "Quatsino", a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
+		inSREP[inSREP$Stock=="Quatsino",]$a.RR <- inSREP[inSREP$inlets=="Quatsino",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "Quatsino", inlets = "Quatsino", a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
 
-		## inSREP[inSREP$Stock=="WCVI South",]$a.RR <- inSREP[inSREP$inlets=="Barkley",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "WCVI South", inlets = "Barkley", a.RR = inSREP[inSREP$inlets=="Barkley",]$a.RR[1])
+		inSREP[inSREP$Stock=="WCVI South",]$a.RR <- inSREP[inSREP$inlets=="Barkley",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "WCVI South", inlets = "Barkley", a.RR = inSREP[inSREP$inlets=="Barkley",]$a.RR[1])
 
-		## inSREP[inSREP$Stock=="WCVI Nootka & Kyuquot",]$a.RR <- inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "WCVI Nootka & Kyuquot", inlets = "Nootka/Esperanza", a.RR = inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1])
+		inSREP[inSREP$Stock=="WCVI Nootka & Kyuquot",]$a.RR <- inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "WCVI Nootka & Kyuquot", inlets = "Nootka/Esperanza", a.RR = inSREP[inSREP$inlets=="Nootka/Esperanza",]$a.RR[1])
 
-		## inSREP[inSREP$Stock=="WCVI North",]$a.RR <- inSREP[inSREP$inlets=="Quatsino",]$a.RR[1]
-		# inSREP <- inSREP |> add_row(Stock = "WCVI North", inlets = "Quatsino", a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
+		inSREP[inSREP$Stock=="WCVI North",]$a.RR <- inSREP[inSREP$inlets=="Quatsino",]$a.RR[1]
+		inSREP <- inSREP |> add_row(Stock = "WCVI North", inlets = "Quatsino", a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
 		
 		inSREP <- inSREP %>% select(-c(inlets, CU, lnalpha)) %>% rename(a.par=a.RR)
 		
-		# When incorporating uncertainty in Ricker A:
 		Sig.Ric.A <- 0.51 #0.255 for a narrower plausible bound
-		# Sig.Ric.A derived from 95% CL of lower and upper plausible limits = 
-		# 0.5 logA - 1.5 logA (Luedke pers. comm. Dec 2020)
-		# See distribution below:
-		# test <- seq(0,4, len=40)
-		# plot(x=test, y=dnorm(test, 1,0.255), type="l", xlab="LogA", 
-		# ylab="Probability Density", ylim=c(0,5))
-		# # With this sigma, 95% of probablity density is within bounds mean 
-		# +/- 0.50 (assuming range 0.5-1.5, mean=1). 0.255*1.96 = 0.50
-		# lines(x=test, y=dnorm(test, 1,0.51))# With this sigma, 95% of probablity 
-		# density is within bounds mean +/- 1.0 
-		# (assuming range 0-2.0, mean=1). 0.510*1.96 = 1.0
 		
 		Ric.A.hi <- exp(rnorm(length(inSREP$Median), log(inSREP$a.par), Sig.Ric.A))
 		if(min(Ric.A.hi)<0) Ric.A <- exp(rnorm(length(inSREP$Median), inSREP$a.RR, Sig.Ric.A))

@@ -231,6 +231,9 @@ rowsample <- sample(1:10000, 1000)
 lineSREPdraws <- derived_obj$deripost_full$SREP # 10000, 25
 lineAlphadraws <- exp(derived_obj$deripost_full$logAlpha) # 10000, 25
 rowsample <- sample(1:10000, 100) # 1:10000, 1000
+
+Smsylines <- derived_obj$deripost_summary$SMSY_r$Median
+
 par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
 
 for (i in 1:25) {
@@ -248,7 +251,8 @@ for (i in 1:25) {
 
   RRmed <- SSseq * median(alpha_draws)^(1 - SSseq / median(srep_draws))
 
-  plot(spawners, recruits, xlim = c(0, Smax), ylim = c(0, max(recruits)))
+  plot(spawners, recruits, xlim = c(0, Smax + Smax/10), ylim = c(0, max(recruits)))
+  abline(v = Smsylines[i], col = 'red', lty = 'dashed')
   mtext(stock_name, side = 3, cex = 0.8)
   matlines(t(SSmat[rowsample, ]), t(RRmat[rowsample, ]),
            col = rgb(0, 0, 0, 0.1), lty = 1)
