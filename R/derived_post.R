@@ -7,7 +7,7 @@ library(beepr)
 library(HDInterval) # High density interval for posteriors with skew/multimodality
 
 # Function start
-derived_post <- function(x) {
+derived_post <- function(x, model) {
   post <- as.matrix(x) # Where x is the stan fit object
   
   # mcmc_dens(post, regex_pars = "b0")
@@ -66,7 +66,7 @@ derived_post <- function(x) {
   
   if (dat$prioronly == 0) { # Just to be able to run prioronly without these additional items
   # LambertW0 doesn't work in prioronly settings
-  
+  if (model == 'SREP'){
   # monte carlo integration - WRONG
   # This creates a prediction interval - including new site variability
 	# If you take the mean of logE_tar_adj --> marginal mean - WRONG
@@ -104,7 +104,33 @@ derived_post <- function(x) {
     LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
 
   matrices$SREP_line_ocean_adj <- exp(matrices$logSREP_line_ocean_adj) 
-  matrices$SREP_line_stream_adj <- exp(matrices$logSREP_line_stream_adj) 
+  matrices$SREP_line_stream_adj <- exp(matrices$logSREP_line_stream_adj)
+  }
+  
+  if (model == 'SMAX'){
+  matrices$logSMAX_tar_adj <- apply(matrices$logSMAX_tar, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
+
+  matrices$logSMAX_line_ocean_adj <- apply(matrices$logSMAX_line_ocean, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
+	
+  matrices$logSMAX_line_stream_adj <- apply(matrices$logSMAX_line_stream, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
+
+  matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
+    FUN = function(x)rnorm(length(x), x, sd = matrices$logAlpha_sd))
+
+  matrices$SMAX_tar_adj <- exp(matrices$logSMAX_tar_adj) # for transformed E
+  matrices$BETA_adj <- 1 / matrices$SMAX_tar_adj
+  matrices$SREP_adj <- matrices$logAlpha_tar_adj/matrices$BETA_adj
+  matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_adj
+  matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
+    LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
+
+  matrices$SMAX_line_ocean_adj <- exp(matrices$logSMAX_line_ocean_adj) 
+  matrices$SMAX_line_stream_adj <- exp(matrices$logSMAX_line_stream_adj)
+	}
+	
   }
 
   # # Prior predictions and posterior predictions - adding in observation error

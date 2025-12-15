@@ -198,6 +198,7 @@ f_srep <- function(par){
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
 	logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
+	# logRS_pred[i] <- exp(logAlpha[stk[i]])*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
@@ -294,8 +295,7 @@ f_srep <- function(par){
 }
 
 ## MakeADFun ####
-obj <- RTMB::MakeADFun(f_srep,
-    par,
+obj <- RTMB::MakeADFun(f_srep, par,
     random = c("logAlpha_re", "logSREP_re"),
     silent=TRUE)
 
@@ -305,7 +305,6 @@ obj <- RTMB::MakeADFun(f_srep,
   # and then pipe through vector - recreating what REPORT() does
   # this can then be done for all forms of prior/posterior prediction
   # just avoids all the behind the scene work of the RTMB framework
-
 # PRIOR PUSHFORWARD APPROACH: Random Generation ####
 randomgenmethod <- F # Turn on or off for now
 if(randomgenmethod == T){
@@ -499,9 +498,11 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 
 
 # Acquire outputs of MCMC ####
-derived_obj <- derived_post(fitstan); beep(2)
+derived_obj <- derived_post(fitstan, model = 'SREP'); beep(2)
 	# add stocknames - see extra code from _Plots.R
-
+	dsrep <- derived_obj
+	fitsrep <- fitstan
+	
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else {save(derived_obj, file = "derived_obj.RData")}

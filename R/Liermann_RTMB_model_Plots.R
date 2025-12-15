@@ -411,7 +411,6 @@ mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
 
 #### PLOT: POINT-WISE BENCHMARK COMPARISONS #########################################################################################################
 # Prepare/load datasets for plotting #
-Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
 ParkenCaseStudy <- read.csv(here::here("DataIn/Parken_evalstocks.csv")) # Case study stocks
 
 dpars <- derived_obj$deripost_summary
@@ -479,7 +478,7 @@ parken <- ParkenCaseStudy |>
 cols <- viridis(8, alpha=0.9, option = "mako", direction = -1)
 options(scipen = 999)
 
-# Point-wise Benchmark Comparison SREP - BY LOG WA ####
+#### Point-wise Benchmark Comparison SREP - BY LOG WA ####
 ggplot() +
   
   geom_errorbar(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SREPp, ymax = SREPp_95, ymin = SREPp_5,
@@ -557,7 +556,7 @@ ggplot() +
 # save
 # ggsave("pointwise_example.png", width = 4, height = 3, dpi = 300) # NEED TO CHANGE WIDTH AND HEIGHT for new save
 
-# Point-wise comparison - SMSY - by logWA ####
+#### Point-wise comparison - SMSY - by logWA ####
 ggplot() +
   
   geom_errorbar(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SMSYp, ymax = SMSYp_95, ymin = SMSYp_5,
@@ -607,6 +606,133 @@ ggplot() +
                               'Liermann MCMC Marg.' = "darkblue",
 							  'Liermann Bootstrap' = 'forestgreen'))
 							 
+
+
+#### Point-wise comparison of SYNOPTIC POPULATIONS ####
+Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks e.g. WCVI stocks
+	# Double check ordering of pops
+	# Double check if WA is available
+
+synoptic <- WAbase |>
+  rename("Stock_name" = Name) # This name can change depending on what data sets are being run
+  # SREP ESTIMATE FOR SYNOPTIC POPULATIONS
+targetsyn <- cbind(synoptic, derived_obj$deripost_summary$SREP) |> 
+  rename("SREP_mean" = Mean, "SREP_median" = Median,
+    "SREP_LQ_5" = LQ_5, "SREP_UQ_95" = UQ_95, "SREP_Stocknum" = Stock,
+    "SREP_Mode" = PosteriorMode)
+targetsyn <- cbind(targetsyn, derived_obj$deripost_summary$SMSY_r) |> 
+  rename("SMSY_mean" = Mean, "SMSY_median" = Median,
+    "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
+    "SMSY_Mode" = PosteriorMode)
+
+#### SREP ####
+ggplot() +
+  
+  # geom_errorbar(data = Parkentable1, aes(x = fct_reorder(Stock, log(WA)), y = SREP, ymax = SREPp_95, ymin = SREPp_5,
+                                       # color = "Parken",
+                                       # width=.1),
+# ) +
+  geom_point(data = Parkentable1,
+             aes(x = fct_reorder(Stock, log(WA)), y = Srep, color = "Parken")) +
+  
+  geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     y = SREP_median,
+                                     ymax = SREP_UQ_95, 
+                                     ymin = SREP_LQ_5,
+                                 color = "Liermann MCMC Cond.",
+                                 width=.1),
+                position = position_nudge(+0.1)) +
+  geom_point(data = targetsyn,
+             position = position_nudge(+0.1),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_median, color = "Liermann MCMC Cond.")) +
+  
+  # geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
+                                     # y = Value_IWAM_SREP,
+                                     # ymax = lwr_IWAM_SREP, 
+                                     # ymin = upr_IWAM_SREP,
+                                 # color = "IWAM",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsAll,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = Value_IWAM_SREP, color = "IWAM")) +
+  
+  theme_classic() +
+  scale_y_continuous(transform = "log", 
+                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
+  ylab(TeX("$S_{REP}$ Estimate")) +
+  xlab("") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+  scale_color_manual(name='Model',
+                     breaks=c('Parken',
+                              # 'RTMB MLE',
+							  'IWAM',
+                              'Liermann MCMC Cond.',
+                              'Liermann MCMC Marg.',
+							  'Liermann Bootstrap'),
+                     values=c('Parken' = "black",
+                              # 'RTMB MLE' = "orange",
+							  'IWAM' = 'orange',
+                              'Liermann MCMC Cond.' = "skyblue",
+                              'Liermann MCMC Marg.' = "darkblue",
+							  'Liermann Bootstrap' = 'forestgreen')
+							  )
+
+
+
+#### SMSY ####
+ggplot() +
+  
+  # geom_errorbar(data = Parkentable1, aes(x = fct_reorder(Stock, log(WA)), y = SREP, ymax = SREPp_95, ymin = SREPp_5,
+                                       # color = "Parken",
+                                       # width=.1),
+# ) +
+  geom_point(data = Parkentable1,
+             aes(x = fct_reorder(Stock, log(WA)), y = Smsy, color = "Parken")) +
+  
+  geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     y = SMSY_median,
+                                     ymax = SMSY_UQ_95, 
+                                     ymin = SMSY_LQ_5,
+                                 color = "Liermann MCMC Cond.",
+                                 width=.1),
+                position = position_nudge(+0.1)) +
+  geom_point(data = targetsyn,
+             position = position_nudge(+0.1),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond.")) +
+  
+  # geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
+                                     # y = Value_IWAM_SREP,
+                                     # ymax = lwr_IWAM_SREP, 
+                                     # ymin = upr_IWAM_SREP,
+                                 # color = "IWAM",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsAll,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = Value_IWAM_SREP, color = "IWAM")) +
+  
+  theme_classic() +
+  scale_y_continuous(transform = "log", 
+                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
+  ylab(TeX("$S_{MSY}$ Estimate")) +
+  xlab("") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+  scale_color_manual(name='Model',
+                     breaks=c('Parken',
+                              # 'RTMB MLE',
+							  'IWAM',
+                              'Liermann MCMC Cond.',
+                              'Liermann MCMC Marg.',
+							  'Liermann Bootstrap'),
+                     values=c('Parken' = "black",
+                              # 'RTMB MLE' = "orange",
+							  'IWAM' = 'orange',
+                              'Liermann MCMC Cond.' = "skyblue",
+                              'Liermann MCMC Marg.' = "darkblue",
+							  'Liermann Bootstrap' = 'forestgreen')
+							  )
+
 
 
 #### Linear Regression: Liermann vs. Parken model ###################################################################################################
