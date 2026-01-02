@@ -188,10 +188,11 @@ f_smax <- function(par){
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	# logRS_pred[i] <- exp(logAlpha[stk[i]])*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	alpha_pred <- exp(logAlpha)
+	# logRS_pred[i] <- alpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	
 	# logRS_pred[i] <- exp(logAlpha[stk[i]]) - S[i]/SMAX[stk[i]]
-	logRS_pred[i] <- logAlpha[stk[i]] - S[i]/SMAX[stk[i]]
+	logRS_pred[i] <- alpha_pred[stk[i]] - S[i]/SMAX[stk[i]]
 
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -262,7 +263,7 @@ f_smax <- function(par){
   REPORT(logAlpha02)
   REPORT(logAlpha_re) # random effect parameter for resampling
   REPORT(logAlpha_sd)
-  REPORT(alpha)
+  REPORT(alpha) # Also called alpha_pred
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(SREP_r) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -271,7 +272,6 @@ f_smax <- function(par){
   # ADREPORT - predicted values from watershed area model
     # Mean estimate of the median (without bias correction)
   alpha_tar <- exp(logAlpha_tar)
-  
   REPORT(SMAX_tar)
   REPORT(logSMAX_tar)
   REPORT(logAlpha_tar)

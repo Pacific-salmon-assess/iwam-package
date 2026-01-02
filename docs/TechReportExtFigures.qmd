@@ -747,9 +747,62 @@ grid.arrange(res1st, res2st, nrow = 1,
 cat("</details>\n\n")
 ```
 
+```{r pval resid logsrep_re, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+# Posterior P-value for residauls of logSREP_re by watershed area and latitude
+```
+
+### Posterior P-Values of logRS Residuals
+
+```{r pval hist, echo = FALSE, results = 'asis', message = FALSE, warning = FALSE, include = FALSE}
+# Copied no changes
+cat("<details><summary><strong>Show figure: Posterior P-Value for logRS</strong></summary>\n")
+
+par(mfrow = c(1,1))
+
+slogRS_pred <- derived_obj$deripost_full$logRS_pred
+stauobs <- derived_obj$deripost_full$tauobs
+simlogRS <- matrix(NA, nrow = dim(slogRS_pred)[1], ncol = dim(slogRS_pred)[2])
+for (i in 1:dim(slogRS_pred)[1]){
+  simlogRS[i, ] <- rnorm(dim(slogRS_pred)[2], # 501
+                        mean = slogRS_pred[i, ], 
+                        sd = sqrt(1/stauobs[i, stk]))
+} 
+
+mean_simlogRS <- apply(simlogRS, 1, mean) # Mean of all simulated logRS
+
+hist(mean_simlogRS, xlab = "Mean of Log(R/S)", 
+     main = "Visualization of Posterior Predictive P-Value")
+abline(v = mean(dat$logRS), col = "red", lwd = 3) # Mean of observed logRS
+
+cat("</details>\n\n")
+```
+
+```{r pval ggplot, echo = FALSE, results = 'asis', message = FALSE, warning = FALSE}
+cat("<details><summary><strong>Show figure: Posterior P-Value for logRS</strong></summary>\n")
+
+par(mfrow = c(1,1))
+
+ggplot(as.data.frame(mean_simlogRS), aes(x = mean_simlogRS)) + 
+	geom_density(fill = "grey") +
+	geom_vline(xintercept = mean(dat$logRS), color = "red", linetype = "dashed") + 
+	xlab("Mean of Simulated log(R/S)") + 
+	ylab("Density") + 
+	theme_classic()
+
+cat("</details>\n\n")
+```
+
+```{r pvalpp, echo = FALSE, message = FALSE, warning = FALSE}
+pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS) # Proportion of simulated means above observed mean
+# print(paste0("Posterior Predictive P-Value = ", pvalpp))
+  # A slightly higher bias than observed predictions
+```
+
+<!-- REMOVE COMMENT OUT WHEN FIXED: Where the posterior p-value represents the proportion of simulated means above the observed mean. In this case a value of `r pvalpp`, which indicates a slightly higher bias of the simulated responses over the observations. -->
+
 ### Residuals of Posterior Predictive against Years and Observed Spawners
 
-```{r residpp by year plot, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+```{r residpp by year prep, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 residlogRS <- matrix(0, nrow = 10000, ncol = 501)
 for (i in 1:501){
@@ -778,6 +831,25 @@ residplot <- dfresidlogRS %>%
 residplot_median <- residplot %>%
   group_by(Name, chain, Stocknumber, Yr, Sp, Rec, Stream, yr_num, Comments, lh) %>%
   summarise(median_value = median(value), .groups = "drop")
+```
+
+```{r pval per pop logRS, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
+# pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS)
+# Need a PER STOCK AND PER OBSERVATION simlogRS and obslogRS
+poplogRS <- tempnumbersrdat |> 
+  left_join(derived_obj$deripost_summary$logRS_pred, by = join_by(chain == Stock))
+
+# Calculate P-VALUE PER STOCK
+ppvallogRS <- tapply(sum(x > y)/length(x))
+
+result <- poplogRS %>%
+  group_by(Name) %>%
+  summarise(
+    summary_value = sum(Median > (log(Rec) - log(Sp))) / n()
+  ) |> 
+  left_join(WAbase, by = 'Name') |> 
+  arrange(Latitude)
+# No populations are above 0.9 or below 0.1
 ```
 
 ```{r residlogRS by Yr, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE, fig.width = 12, fig.height = 12}
@@ -832,6 +904,10 @@ grid.arrange(grobs = plot_listSp, nrow = 5, # for a 5 x 5 grid of 25 synoptic st
 )
 
 cat("</details>\n\n")
+```
+
+```{r pval resid logRS, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE, include = FALSE}
+# Posterior P-value for residauls of logSREP_re by watershed area and latitude
 ```
 
 ### Q-Q Norm Plot of Residuals

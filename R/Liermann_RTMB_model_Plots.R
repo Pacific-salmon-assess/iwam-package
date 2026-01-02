@@ -413,28 +413,52 @@ mtext("Autocorrelation", side = 2, line = 1, outer = TRUE, cex = 1.3)
 # Prepare/load datasets for plotting #
 ParkenCaseStudy <- read.csv(here::here("DataIn/Parken_evalstocks.csv")) # Case study stocks
 
-dpars <- derived_obj$deripost_summary
+dpars_srep <- dsrep$deripost_summary
+dpars_smax <- dsmax$deripost_summary
 
 targets <- WAin |>
   rename("Stock_name" = Stock) # This name can change depending on what data sets are being run
 
+#### SREP MODEL RESULTS ####
   # SMSY Estimate for TARGET STOCKS
-targets1 <- cbind(targets, derived_obj$deripost_summary$SMSY) |> 
+targets1_srep <- cbind(targets, dsrep$deripost_summary$SMSY) |> 
   rename("SMSY_mean" = Mean, "SMSY_median" = Median,
     "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
     "SMSY_Mode" = PosteriorMode)
   # SGEN Estimate for TARGET STOCKS
-targets2 <- cbind(targets1, derived_obj$deripost_summary$SGEN) |> 
+targets2_srep <- cbind(targets1_srep, dsrep$deripost_summary$SGEN) |> 
   rename("SGEN_mean" = Mean, "SGEN_median" = Median,
     "SGEN_LQ_5" = LQ_5, "SGEN_UQ_95" = UQ_95, "SGEN_Stocknum" = Stock,
     "SGEN_Mode" = PosteriorMode)
   # Marginal Mean for SREP (E)
-targets3 <- cbind(targets2, derived_obj$deripost_summary$SREP_tar_adj) |> 
+targets3_srep <- cbind(targets2_srep, dsrep$deripost_summary$SREP_tar_adj) |> 
   rename("SREP_tar_adj_mean" = Mean, "SREP_tar_adj_median" = Median,
     "SREP_tar_adj_LQ_5" = LQ_5, "SREP_tar_adj_UQ_95" = UQ_95, "SREP_tar_adj_Stocknum" = Stock,
     "SREP_tar_adj_Mode" = PosteriorMode)
   # SREP ESTIMATE FOR TARGET STOCKS
-targetsAll <- cbind(targets3, derived_obj$deripost_summary$SREP_tar) |> 
+targetsAll_srep <- cbind(targets3_srep, dsrep$deripost_summary$SREP_tar) |> 
+  rename("SREP_tar_mean" = Mean, "SREP_tar_median" = Median,
+    "SREP_tar_LQ_5" = LQ_5, "SREP_tar_UQ_95" = UQ_95, "SREP_tar_Stocknum" = Stock,
+    "SREP_tar_Mode" = PosteriorMode)
+
+#### SMAX MODEL RESULTS ####
+  # SMSY Estimate for TARGET STOCKS
+targets1_smax <- cbind(targets, dsmax$deripost_summary$SMSY) |> 
+  rename("SMSY_mean" = Mean, "SMSY_median" = Median,
+    "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
+    "SMSY_Mode" = PosteriorMode)
+  # SGEN Estimate for TARGET STOCKS
+targets2_smax <- cbind(targets1_smax, dsmax$deripost_summary$SGEN) |> 
+  rename("SGEN_mean" = Mean, "SGEN_median" = Median,
+    "SGEN_LQ_5" = LQ_5, "SGEN_UQ_95" = UQ_95, "SGEN_Stocknum" = Stock,
+    "SGEN_Mode" = PosteriorMode)
+  # Marginal Mean for SREP (E)
+targets3_smax <- cbind(targets2_smax, dsmax$deripost_summary$SREP_tar_adj) |> 
+  rename("SREP_tar_adj_mean" = Mean, "SREP_tar_adj_median" = Median,
+    "SREP_tar_adj_LQ_5" = LQ_5, "SREP_tar_adj_UQ_95" = UQ_95, "SREP_tar_adj_Stocknum" = Stock,
+    "SREP_tar_adj_Mode" = PosteriorMode)
+  # SREP ESTIMATE FOR TARGET STOCKS
+targetsAll_smax <- cbind(targets3_smax, dsmax$deripost_summary$SREP_tar) |> 
   rename("SREP_tar_mean" = Mean, "SREP_tar_median" = Median,
     "SREP_tar_LQ_5" = LQ_5, "SREP_tar_UQ_95" = UQ_95, "SREP_tar_Stocknum" = Stock,
     "SREP_tar_Mode" = PosteriorMode)
@@ -448,7 +472,7 @@ BS_wide <- BS.dfout %>%
     values_from = c(Value, lwr, upr),
     names_sep = "_"
   )
-targetsAll <- targetsAll %>%
+targetsAll_srep <- targetsAll_srep %>%
 	left_join(BS_wide, by = c("Stock_name" = "Stock", "WA", "lh"))
 
 	# SREP from IWAM
@@ -488,16 +512,27 @@ ggplot() +
   geom_point(data = parken,
              aes(x = fct_reorder(Stock, log(WA)), y = SREPp, color = "Parken")) +
   
-  geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, log(WA)),
+  geom_errorbar(data = targetsAll_srep, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = SREP_tar_median,
                                      ymax = SREP_tar_UQ_95, 
                                      ymin = SREP_tar_LQ_5,
                                  color = "Liermann MCMC Cond.",
                                  width=.1),
                 position = position_nudge(+0.1)) +
-  geom_point(data = targetsAll,
+  geom_point(data = targetsAll_srep,
              position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_tar_median, color = "Liermann MCMC Cond.")) +
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_tar_median, color = "Liermann MCMC Cond. SREP")) +
+
+  geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     y = SREP_tar_median,
+                                     ymax = SREP_tar_UQ_95, 
+                                     ymin = SREP_tar_LQ_5,
+                                 color = "Liermann MCMC Cond. SMAX",
+                                 width=.1),
+                position = position_nudge(+0.1)) +
+  geom_point(data = targetsAll_smax,
+             position = position_nudge(+0.1),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_tar_median, color = "Liermann MCMC Cond. SMAX")) +
   
   # geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, logWA),
                                      # y = SREP_tar_adj_mean,
@@ -616,12 +651,21 @@ Parkentable1 <- read.csv(here::here("DataIn/Parken_Table1n2.csv")) # Test stocks
 synoptic <- WAbase |>
   rename("Stock_name" = Name) # This name can change depending on what data sets are being run
   # SREP ESTIMATE FOR SYNOPTIC POPULATIONS
-targetsyn <- cbind(synoptic, derived_obj$deripost_summary$SREP) |> 
+targetsyn_srep <- cbind(synoptic, dsrep$deripost_summary$SREP) |> 
   rename("SREP_mean" = Mean, "SREP_median" = Median,
     "SREP_LQ_5" = LQ_5, "SREP_UQ_95" = UQ_95, "SREP_Stocknum" = Stock,
     "SREP_Mode" = PosteriorMode)
-targetsyn <- cbind(targetsyn, derived_obj$deripost_summary$SMSY_r) |> 
+targetsyn_srep <- cbind(targetsyn_srep, dsrep$deripost_summary$SMSY_r) |> 
   rename("SMSY_mean" = Mean, "SMSY_median" = Median,
+    "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
+    "SMSY_Mode" = PosteriorMode)
+	
+targetsyn_smax <- cbind(synoptic, dsmax$deripost_summary$SREP_r) |>
+	 rename("SREP_mean" = Mean, "SREP_median" = Median,
+    "SREP_LQ_5" = LQ_5, "SREP_UQ_95" = UQ_95, "SREP_Stocknum" = Stock,
+    "SREP_Mode" = PosteriorMode)
+targetsyn_smax <- cbind(targetsyn_smax, dsmax$deripost_summary$SMSY_r) |>
+	 rename("SMSY_mean" = Mean, "SMSY_median" = Median,
     "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
     "SMSY_Mode" = PosteriorMode)
 
@@ -635,16 +679,27 @@ ggplot() +
   geom_point(data = Parkentable1,
              aes(x = fct_reorder(Stock, log(WA)), y = Srep, color = "Parken")) +
   
-  geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)),
+  geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = SREP_median,
                                      ymax = SREP_UQ_95, 
                                      ymin = SREP_LQ_5,
                                  color = "Liermann MCMC Cond.",
                                  width=.1),
-                position = position_nudge(+0.1)) +
-  geom_point(data = targetsyn,
-             position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_median, color = "Liermann MCMC Cond.")) +
+                position = position_nudge(+0.2)) +
+  geom_point(data = targetsyn_srep,
+             position = position_nudge(+0.2),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_median, color = "Liermann MCMC Cond. (SREP)")) +
+			 
+  geom_errorbar(data = targetsyn_smax, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     y = SREP_median,
+                                     ymax = SREP_UQ_95, 
+                                     ymin = SREP_LQ_5,
+                                 color = "Liermann MCMC Cond.",
+                                 width=.1),
+                position = position_nudge(-0.2)) +
+  geom_point(data = targetsyn_smax,
+             position = position_nudge(-0.2),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_median, color = "Liermann MCMC Cond. (SMAX)")) +
   
   # geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
                                      # y = Value_IWAM_SREP,
@@ -667,13 +722,15 @@ ggplot() +
                      breaks=c('Parken',
                               # 'RTMB MLE',
 							  'IWAM',
-                              'Liermann MCMC Cond.',
+                              'Liermann MCMC Cond. (SREP)',
+							  'Liermann MCMC Cond. (SMAX)',
                               'Liermann MCMC Marg.',
 							  'Liermann Bootstrap'),
                      values=c('Parken' = "black",
                               # 'RTMB MLE' = "orange",
 							  'IWAM' = 'orange',
-                              'Liermann MCMC Cond.' = "skyblue",
+                              'Liermann MCMC Cond. (SREP)' = "skyblue",
+							  'Liermann MCMC Cond. (SMAX)' = "forestgreen",
                               'Liermann MCMC Marg.' = "darkblue",
 							  'Liermann Bootstrap' = 'forestgreen')
 							  )
@@ -690,16 +747,27 @@ ggplot() +
   geom_point(data = Parkentable1,
              aes(x = fct_reorder(Stock, log(WA)), y = Smsy, color = "Parken")) +
   
-  geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)),
+  geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     y = SMSY_median,
+                                     ymax = SMSY_UQ_95, 
+                                     ymin = SMSY_LQ_5,
+                                 color = "Liermann MCMC Cond. (SREP)",
+                                 width=.1),
+                position = position_nudge(+0.2)) +
+  geom_point(data = targetsyn_srep,
+             position = position_nudge(+0.2),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond. (SREP)")) +
+  
+  geom_errorbar(data = targetsyn_smax, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = SMSY_median,
                                      ymax = SMSY_UQ_95, 
                                      ymin = SMSY_LQ_5,
                                  color = "Liermann MCMC Cond.",
                                  width=.1),
-                position = position_nudge(+0.1)) +
-  geom_point(data = targetsyn,
-             position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond.")) +
+                position = position_nudge(-0.2)) +
+  geom_point(data = targetsyn_smax,
+             position = position_nudge(-0.2),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond. (SMAX)")) +
   
   # geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
                                      # y = Value_IWAM_SREP,
@@ -722,13 +790,15 @@ ggplot() +
                      breaks=c('Parken',
                               # 'RTMB MLE',
 							  'IWAM',
-                              'Liermann MCMC Cond.',
+                              'Liermann MCMC Cond. (SREP)',
+							  'Liermann MCMC Cond. (SMAX)',
                               'Liermann MCMC Marg.',
 							  'Liermann Bootstrap'),
                      values=c('Parken' = "black",
                               # 'RTMB MLE' = "orange",
 							  'IWAM' = 'orange',
-                              'Liermann MCMC Cond.' = "skyblue",
+                              'Liermann MCMC Cond. (SREP)' = "skyblue",
+							  'Liermann MCMC Cond. (SMAX)' = "forestgreen",
                               'Liermann MCMC Marg.' = "darkblue",
 							  'Liermann Bootstrap' = 'forestgreen')
 							  )
@@ -756,8 +826,8 @@ baselinescatter <- data.frame(
 	WAtarget = dat$WAin$WA, # ONLY WORKS IF SAME NUMBER ****
 	WAlh = WAbase$lh,
 	WAlhtarget = dat$WAin$lh, # 0 and 1's # ONLY WORKS IF SAME NUMBER ****
-	SREP = dpars$SREP$Median, # ?
-	SREP_tar = dpars$SREP_tar$Median # ONLY WORKS IF SAME NUMBER ****
+	SREP = dpars_srep$SREP$Median, # ?
+	SREP_tar = dpars_srep$SREP_tar$Median # ONLY WORKS IF SAME NUMBER ****
 ) # dat$mean_logWA
 
 posteriorline <- data.frame(
@@ -872,7 +942,7 @@ ggsave("figure.png", width = 4, height = 3, dpi = 300) # REALLY IMPORTANT VISUAL
 
 #### Bar plot comparison of SYNOPTIC values of SREP #################################################################################################
   # Compare Parken and Liermann estimates of SREP for the SYNOPTIC STOCKS
-tempSREPpars <- dpars$SREP |> 
+tempSREPpars <- dpars_srep$SREP |> 
   rename("SREP_stock_temp" = Stock)
 bardf <- cbind(Parkentable1, tempSREPpars)
 bardf_long <- bardf %>%
