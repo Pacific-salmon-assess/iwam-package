@@ -97,11 +97,13 @@ derived_post <- function(x, model) {
     # BETA, SMSY, and SGEN with these new values
     # Would this be done on EVERY iteration for EACH chain?
   # e.g.
+  matrices$Alpha_tar_adj <- exp(matrices$logAlpha_tar_adj) # matrices$logAlpha_tar_adj is actually loglog - needs to be exp
+  
   matrices$SREP_tar_adj <- exp(matrices$logSREP_tar_adj) # for transformed E
-  matrices$BETA_adj <- matrices$logAlpha_tar_adj / matrices$SREP_tar_adj
-  matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_adj
+  matrices$BETA_adj <- matrices$Alpha_tar_adj / matrices$SREP_tar_adj
+  matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$Alpha_tar_adj))) / matrices$BETA_adj
   matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
-    LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
+    LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$Alpha_tar_adj)))
 
   matrices$SREP_line_ocean_adj <- exp(matrices$logSREP_line_ocean_adj) 
   matrices$SREP_line_stream_adj <- exp(matrices$logSREP_line_stream_adj)
@@ -120,17 +122,43 @@ derived_post <- function(x, model) {
   matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
     FUN = function(x)rnorm(length(x), x, sd = matrices$logAlpha_sd))
 
-  matrices$SMAX_tar_adj <- exp(matrices$logSMAX_tar_adj) # for transformed E
+  matrices$Alpha_tar_adj <- exp(matrices$logAlpha_tar_adj)
+
+  matrices$SMAX_tar_adj <- exp(matrices$logSMAX_tar_adj) 
   matrices$BETA_adj <- 1 / matrices$SMAX_tar_adj
-  matrices$SREP_adj <- matrices$logAlpha_tar_adj/matrices$BETA_adj
-  matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_adj
+  matrices$SREP_adj <- matrices$Alpha_tar_adj/matrices$BETA_adj
+  matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$Alpha_tar_adj))) / matrices$BETA_adj
   matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
-    LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
+    LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$Alpha_tar_adj)))
 
   matrices$SMAX_line_ocean_adj <- exp(matrices$logSMAX_line_ocean_adj) 
   matrices$SMAX_line_stream_adj <- exp(matrices$logSMAX_line_stream_adj)
 	}
+
+  # if (model == 'BETA'){
+  # matrices$logBETA_tar_adj <- apply(matrices$logBETA_tar, 2, 
+    # FUN = function(x)rnorm(length(x), x, sd = matrices$logBETA_sd))
+
+  # matrices$logBETA_line_ocean_adj <- apply(matrices$logBETA_line_ocean, 2, 
+    # FUN = function(x)rnorm(length(x), x, sd = matrices$logBETA_sd))
 	
+  # matrices$logBETA_line_stream_adj <- apply(matrices$logBETA_line_stream, 2, 
+    # FUN = function(x)rnorm(length(x), x, sd = matrices$logBETA_sd))
+
+  # matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
+    # FUN = function(x)rnorm(length(x), x, sd = matrices$logAlpha_sd))
+
+  # matrices$BETA_tar_adj <- exp(matrices$logBETA_tar_adj) 
+  # matrices$SMAX_adj <- 1 / matrices$BETA_tar_adj
+  # matrices$SREP_adj <- matrices$logAlpha_tar_adj/matrices$BETA_tar_adj
+  # matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$logAlpha_tar_adj))) / matrices$BETA_tar_adj
+  # matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
+    # LambertW0(- matrices$BETA_tar_adj * matrices$SMSY_adj / (exp(matrices$logAlpha_tar_adj)))
+
+  # matrices$BETA_line_ocean_adj <- exp(matrices$logBETA_line_ocean_adj) 
+  # matrices$BETA_line_stream_adj <- exp(matrices$logBETA_line_stream_adj)
+	# }
+
   }
 
   # # Prior predictions and posterior predictions - adding in observation error

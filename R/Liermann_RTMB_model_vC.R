@@ -211,8 +211,8 @@ f_srep <- function(par){
   BETA_r = numeric(nrow(WAbase))
   
   for (i in 1:N_Stk){
-    BETA_r[i] <- logAlpha[i] / SREP[i]
-    SMSY_r[i] <- (1 - LambertW0(exp(1 - logAlpha[i]))) / BETA_r[i]
+    BETA_r[i] <- alpha_pred[i] / SREP[i]
+    SMSY_r[i] <- (1 - LambertW0(exp(1 - alpha_pred[i]))) / BETA_r[i]
   }
 
   ## PREDICTIONS
@@ -229,16 +229,17 @@ f_srep <- function(par){
     else logAlpha_tar[i] <- logAlpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
 
     logSREP_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP # + biaslogSREP + logSREP_sd^2/2
-		# add -0.5*logSREP_sd^2 OR 
+		# add -0.5*logSREP_sd^2 OR
 		# do the random normal when extracting the posterior
     SREP_tar[i] <- exp(logSREP_tar[i])
     
+	alpha_tar <- exp(logAlpha_tar)
     # Predict BETA
-    BETA[i] <- logAlpha_tar[i]/SREP_tar[i]
+    BETA[i] <- alpha_tar[i]/SREP_tar[i]
     # Predict SMSY
-    SMSY[i] <- (1-LambertW0(exp(1-logAlpha_tar[i])))/BETA[i]
+    SMSY[i] <- (1-LambertW0(exp(1-alpha_tar[i])))/BETA[i]
     # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logAlpha_tar[i])))
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(alpha_tar[i])))
   }
   
   # Create predictions on an simulated line
@@ -257,7 +258,7 @@ f_srep <- function(par){
   
   REPORT(logRS_pred)
   
-  alpha <- exp(logAlpha)
+  # alpha <- exp(logAlpha)
   # REPORT(logRS) # logRS for all 501 data points
   REPORT(logSREP_re)
   REPORT(logSREP_sd)
@@ -268,15 +269,14 @@ f_srep <- function(par){
   REPORT(logAlpha02)
   REPORT(logAlpha_re) # random effect parameter for resampling
   REPORT(logAlpha_sd)
-  REPORT(alpha)
+  REPORT(alpha_pred)
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(tauobs) # Necessary to add back in observation error?
   
   # ADREPORT - predicted values from watershed area model
     # Mean estimate of the median (without bias correction)
-  alpha_tar <- exp(logAlpha_tar)
-  
+  # alpha_tar <- exp(logAlpha_tar)
   REPORT(SREP_tar)
   REPORT(logSREP_tar)
   REPORT(logAlpha_tar)

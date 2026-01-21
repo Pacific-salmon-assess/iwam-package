@@ -188,11 +188,13 @@ f_smax <- function(par){
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	alpha_pred <- exp(logAlpha)
 	# logRS_pred[i] <- alpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	
+	alpha_pred <- exp(logAlpha) 
 	# logRS_pred[i] <- exp(logAlpha[stk[i]]) - S[i]/SMAX[stk[i]]
-	logRS_pred[i] <- alpha_pred[stk[i]] - S[i]/SMAX[stk[i]]
+	logRS_pred[i] <- alpha_pred[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
+	# logRS_pred[i] <- logAlpha[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
+
 
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -207,8 +209,8 @@ f_smax <- function(par){
   for (i in 1:N_Stk){
     # BETA_r[i] <- logAlpha[i] / SREP[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	BETA_r[i] <- 1/SMAX[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    SMSY_r[i] <- (1 - LambertW0(exp(1 - logAlpha[i]))) / BETA_r[i]
-	SREP_r[i] <- logAlpha[i]/BETA_r[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    SMSY_r[i] <- (1 - LambertW0(exp(1 - alpha_pred[i]))) / BETA_r[i]
+	SREP_r[i] <- alpha_pred[i]/BETA_r[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   }
 
   ## PREDICTIONS
@@ -225,15 +227,16 @@ f_smax <- function(par){
     logSMAX_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSMAX # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     SMAX_tar[i] <- exp(logSMAX_tar[i]) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     
+	alpha_tar <- exp(logAlpha_tar)
     # Predict BETA
     # BETA[i] <- logAlpha_tar[i]/SREP_tar[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	BETA[i] <- 1/SMAX_tar[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     # Predict SMSY
-    SMSY[i] <- (1-LambertW0(exp(1-logAlpha_tar[i])))/BETA[i]
+    SMSY[i] <- (1-LambertW0(exp(1-alpha_tar[i])))/BETA[i]
     # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logAlpha_tar[i])))
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(alpha_tar[i])))
 	# Predict SREP
-	SREP[i] <- logAlpha_tar[i]/BETA[i]
+	SREP[i] <- alpha_tar[i]/BETA[i]
   }
   
   # Create predictions on an simulated line
@@ -252,7 +255,7 @@ f_smax <- function(par){
   
   REPORT(logRS_pred)
   
-  alpha <- exp(logAlpha)
+  # alpha <- exp(logAlpha)
   # REPORT(logRS) # logRS for all 501 data points
   REPORT(logSMAX_re)
   REPORT(logSMAX_sd)
@@ -263,7 +266,7 @@ f_smax <- function(par){
   REPORT(logAlpha02)
   REPORT(logAlpha_re) # random effect parameter for resampling
   REPORT(logAlpha_sd)
-  REPORT(alpha) # Also called alpha_pred
+  REPORT(alpha_pred) # Also called alpha_pred
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(SREP_r) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -271,7 +274,7 @@ f_smax <- function(par){
   
   # ADREPORT - predicted values from watershed area model
     # Mean estimate of the median (without bias correction)
-  alpha_tar <- exp(logAlpha_tar)
+  # alpha_tar <- exp(logAlpha_tar)
   REPORT(SMAX_tar)
   REPORT(logSMAX_tar)
   REPORT(logAlpha_tar)

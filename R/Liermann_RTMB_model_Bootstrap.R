@@ -30,6 +30,8 @@ WAin <- read.csv(here::here(WAin))
     # and make bootstrapped benchmark estimates from the mcmc chains of the
     # Liermann model.
 
+options(scipen = 999)
+
     # 1. SETUP
 BS <- TRUE # default for FALSE
 bsiters <- 2500 # New with Brown et al. CSAS runs
@@ -48,7 +50,9 @@ prod <- c("LifeStageModel") # "LifeStageModel" or "Parken" or "RunReconstruction
 bias.cor <- F # True to add a bias correction term for sREP
   # bias.cor is also an option - but shouldn't be necessary given that these are posteriors
 
-# Parallel setup - NOT FUCNTIONING
+model <- c("SREP") # Options are SMAX or SREP
+
+# Parallel setup - NOT FUNCTIONING
 # library(doParallel)
 # library(doRNG)
 # cl <- makeCluster(detectCores() - 1)
@@ -67,15 +71,38 @@ set.seed(1) ; if (BS == TRUE) {
 	# Use mean SREP on realscale
 		# Conditional if bias corrected
 		# Marginal if rnorm
+	if (model == 'SREP'){
     if (adj == T) { # These should be means - not medians!!!
-		SREP <- derived_obj$deripost_summary$SREP_tar_adj$Median 
-		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$SREP_tar_adj$LQ_5)) / 1.96 
-		SREP_SE <- (SREP - derived_obj$deripost_summary$SREP_tar_adj$LQ_5) / 1.96
+		SREP <- dsrep$deripost_summary$SREP_tar_adj$Median 
+		SREP_logSE <- (log(SREP) - log(dsrep$deripost_summary$SREP_tar_adj$LQ_5)) / 1.96 
+		SREP_SE <- (SREP - dsrep$deripost_summary$SREP_tar_adj$LQ_5) / 1.96
     } else {
-		SREP <- derived_obj$deripost_summary$SREP_tar$Median
-		SREP_logSE <- (log(SREP) - log(derived_obj$deripost_summary$SREP_tar$LQ_5)) / 1.96 
-		SREP_SE <- (SREP - derived_obj$deripost_summary$SREP_tar$LQ_5) / 1.96 
-    }
+		SREP <- dsrep$deripost_summary$SREP_tar$Median
+		SREP_logSE <- (log(SREP) - log(dsrep$deripost_summary$SREP_tar$LQ_5)) / 1.96 
+		SREP_SE <- (SREP - dsrep$deripost_summary$SREP_tar$LQ_5) / 1.96 
+    }}
+	
+	# if (model == 'SREP'){
+    # if (adj == T) { # These should be means - not medians!!!
+		# SREP <- dsmax$deripost_summary$SREP_adj$Median 
+		# SREP_logSE <- (log(SREP) - log(dsmax$deripost_summary$SREP_adj$LQ_5)) / 1.96 
+		# SREP_SE <- (SREP - dsmax$deripost_summary$SREP_adj$LQ_5) / 1.96
+    # } else {
+		# SREP <- dsmax$deripost_summary$SREP$Median
+		# SREP_logSE <- (log(SREP) - log(dsmax$deripost_summary$SREP$LQ_5)) / 1.96 
+		# SREP_SE <- (SREP - dsmax$deripost_summary$SREP$LQ_5) / 1.96 
+    # }}
+	
+	if (model == 'SMAX') {
+	if (adj == T) {
+		SMAX <- dsmax$deripost_summary$SMAX_tar_adj$Median 
+		SMAX_logSE <- (log(SMAX) - log(dsmax$deripost_summary$SMAX_tar_adj$LQ_5)) / 1.96 
+		SMAX_SE <- (SMAX - dsmax$deripost_summary$SMAX_tar_adj$LQ_5) / 1.96
+	} else {
+		SMAX <- dsmax$deripost_summary$SMAX_tar$Median
+		SMAX_logSE <- (log(SMAX) - log(dsmax$deripost_summary$SMAX_tar$LQ_5)) / 1.96 
+		SMAX_SE <- (SMAX - dsmax$deripost_summary$SMAX_tar$LQ_5) / 1.96 
+    }}
   
     # Steps not included in this bootstrapping function
       # - Removing Stocks: Cypre (LIFESTAGEMODEL ONLY)
@@ -87,34 +114,54 @@ set.seed(1) ; if (BS == TRUE) {
       # - Creation of the RPs dataframe
 	  
 	# RPs <- stock_SMSY %>% left_join(stock_SREP, by="Stock")
+	if (model == 'SREP' & prod == 'RunReconstruction'){
 	inSREP <- derived_obj$deripost_summary$SREP_tar_adj |>
 		mutate(CU = WAin$CU) |>
 		mutate(Inlet = WAin$Inlet) |>
 		mutate(Stock = WAin$Stock) |>
 		# filter (Stock != "Cypre") |>
 		rename(inlets=Inlet)
+	}
     
     # 1. LifeStageModel METHOD
       # Could USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
     if (prod == "LifeStageModel") {
       Mean.Ric.A <- 1
-      Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, 0))
+      if (model == 'SREP') Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, 0))
+	  if (model == 'SMAX') Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, 0))
       Sig.Ric.A <- 0.51 
      
-      Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
+      if (model == 'SREP') Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A)) 
+	  if (model == 'SMAX') Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, Sig.Ric.A))
 		# Mean will be larger than 1
-      if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
+      if (model == 'SREP') if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
+	  if (model == 'SMAX') if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, Sig.Ric.A))
       
-	  # Bias correction
+	  # Bias correction - SREP
+	  if (model == 'SREP'){
       if (bias.cor == TRUE) { # Only if mean
         sREP <- exp(rnorm(length(SREP), log(SREP) - 0.5*SREP_logSE^2, SREP_logSE))
         if(min(sREP)<=0) sREP <- exp(rnorm(length(SREP), log(SREP) - 0.5*SREP_logSE^2, SREP_logSE))
       } else {
 		sREP <- exp(rnorm(length(SREP), log(SREP), SREP_logSE))
 		if(min(sREP)<=0)   sREP <- exp(rnorm(length(SREP), SREP, SREP_SE))
-      }
-  
-      SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
+      }}
+	  
+	  # Bias correction - SMAX
+	  if (model == 'SMAX'){
+	  if (bias.cor == TRUE) { # Only if mean
+        sMAX <- exp(rnorm(length(SMAX), log(SMAX) - 0.5*SMAX_logSE^2, SMAX_logSE))
+        if(min(sMAX)<=0) sMAX <- exp(rnorm(length(SMAX), log(SMAX) - 0.5*SMAX_logSE^2, SMAX_logSE))
+      } else {
+		sMAX <- exp(rnorm(length(SMAX), log(SMAX), SMAX_logSE))
+		if(min(sMAX)<=0)   sMAX <- exp(rnorm(length(SMAX), SMAX, SMAX_SE))
+      }}
+	  
+      if (model == 'SREP') SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
+	  if (model == 'SMAX') SGENcalcs <- purrr::map2_dfr (Ric.A, sMAX, Sgen.fn4)
+	  # The main difference from .fn2 is that the beta par here is unaffected by the NEW assumed alpha
+	  # In .fn2 - the b.par is affected by the residual information in SREP AND the NEW assumed alpha - which warps it
+	  # When you use the SMAX model - but calculate b.par THROUGH SREP - you can get to similar answers
     }
     
     # 2. PARKEN METHOD
@@ -271,14 +318,13 @@ set.seed(1) ; if (BS == TRUE) {
   # }
 
   # 3. Outputs: Compile bootstrapped estimates of Sgen, SMSY, and SREP, and identify 5th and 
-      # 95th percentiles
-  SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
-  
+      # 95th percentiles  
   stockNames <- WAin %>% 
     # filter(Stock != "Cypre") %>% # CYPRE FLAG ## ## ## 
     pull(Stock)
   stockNames <- unique(stockNames)
   
+  SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
   rownames(SGEN.bs) <- stockNames
   SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
                           lwr=apply(SGEN.bs, 1, quantile, 0.025),
@@ -296,6 +342,13 @@ set.seed(1) ; if (BS == TRUE) {
                           lwr=apply(SREP.bs, 1, quantile, 0.025),
                           upr=apply(SREP.bs, 1, quantile, 0.975) )
   
+  # SMAX @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  SMAX.bs <- select(as.data.frame(outBench), starts_with("SMAX"))
+  rownames(SMAX.bs) <- stockNames
+  SMAX.boot <- data.frame(SMAX= apply(SMAX.bs, 1, quantile, 0.5), 
+                          lwr=apply(SMAX.bs, 1, quantile, 0.025),
+                          upr=apply(SMAX.bs, 1, quantile, 0.975) )
+  
   if (prod == "LifeStageModel" | prod == "RunReconstruction") {
     APAR.bs <- select(as.data.frame(outAlpha), starts_with("alpha"))
     rownames(APAR.bs) <- stockNames
@@ -305,7 +358,7 @@ set.seed(1) ; if (BS == TRUE) {
   }
   
   boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
-                SREP.boot=SREP.boot) # , APAR.boot=APAR.boot)
+                SREP.boot=SREP.boot, SMAX.boot=SMAX.boot) # , APAR.boot=APAR.boot)
   if (prod == "LifeStageModel" | prod == "RunReconstruction") boot$APAR.boot <- APAR.boot
   
   df1 <- data.frame(boot[["SGEN.boot"]], Stock=rownames(boot[["SGEN.boot"]]), RP="SGEN") 
@@ -314,14 +367,17 @@ set.seed(1) ; if (BS == TRUE) {
   df2 <- df2 %>% rename(Value=SREP)
   df3 <- data.frame(boot[["SMSY.boot"]], Stock=rownames(boot[["SMSY.boot"]]), RP="SMSY")
   df3 <- df3 %>% rename(Value=SMSY)
+  df4 <- data.frame(boot[["SMAX.boot"]], Stock=rownames(boot[["SMAX.boot"]]), RP="SMAX") # @@@@
+  df4 <- df4 %>% rename(Value=SMAX)# @@@@
   if (prod == "LifeStageModel" | prod == "RunReconstruction") {
-    df4 <- data.frame(boot[["APAR.boot"]], Stock=rownames(boot[["APAR.boot"]]), RP="APAR")
-    df4 <- df4 %>% rename(Value=APAR)
+    df5 <- data.frame(boot[["APAR.boot"]], Stock=rownames(boot[["APAR.boot"]]), RP="APAR")
+    df5 <- df5 %>% rename(Value=APAR)
   }
   
   dfout <- add_row(df1, df2)
   dfout <- add_row(dfout, df3)
-  if (prod == "LifeStageModel" | prod == "RunReconstruction") dfout <- add_row(dfout, df4)
+  dfout <- add_row(dfout, df4)
+  if (prod == "LifeStageModel" | prod == "RunReconstruction") dfout <- add_row(dfout, df5)
   rownames(dfout) <- NULL
   
   # dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits
