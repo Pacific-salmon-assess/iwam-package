@@ -17,6 +17,8 @@ library(latex2exp)
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 
+options(scipen = 999)
+
 # SAVING R OBJECTS: ####
 # In script_A.R
 # save(derived_obj, file = "derived_obj.RData")
@@ -29,8 +31,6 @@ WAin <- read.csv(here::here(WAin))
     # The point of this is to use the Parken assumptions of productivity
     # and make bootstrapped benchmark estimates from the mcmc chains of the
     # Liermann model.
-
-options(scipen = 999)
 
     # 1. SETUP
 BS <- TRUE # default for FALSE

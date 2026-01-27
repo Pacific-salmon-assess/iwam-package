@@ -22,6 +22,8 @@ source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 
+options(scipen = 999)
+
 # Run Liermann_RTMB_model_vC.R to load in all necessary global objects
     # e.g. derived_obj, WAin, WAbase, srdat, fitstan, pars, names
 
@@ -125,47 +127,55 @@ print(paste0("Posterior Predictive P-Value = ", pvalpp))
 
 
 #### Posterior Predictive Distribution: logAlpha ####################################################################################################
-slogAlpha0 <- derived_obj$deripost_full$logAlpha0 # dim(10000, 1)
-slogAlpha02 <- derived_obj$deripost_full$logAlpha02 # dim(10000, 1)
-slogAlpha_sd <- derived_obj$deripost_full$logAlpha_sd # dim(10000, 1)
-simlogAlpha_s <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
-simlogAlpha_o <- matrix(NA, nrow = dim(slogAlpha0)[1], ncol = dim(slogAlpha0)[2])
-for (i in 1:dim(slogAlpha0)[1]){
-  simlogAlpha_s[i] <- slogAlpha0[i] + rnorm(1, mean = 0, sd = slogAlpha_sd[i])
-  simlogAlpha_o[i] <- simlogAlpha_s[i] + slogAlpha02[i]
+# Choose model:
+derived_obj <- dsmax # dsrep
+sAlpha0 <- derived_obj$deripost_full$Alpha0 # dim(10000, 1)
+sAlpha02 <- derived_obj$deripost_full$Alpha02 # dim(10000, 1)
+sAlpha_sd <- derived_obj$deripost_full$Alpha_sd # dim(10000, 1)
+simloglogAlpha_s <- matrix(NA, nrow = dim(sAlpha0)[1], ncol = dim(sAlpha0)[2])
+simloglogAlpha_o <- matrix(NA, nrow = dim(sAlpha0)[1], ncol = dim(sAlpha0)[2])
+for (i in 1:dim(sAlpha0)[1]){
+  simloglogAlpha_s[i] <- sAlpha0[i] + rnorm(1, mean = 0, sd = sAlpha_sd[i])
+  simloglogAlpha_o[i] <- simloglogAlpha_s[i] + sAlpha02[i]
 }
 
+# pdf(here::here("DataOut/SRcurve_smaxmodel.pdf"), width = plotdims[1], height = plotdims[2])
 ggplot() +
-  geom_density(aes(x = simlogAlpha_s), # For a new STREAM observation
+  geom_density(aes(x = simloglogAlpha_s), # For a new STREAM observation
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
-  geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
+  geom_density(aes(x = simloglogAlpha_o), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  labs(x = "Mean of uncentered logAlpha Posterior Predictive Distribution (Stream and Ocean)", 
+  labs(x = "Mean of uncentered log(log(Alpha)) Posterior Predictive Distribution (Stream and Ocean)", 
          y = "Density")
   # labs(x = "Mean of uncentered logAlpha Prior Predictive Distribution (Stream and Ocean)", 
        # y = "Density")
+# dev.off()
 
+# pdf(here::here("DataOut/logalphaposteriorpredictivedist.pdf"), width = 7, height = 7)
 ggplot() +
-  geom_density(aes(x = exp(simlogAlpha_s)), # For a new STREAM observation
+  geom_density(aes(x = exp(simloglogAlpha_s)), # For a new STREAM observation
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
-  geom_density(aes(x = exp(simlogAlpha_o)), # For a new OCEAN observation
+  geom_density(aes(x = exp(simloglogAlpha_o)), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  labs(x = "Mean of uncentered Alpha Posterior Predictive Distribution (Stream and Ocean)", 
+  labs(x = "Mean of uncentered log(Alpha) Posterior Predictive Distribution (Stream and Ocean)", 
          y = "Density")
+# dev.off()
 
 
 #### Pushforward (under prior predictive): logAlpha #################################################################################################
 ggplot() +
-  geom_density(aes(x = slogAlpha02), # For a pushforward alpha?
+  geom_density(aes(x = sAlpha02), # For a pushforward alpha?
                fill = "grey", alpha = 0.4, color = "grey", linewidth = 1.2) +
   theme_classic() +
   labs(x = "Hierarchical Mean logAlpha_LH Prior Pushforward Distribution", y = "Density")
 
-# Posterior OR Prior Distribution ridge plot: logAlpha ####
+
+
+# Posterior OR Prior Distribution ridge plot: logAlpha ##########################################################################
   # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
-dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
+dfalpharidge <- derived_obj$deripost_full$loglogAlpha[, 1:25]
 Stocknames <- WAbase$Name
 colnames(dfalpharidge) <- Stocknames
 alpharidgetable <- as.data.table(dfalpharidge)
@@ -177,7 +187,8 @@ TypeLabels <- ifelse(lifehist$lh == 0, "S", "O")
 n_S <- sum(TypeLabels == "S")
 n_O <- sum(TypeLabels == "O")
 
-ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, Stock))) +
+# pdf(here::here("DataOut/logalpha_ridgeplot.pdf"), width = 7, height = 7)
+ggplot(alpharidgetable_long, aes(x = exp(Value), y = Stock, fill = interaction(Type, Stock))) +
   geom_density_ridges(color = "gray20", alpha = 0.8, scale = 1.2) +
   theme_classic() +
   labs(x = "logAlpha", y = "Stock") +
@@ -190,6 +201,7 @@ ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, 
                paste("O.", Stocknames[TypeLabels == "O"], sep = ""))
     )
  )
+# dev.off()
 
 # ggplot(alpharidge_long, aes(x = Value, y = factor(Index), fill = factor(Index))) +
 #   geom_density_ridges(alpha = 0.5, scale = 1.2, color = "forestgreen") +
@@ -209,6 +221,7 @@ ggplot(alpharidgetable_long, aes(x = Value, y = Stock, fill = interaction(Type, 
 
 
 #### Posterior Distributions of b0 and bWA ##########################################################################################################
+pdf(here::here("DataOut/b0_posteriordensity.pdf"), width = 7, height = 7)
 ggplot() +
   geom_density(aes(x = derived_obj$deripost_full$b0[,1]), 
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
@@ -216,7 +229,9 @@ ggplot() +
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
   labs(x = "b0", y = "Density")
+dev.off()
 
+pdf(here::here("DataOut/bWA_posteriordensity.pdf"), width = 7, height = 7)
 ggplot() +
   geom_density(aes(x = derived_obj$deripost_full$bWA[,1]), 
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
@@ -224,7 +239,7 @@ ggplot() +
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
   labs(x = "bWA", y = "Density")
-
+dev.off()
 
 
 #### Plot SR Relationship Curves - based on SREP ####################################################################################################################
@@ -276,8 +291,6 @@ mtext("Recruitment", side = 2, line = 1, outer = TRUE, cex = 1.3)
 
 
 #### Plot SR Relationship Curves - based on SMAX ########################################################################################################
-lineSMAXdraws <- dsmax$deripost_full$SMAX # 10000, 25
-lineAlphadraws <- exp(dsmax$deripost_full$logAlpha) # 10000, 25
 # SSdraws <- matrix(NA, nrow = 10000, ncol = 100) # this needs to be 10,000 by 100?
 # RRdraws <- matrix(NA, nrow = 10000, ncol = 100)
 RRmedian <- lineAlphamedian <- lineSMAXmedian <- SSmedian <- NA
@@ -285,11 +298,13 @@ RRmedian <- lineAlphamedian <- lineSMAXmedian <- SSmedian <- NA
 rowsample <- sample(1:10000, 1000)
 
 lineSMAXdraws <- dsmax$deripost_full$SMAX # 10000, 25
-lineAlphadraws <- exp(dsmax$deripost_full$logAlpha) # 10000, 25
+lineAlphadraws <- exp(dsmax$deripost_full$loglogAlpha) # 10000, 25
 rowsample <- sample(1:10000, 100) # 1:10000, 1000
 
 Smsylines <- dsmax$deripost_summary$SMSY_r$Median
 
+# plotdims <- dev.size()
+pdf(here::here("DataOut/SRcurve_smaxmodel.pdf"), width = plotdims[1], height = plotdims[2])
 par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
 
 for (i in 1:25) {
@@ -299,15 +314,15 @@ for (i in 1:25) {
   Smax       <- max(spawners)
 
   SSseq <- seq(Smax/100, Smax, length.out = 100)
-  alpha_draws <- lineAlphadraws[, i]
+  logalpha_draws <- lineAlphadraws[, i]
   smax_draws  <- lineSMAXdraws[, i]
 
   SSmat <- matrix(SSseq, nrow = 10000, ncol = 100, byrow = TRUE)
   # RRmat <- SSmat * alpha_draws^(1 - SSmat / srep_draws)
-  RRmat <- SSmat * exp(alpha_draws - SSmat / smax_draws)
+  RRmat <- SSmat * exp(logalpha_draws - SSmat / smax_draws)
 
   # RRmed <- SSseq * median(alpha_draws)^(1 - SSseq / median(srep_draws))
-  RRmed <- SSseq * exp(median(alpha_draws) - SSseq / median(smax_draws))
+  RRmed <- SSseq * exp(median(logalpha_draws) - SSseq / median(smax_draws))
 
   plot(spawners, recruits, xlim = c(0, Smax + Smax/10), ylim = c(0, max(recruits)))
   abline(v = Smsylines[i], col = 'red', lty = 'dashed')
@@ -319,7 +334,7 @@ for (i in 1:25) {
 
 mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
 mtext("Recruitment", side = 2, line = 1, outer = TRUE, cex = 1.3)
-
+dev.off()
 
 #### RESIDUALS ######################################################################################################################################
 #### For the relationship between capacity and watershed size 
@@ -569,16 +584,16 @@ ggplot() +
   geom_point(data = parken,
              aes(x = fct_reorder(Stock, log(WA)), y = SREPp, color = "Parken")) +
   
-  geom_errorbar(data = targetsAll_srep, aes(x = fct_reorder(Stock_name, log(WA)),
-                                     y = SREP_tar_median,
-                                     ymax = SREP_tar_UQ_95, 
-                                     ymin = SREP_tar_LQ_5,
-                                 color = "Liermann SREP",
-                                 width=.1),
-                position = position_nudge(+0.1)) +
-  geom_point(data = targetsAll_srep,
-             position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_tar_median, color = "Liermann SREP")) +
+  # geom_errorbar(data = targetsAll_srep, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     # y = SREP_tar_median,
+                                     # ymax = SREP_tar_UQ_95, 
+                                     # ymin = SREP_tar_LQ_5,
+                                 # color = "Liermann SREP",
+                                 # width=.1),
+                # position = position_nudge(+0.1)) +
+  # geom_point(data = targetsAll_srep,
+             # position = position_nudge(+0.1),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_tar_median, color = "Liermann SREP")) +
 
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = SREP_tar_median,
@@ -662,16 +677,16 @@ ggplot() +
   geom_point(data = parken,
              aes(x = fct_reorder(Stock, log(WA)), y = SMSYp, color = "Parken")) +
   
-  geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, log(WA)),
-                                     y = SMSY_median,
-                                     ymax = SMSY_UQ_95, 
-                                     ymin = SMSY_LQ_5,
-                                 color = "Liermann MCMC Cond.",
-                                 width=.1),
-                position = position_nudge(+0.1)) +
-  geom_point(data = targetsAll,
-             position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond.")) +
+  # geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     # y = SMSY_median,
+                                     # ymax = SMSY_UQ_95, 
+                                     # ymin = SMSY_LQ_5,
+                                 # color = "Liermann MCMC Cond.",
+                                 # width=.1),
+                # position = position_nudge(+0.1)) +
+  # geom_point(data = targetsAll,
+             # position = position_nudge(+0.1),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond.")) +
   
   geom_errorbar(data = targetsAll, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = Value_SMSY,
@@ -715,6 +730,7 @@ Parkentable1 <- Parkentable1 |>
 
 synoptic <- WAbase |>
   rename("Stock_name" = Name) # This name can change depending on what data sets are being run
+  
   # SREP ESTIMATE FOR SYNOPTIC POPULATIONS
 targetsyn_srep <- cbind(synoptic, dsrep$deripost_summary$SREP) |> 
   rename("SREP_mean" = Mean, "SREP_median" = Median,
@@ -746,6 +762,8 @@ targetsyn_smax <- cbind(targetsyn_smax, dsmax$deripost_summary$SMAX) |>
 
 
 #### SREP ####
+# plotdims <- dev.size() # 1. Set size of graphics pop-out first - and then save plotdims
+# pdf(here::here("DataOut/PointwiseSMAXmodel_SYNOPTIC_SREP.pdf"), width = 12, height = 7) # 2. print to pdf
 ggplot() +
   
   # geom_errorbar(data = Parkentable1, aes(x = fct_reorder(Stock, log(WA)), y = SREP, ymax = SREPp_95, ymin = SREPp_5,
@@ -755,16 +773,16 @@ ggplot() +
   geom_point(data = Parkentable1,
              aes(x = fct_reorder(Stock, log(WA)), y = Srep, color = "Parken")) +
   
-  geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
-                                     y = SREP_median,
-                                     ymax = SREP_UQ_95, 
-                                     ymin = SREP_LQ_5,
-                                 color = "Liermann MCMC Cond. (SREP)",
-                                 width=.1),
-                position = position_nudge(+0.2)) +
-  geom_point(data = targetsyn_srep,
-             position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_median, color = "Liermann MCMC Cond. (SREP)")) +
+  # geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     # y = SREP_median,
+                                     # ymax = SREP_UQ_95, 
+                                     # ymin = SREP_LQ_5,
+                                 # color = "Liermann MCMC Cond. (SREP)",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsyn_srep,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = SREP_median, color = "Liermann MCMC Cond. (SREP)")) +
 			 
   geom_errorbar(data = targetsyn_smax, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = SREP_median,
@@ -805,15 +823,16 @@ ggplot() +
                      values=c('Parken' = "black",
                               # 'RTMB MLE' = "orange",
 							  'IWAM' = 'orange',
-                              'Liermann MCMC Cond. (SREP)' = "skyblue",
-							  'Liermann MCMC Cond. (SMAX)' = "forestgreen",
+                              'Liermann MCMC Cond. (SREP)' = "forestgreen",
+							  'Liermann MCMC Cond. (SMAX)' = "skyblue",
                               'Liermann MCMC Marg.' = "darkblue",
-							  'Liermann Bootstrap' = 'forestgreen')
+							  'Liermann Bootstrap' = 'amber')
 							  )
+# dev.off()
 
 
-
-#### SMAX ####
+#### SMAX - SYNOPTIC POPS ####
+# pdf(here::here("DataOut/PointwiseSMAXmodel_SYNOPTIC_SMAX.pdf"), width = 12, height = 7) # 2. print to pdf
 ggplot() +
   
   # geom_errorbar(data = Parkentable1, aes(x = fct_reorder(Stock, log(WA)), y = SREP, ymax = SREPp_95, ymin = SREPp_5,
@@ -823,16 +842,16 @@ ggplot() +
   geom_point(data = Parkentable1,
              aes(x = fct_reorder(Stock, log(WA)), y = SMAX, color = "Parken")) +
   
-  geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
-                                     y = SMAX_median,
-                                     ymax = SMAX_UQ_95, 
-                                     ymin = SMAX_LQ_5,
-                                 color = "Liermann MCMC Cond. (SREP)",
-                                 width=.1),
-                position = position_nudge(+0.2)) +
-  geom_point(data = targetsyn_srep,
-             position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, log(WA)), y = SMAX_median, color = "Liermann MCMC Cond. (SREP)")) +
+  # geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     # y = SMAX_median,
+                                     # ymax = SMAX_UQ_95, 
+                                     # ymin = SMAX_LQ_5,
+                                 # color = "Liermann MCMC Cond. (SREP)",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsyn_srep,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = SMAX_median, color = "Liermann MCMC Cond. (SREP)")) +
   
   geom_errorbar(data = targetsyn_smax, aes(x = fct_reorder(Stock_name, log(WA)),
                                      y = SMAX_median,
@@ -873,12 +892,81 @@ ggplot() +
                      values=c('Parken' = "black",
                               # 'RTMB MLE' = "orange",
 							  'IWAM' = 'orange',
-                              'Liermann MCMC Cond. (SREP)' = "skyblue",
-							  'Liermann MCMC Cond. (SMAX)' = "forestgreen",
+                              'Liermann MCMC Cond. (SREP)' = "forestgreen",
+							  'Liermann MCMC Cond. (SMAX)' = "skyblue",
                               'Liermann MCMC Marg.' = "darkblue",
-							  'Liermann Bootstrap' = 'forestgreen')
+							  'Liermann Bootstrap' = 'amber')
 							  )
+# dev.off()
 
+
+#### SMSY - SYNOPTIC POPS ####
+# pdf(here::here("DataOut/PointwiseSMAXmodel_SYNOPTIC_SMSY.pdf"), width = 12, height = 7) # 2. print to pdf
+ggplot() +
+  
+  # geom_errorbar(data = Parkentable1, aes(x = fct_reorder(Stock, log(WA)), y = SREP, ymax = SREPp_95, ymin = SREPp_5,
+                                       # color = "Parken",
+                                       # width=.1),
+# ) +
+  geom_point(data = Parkentable1,
+             aes(x = fct_reorder(Stock, log(WA)), y = Smsy, color = "Parken")) +
+  
+  # geom_errorbar(data = targetsyn_srep, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     # y = SMAX_median,
+                                     # ymax = SMAX_UQ_95, 
+                                     # ymin = SMAX_LQ_5,
+                                 # color = "Liermann MCMC Cond. (SREP)",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsyn_srep,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = SMAX_median, color = "Liermann MCMC Cond. (SREP)")) +
+  
+  geom_errorbar(data = targetsyn_smax, aes(x = fct_reorder(Stock_name, log(WA)),
+                                     y = SMSY_median,
+                                     ymax = SMSY_UQ_95, 
+                                     ymin = SMSY_LQ_5,
+                                 color = "Liermann MCMC Cond. (SMAX)",
+                                 width=.1),
+                position = position_nudge(-0.2)) +
+  geom_point(data = targetsyn_smax,
+             position = position_nudge(-0.2),
+             aes(x = fct_reorder(Stock_name, log(WA)), y = SMSY_median, color = "Liermann MCMC Cond. (SMAX)")) +
+  
+  # geom_errorbar(data = targetsyn, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
+                                     # y = Value_IWAM_SREP,
+                                     # ymax = lwr_IWAM_SREP, 
+                                     # ymin = upr_IWAM_SREP,
+                                 # color = "IWAM",
+                                 # width=.1),
+                # position = position_nudge(+0.2)) +
+  # geom_point(data = targetsAll,
+             # position = position_nudge(+0.2),
+             # aes(x = fct_reorder(Stock_name, log(WA)), y = Value_IWAM_SREP, color = "IWAM")) +
+  
+  theme_classic() +
+  scale_y_continuous(transform = "log", 
+                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
+  ylab(TeX("$S_{MSY}$ Estimate")) +
+  xlab("") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+  scale_color_manual(name='Model',
+                     breaks=c('Parken',
+                              # 'RTMB MLE',
+							  'IWAM',
+                              'Liermann MCMC Cond. (SREP)',
+							  'Liermann MCMC Cond. (SMAX)',
+                              'Liermann MCMC Marg.',
+							  'Liermann Bootstrap'),
+                     values=c('Parken' = "black",
+                              # 'RTMB MLE' = "orange",
+							  'IWAM' = 'orange',
+                              'Liermann MCMC Cond. (SREP)' = "forestgreen",
+							  'Liermann MCMC Cond. (SMAX)' = "skyblue",
+                              'Liermann MCMC Marg.' = "darkblue",
+							  'Liermann Bootstrap' = 'amber')
+							  )
+# dev.off()
 
 
 #### Linear Regression: Liermann vs. Parken model ###################################################################################################
@@ -895,29 +983,30 @@ ggplot() +
 # Need posterior predictive means of the linear regression - of logSREP_tar w/ quantiles
 # Plotted against simulated WA
 # derived_obj$deripost_summary$SREP_line_ocean and SREP_line_ocean including their marginal variants
-# Plot lineWA against SREP 
+# Plot lineWA against SREP/SMAX
+
 baselinescatter <- data.frame(
 	WAbaseshifted = WAbase$logWAshifted,
 	WAreal = WAbase$WA,
 	WAtarget = dat$WAin$WA, # ONLY WORKS IF SAME NUMBER ****
 	WAlh = WAbase$lh,
 	WAlhtarget = dat$WAin$lh, # 0 and 1's # ONLY WORKS IF SAME NUMBER ****
-	SREP = dpars_srep$SREP$Median, # ?
-	SREP_tar = dpars_srep$SREP_tar$Median # ONLY WORKS IF SAME NUMBER ****
+	SMAX = dpars_smax$SMAX$Median, # ? # or dpars_smax
+	SMAX_tar = dpars_smax$SMAX_tar$Median # ONLY WORKS IF SAME NUMBER **** # or dpars_smax
 ) # dat$mean_logWA
 
 posteriorline <- data.frame(
 	lineWA = dat$lineWA, # vector of 72
-	median_stream_line = derived_obj$deripost_summary$logSREP_line_stream$Median,
-	median_ocean_line = derived_obj$deripost_summary$logSREP_line_ocean$Median,
-	lower_stream_line = derived_obj$deripost_summary$logSREP_line_stream$LQ_5 ,
-	upper_stream_line = derived_obj$deripost_summary$logSREP_line_stream$UQ_95,
-	lower_ocean_line = derived_obj$deripost_summary$logSREP_line_ocean$LQ_5,
-	upper_ocean_line = derived_obj$deripost_summary$logSREP_line_ocean$UQ_95
+	median_stream_line = dsmax$deripost_summary$logSMAX_line_stream$Median,
+	median_ocean_line = dsmax$deripost_summary$logSMAX_line_ocean$Median,
+	lower_stream_line = dsmax$deripost_summary$logSMAX_line_stream$LQ_5 ,
+	upper_stream_line = dsmax$deripost_summary$logSMAX_line_stream$UQ_95,
+	lower_ocean_line = dsmax$deripost_summary$logSMAX_line_ocean$LQ_5,
+	upper_ocean_line = dsmax$deripost_summary$logSMAX_line_ocean$UQ_95
 )
 
 # On Logged scales
-ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SREP), color = WAlh)) + # base observation scatter plot ???????????????????????????????
+ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SMAX), color = WAlh)) + # base observation scatter plot ???????????????????????????????
 	geom_point(alpha = 0.5) + # colours, etc. for observation scatter plot
 	scale_color_manual(values = c('stream' = 'forestgreen', 'ocean' = 'skyblue'), guide = "none") +
 	# geom_point(data = baselinescatter, aes(x = , y = )inherit.aes = FALSE) +
@@ -929,15 +1018,15 @@ ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SREP), color = WAl
 	theme_classic() + 
 	# scale_x_log10() +
 	# scale_y_log10() + 
-	labs(x = "Log Mean Centered Accessible Watershed Area", y = "LogSREP (Spawners at Replacement)")
+	labs(x = "Log Mean Centered Accessible Watershed Area", y = "LogSMAX (Spawners at Max Recruitment)")
 
 # Processing
 # Do I need to add back in mean_logWA? for the shifted WA's?
 	# If I convert to real-scale for WA then exp(lineWA + mean_logWA)
-eb01 <- derived_obj$deripost_full$b0[,1]
-eb02 <- derived_obj$deripost_full$b0[,2]
-ebWA1 <- derived_obj$deripost_full$bWA[,1]
-ebWA2 <- derived_obj$deripost_full$bWA[,2]
+eb01 <- dsmax$deripost_full$b0[,1]
+eb02 <- dsmax$deripost_full$b0[,2]
+ebWA1 <- dsmax$deripost_full$bWA[,1]
+ebWA2 <- dsmax$deripost_full$bWA[,2]
 
 realWAline <- exp(seq(log(min(dat$WAbase$WA, na.rm=TRUE)), log(max(dat$WAbase$WA, na.rm=TRUE)), length.out = 72))
 posteriorline$logWAline <- log(realWAline)
@@ -945,23 +1034,23 @@ posteriorline$logWAline <- log(realWAline)
 unc1 <- eb01 -  ebWA1 * dat$mean_logWA
 unc2 <- (eb01 + eb02) - (ebWA1 + ebWA2) * dat$mean_logWA
 
-elogSREP1 <- outer(unc1, rep(1, length(posteriorline$logWAline))) + outer(ebWA1, posteriorline$logWAline)
-elogSREP2 <- outer(unc2, rep(1, length(posteriorline$logWAline))) + outer(ebWA1 + ebWA2, posteriorline$logWAline)
-eSREP1 <- exp(elogSREP1)
-eSREP2 <- exp(elogSREP2)
+elogSMAX1 <- outer(unc1, rep(1, length(posteriorline$logWAline))) + outer(ebWA1, posteriorline$logWAline)
+elogSMAX2 <- outer(unc2, rep(1, length(posteriorline$logWAline))) + outer(ebWA1 + ebWA2, posteriorline$logWAline)
+eSMAX1 <- exp(elogSMAX1)
+eSMAX2 <- exp(elogSMAX2)
 
-posteriorline$eSREP1median <- apply(eSREP1, 2, median)
-posteriorline$eSREP1_5 <- apply(eSREP1, 2, quantile, probs = c(0.05, 0.95))[1,]
-posteriorline$eSREP1_95 <- apply(eSREP1, 2, quantile, probs = c(0.05, 0.95))[2,]
-posteriorline$eSREP2median <- apply(eSREP2, 2, median)
-posteriorline$eSREP2_5 <- apply(eSREP2, 2, quantile, probs = c(0.05, 0.95))[1,]
-posteriorline$eSREP2_95 <- apply(eSREP2, 2, quantile, probs = c(0.05, 0.95))[2,]
+posteriorline$eSMAX1median <- apply(eSMAX1, 2, median)
+posteriorline$eSMAX1_5 <- apply(eSMAX1, 2, quantile, probs = c(0.05, 0.95))[1,]
+posteriorline$eSMAX1_95 <- apply(eSMAX1, 2, quantile, probs = c(0.05, 0.95))[2,]
+posteriorline$eSMAX2median <- apply(eSMAX2, 2, median)
+posteriorline$eSMAX2_5 <- apply(eSMAX2, 2, quantile, probs = c(0.05, 0.95))[1,]
+posteriorline$eSMAX2_95 <- apply(eSMAX2, 2, quantile, probs = c(0.05, 0.95))[2,]
 
-hdi_list1 <- apply(eSREP1, 2, function(x) {
+hdi_list1 <- apply(eSMAX1, 2, function(x) {
   out <- hdi(x, credMass = 0.95)
   c(lower = out[1], upper = out[2])
 })
-hdi_list2 <- apply(eSREP2, 2, function(x) {
+hdi_list2 <- apply(eSMAX2, 2, function(x) {
   out <- hdi(x, credMass = 0.95)
   c(lower = out[1], upper = out[2])
 })
@@ -970,7 +1059,8 @@ posteriorline$hdi_hi1 <- hdi_list1[2, ]
 posteriorline$hdi_lo2 <- hdi_list2[1, ]
 posteriorline$hdi_hi2 <- hdi_list2[2, ]
 
-ggplot(data = baselinescatter, aes(x = WAreal, y = SREP, color = WAlh)) + # base observation scatter plot ???????????????????????????????
+pdf(here::here("DataOut/LinearReg_SmaxModel_realscale.pdf"), width = 12, height = 7) # 2. print to pdf
+ggplot(data = baselinescatter, aes(x = WAreal, y = SMAX, color = WAlh)) + # base observation scatter plot ???????????????????????????????
 	geom_point(alpha = 0.8, size = 3) + # colours, etc. for observation scatter plot
 	scale_color_manual(name = "Life History", 
 		values = c('stream' = 'forestgreen', 'ocean' = 'skyblue'), 
@@ -984,16 +1074,16 @@ ggplot(data = baselinescatter, aes(x = WAreal, y = SREP, color = WAlh)) + # base
 	# THESE ARE MEDIAN VALUES e.g. ON THE LINE
 	# COULD ALSO PLOT THE POSTERIOR PREDICTIVE SREP_tar VALUES?
 	
-	geom_line(data = posteriorline, aes(x = exp(logWAline), y = eSREP1median), 
+	geom_line(data = posteriorline, aes(x = exp(logWAline), y = eSMAX1median), 
 		color = "forestgreen", size = 1, inherit.aes = FALSE) + 
-	geom_ribbon(data = posteriorline, aes(x = exp(logWAline), ymin = eSREP1_5, ymax = eSREP1_95), 
+	geom_ribbon(data = posteriorline, aes(x = exp(logWAline), ymin = eSMAX1_5, ymax = eSMAX1_95), 
 		fill = "forestgreen", alpha = 0.3, inherit.aes = FALSE) + 
 	# geom_ribbon(data = posteriorline, aes(x = exp(logWAline), ymin = hdi_lo1, ymax = hdi_hi1), 
 		# fill = "forestgreen", alpha = 0.2, inherit.aes = FALSE) + # HDPI
 	
-	geom_line(data = posteriorline, aes(x = exp(logWAline), y = eSREP2median), 
+	geom_line(data = posteriorline, aes(x = exp(logWAline), y = eSMAX2median), 
 		color = "skyblue", size = 1, inherit.aes = FALSE) + 
-	geom_ribbon(data = posteriorline, aes(x = exp(logWAline), ymin = eSREP2_5, ymax = eSREP2_95), 
+	geom_ribbon(data = posteriorline, aes(x = exp(logWAline), ymin = eSMAX2_5, ymax = eSMAX2_95), 
 		fill = "skyblue", alpha = 0.3, inherit.aes = FALSE) +
 	# geom_ribbon(data = posteriorline, aes(x = exp(logWAline), ymin = hdi_lo2, ymax = hdi_hi2), 
 		# fill = "skyblue", alpha = 0.2, inherit.aes = FALSE) + # HDPI
@@ -1010,10 +1100,10 @@ ggplot(data = baselinescatter, aes(x = WAreal, y = SREP, color = WAlh)) + # base
 	scale_x_log10(labels = function(x) format(x, scientific = FALSE, trim = TRUE, big.mark = ",")) +
 	scale_y_log10(labels = function(x) format(x, scientific = FALSE, trim = TRUE, big.mark = ",")) + 
 	
-	labs(x = "Accessible Watershed Area", y = "SREP (Spawners at Replacement)")
+	labs(x = "Accessible Watershed Area", y = "SMAX (Spawners at Max Recruitment)")
 
-ggsave("figure.png", width = 4, height = 3, dpi = 300) # REALLY IMPORTANT VISUAL
-
+# ggsave("figure.png", width = 4, height = 3, dpi = 300) # REALLY IMPORTANT VISUAL
+dev.off()
 
 
 #### Bar plot comparison of SYNOPTIC values of SREP #################################################################################################

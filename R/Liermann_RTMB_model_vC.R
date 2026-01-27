@@ -23,6 +23,8 @@ source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 
+options(scipen = 999)
+
 # New LambertW0 see: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
 LambertW0 <- ADjoint(
   function(x){gsl::lambert_W0(x)},
@@ -110,14 +112,14 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
             # logRS_pred = numeric(nrow(srdat)), # Zeroes - testing as a parameter
             logSREP_re = numeric(N_Stk), # Zeroes
-            logAlpha0 = 0.6,
-            logAlpha_re = numeric(nrow(dat$WAbase)), # Zeroes
+            Alpha0 = 0.6,
+            Alpha_re = numeric(nrow(dat$WAbase)), # Zeroes
             tauobs = 0.01 + numeric(N_Stk), # Constrained positive
             logSREP_sd = 1, 
             logAlpha_sd = 1
 )
 if (lhdiston) {
-  par$logAlpha02 <- 0
+  par$Alpha02 <- 0
 }
 
 f_srep <- function(par){
@@ -134,14 +136,14 @@ f_srep <- function(par){
 
   SREP <- numeric(N_Stk)
   logSREP <- numeric(N_Stk)
-  logAlpha <- numeric(N_Stk)
+  loglogAlpha <- numeric(N_Stk)
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
 
   SREP_tar <- numeric(N_Pred)
   logSREP_tar <- numeric(N_Pred)
-  logAlpha_tar <- numeric(N_Pred)
+  loglogAlpha_tar <- numeric(N_Pred)
   
   # Simulated line vectors
   line <- length(lineWA)
@@ -152,11 +154,11 @@ f_srep <- function(par){
   
   if (bias.cor) {
 	biaslogSREP <- -0.5*logSREP_sd^2 # Global
-	biaslogAlpha <- -0.5*logAlpha_sd^2 # Global
+	biasloglogAlpha <- -0.5*Alpha_sd^2 # Global
 	biaslogRS <- -0.5*(sqrt(1/tauobs))^2 # Stock-specific
   } else {
 	biaslogSREP <- 0
-	biaslogAlpha <- 0
+	biasloglogAlpha <- 0
 	biaslogRS <- numeric(N_Stk)
   }
   
@@ -168,8 +170,8 @@ f_srep <- function(par){
   nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior bWA
   nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) # Prior bWA
   
-  nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
-  if(lhdiston) nll <- nll - sum(dnorm(logAlpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
+  nll <- nll - sum(dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
+  if(lhdiston) nll <- nll - sum(dnorm(Alpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
   
   # Half normal/half student-t/half cauchy for SD parameters
     # Half normal:
@@ -187,10 +189,10 @@ f_srep <- function(par){
     logSREP[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd + biaslogSREP
     SREP[i] <- exp(logSREP[i])
     
-	nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE)
+	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
     # Non-centered with scaling of mean by logAlpha_sd
-    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlpha_sd + biaslogAlpha
-    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlpha_sd + biaslogAlpha
+    if(lhdiston) loglogAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biasloglogAlpha
+    else loglogAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biasloglogAlpha
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
@@ -198,8 +200,8 @@ f_srep <- function(par){
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
-	alpha_pred <- exp(logAlpha)
-	logRS_pred[i] <- alpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	logalpha_pred <- exp(loglogAlpha)
+	logRS_pred[i] <- logalpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
@@ -211,8 +213,8 @@ f_srep <- function(par){
   BETA_r = numeric(nrow(WAbase))
   
   for (i in 1:N_Stk){
-    BETA_r[i] <- alpha_pred[i] / SREP[i]
-    SMSY_r[i] <- (1 - LambertW0(exp(1 - alpha_pred[i]))) / BETA_r[i]
+    BETA_r[i] <- logalpha_pred[i] / SREP[i]
+    SMSY_r[i] <- (1 - LambertW0(exp(1 - logalpha_pred[i]))) / BETA_r[i]
   }
 
   ## PREDICTIONS
@@ -225,21 +227,21 @@ f_srep <- function(par){
 	# Conditioning on a random site, but the conditional mean
   for (i in 1:N_Pred){
     # NEW: alpha0 prior for LH specific dists.
-    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
-    else logAlpha_tar[i] <- logAlpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    if(lhdiston) loglogAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    else loglogAlpha_tar[i] <- Alpha0 + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
 
     logSREP_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP # + biaslogSREP + logSREP_sd^2/2
 		# add -0.5*logSREP_sd^2 OR
 		# do the random normal when extracting the posterior
     SREP_tar[i] <- exp(logSREP_tar[i])
     
-	alpha_tar <- exp(logAlpha_tar)
+	logalpha_tar <- exp(loglogAlpha_tar)
     # Predict BETA
-    BETA[i] <- alpha_tar[i]/SREP_tar[i]
+    BETA[i] <- logalpha_tar[i]/SREP_tar[i]
     # Predict SMSY
-    SMSY[i] <- (1-LambertW0(exp(1-alpha_tar[i])))/BETA[i]
+    SMSY[i] <- (1-LambertW0(exp(1 - logalpha_tar[i])))/BETA[i]
     # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(alpha_tar[i])))
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logalpha_tar[i])))
   }
   
   # Create predictions on an simulated line
@@ -264,12 +266,12 @@ f_srep <- function(par){
   REPORT(logSREP_sd)
   REPORT(SREP) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logSREP)
-  REPORT(logAlpha) # model logAlpha (25)
-  REPORT(logAlpha0)
-  REPORT(logAlpha02)
-  REPORT(logAlpha_re) # random effect parameter for resampling
-  REPORT(logAlpha_sd)
-  REPORT(alpha_pred)
+  REPORT(loglogAlpha) # model logAlpha (25)
+  REPORT(Alpha0)
+  REPORT(Alpha02)
+  REPORT(Alpha_re) # random effect parameter for resampling
+  REPORT(Alpha_sd)
+  REPORT(logalpha_pred)
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(tauobs) # Necessary to add back in observation error?
@@ -279,8 +281,8 @@ f_srep <- function(par){
   # alpha_tar <- exp(logAlpha_tar)
   REPORT(SREP_tar)
   REPORT(logSREP_tar)
-  REPORT(logAlpha_tar)
-  REPORT(alpha_tar)
+  REPORT(loglogAlpha_tar)
+  REPORT(logalpha_tar)
   
   REPORT(BETA)
   REPORT(SMSY)
@@ -297,7 +299,7 @@ f_srep <- function(par){
 
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_srep, par,
-    random = c("logAlpha_re", "logSREP_re"),
+    random = c("Alpha_re", "logSREP_re"),
     silent=TRUE)
 
 # Alternative approach from Sean ####
@@ -324,12 +326,12 @@ if(randomgenmethod == T){
       listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
         bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
         logSREP_sd = logSREP_sd, # This isn't being saved internally
-        logAlpha_sd = logAlpha_sd, # This isn't being saved internally
+        Alpha_sd = Alpha_sd, # This isn't being saved internally
         
         logSREP_re = rnorm(N_Stk, 0, logSREP_sd),
-        logAlpha0 = rnorm(1, 0.6, 0.45),
-        logAlpha02 = rnorm(1, 0, 31.6),
-        logAlpha_re = rnorm(nrow(dat$WAbase), 0, logAlpha_sd),
+        Alpha0 = rnorm(1, 0.6, 0.45),
+        Alpha02 = rnorm(1, 0, 31.6),
+        Alpha_re = rnorm(nrow(dat$WAbase), 0, Alpha_sd),
         
         tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
         )
@@ -401,8 +403,8 @@ lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
 upper[names(obj$par) == "logSREP_sd"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "logSREP_sd"] <- 0
-upper[names(obj$par) == "logAlpha_sd"] <- 100 # Turn off for half dists.
-lower[names(obj$par) == "logAlpha_sd"] <- 0
+upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
+lower[names(obj$par) == "Alpha_sd"] <- 0
 
 # nlminb - MLE ####
 # stan MAP: do mle via optimize - would just be using tmb obj and nlminb:
@@ -418,24 +420,25 @@ lower[names(obj$par) == "logAlpha_sd"] <- 0
 # RANDOM INIT - MATCHING PRIORS
 init <- function() {
   # Can also add par <- to sequence above - see prior testing
-  listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
+  listinit <- list(
+	   b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
        bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
        
        # logRS_pred = rnorm(N_Obs, 0, 1),
        logSREP_re = rnorm(N_Stk, 0, 1), # Contains negatives
-       logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
+       Alpha0 = rnorm(1, 0.6, 1), # Contains negatives
        # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
-       logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
+       Alpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
        # Should these be 0.01 to 100s? Would that be more accurate?
        logSREP_sd = runif(1, 0.01, 3), # Positive
-       logAlpha_sd = runif(1, 0.01, 3) # Positive
+       Alpha_sd = runif(1, 0.01, 3) # Positive
   )
   
   if (lhdiston) {
-    listinit$logAlpha02 <- rnorm(1, 0, 1) # alpha0 prior for LH specific dists.
+    listinit$Alpha02 <- rnorm(1, 0, 1) # alpha0 prior for LH specific dists.
   }
   
   return(listinit)

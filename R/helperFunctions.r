@@ -183,6 +183,7 @@ Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE) {
   # b = log(a.par)/SREP
   b.par <- log(a.par)/SREP
   SMAX <- 1 / b.par
+  
   if (explicit){
     SMSY <- (1 - gsl::lambert_W0(exp(1 - log(a.par) ))) / (b.par)
     }

@@ -16,12 +16,14 @@ library(beepr) # Sounds
 library(viridis) # Colours
 library(ggridges) # Ridge plots
 library(data.table) # Create data tables for pivoting
-library(microbenchmark) # Timing functions
+# library(microbenchmark) # Timing functions
 
 here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
+
+options(scipen = 999) # Remove scientific notation
 
 # New LambertW0 see: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
 LambertW0 <- ADjoint(
@@ -30,7 +32,9 @@ LambertW0 <- ADjoint(
 )
 
 # Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv") # c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv") 
+	# c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
 
 # For predicting/re-evaluation of synoptic sets: WAbase
     # 1. Run model until setting up data section
@@ -110,14 +114,14 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             bWA = c(0, 0), # Inital values for WA regression slopes
             # logRS_pred = numeric(nrow(srdat)), # Zeroes - testing as a parameter
             logSMAX_re = numeric(N_Stk), # Zeroes # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-            logAlpha0 = 0.6,
-            logAlpha_re = numeric(nrow(dat$WAbase)), # Zeroes
+            Alpha0 = 0.6,
+            Alpha_re = numeric(nrow(dat$WAbase)), # Zeroes
             tauobs = 0.01 + numeric(N_Stk), # Constrained positive
             logSMAX_sd = 1, # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-            logAlpha_sd = 1
+            Alpha_sd = 1
 )
 if (lhdiston) {
-  par$logAlpha02 <- 0
+  par$Alpha02 <- 0
 }
 
 f_smax <- function(par){
@@ -134,14 +138,14 @@ f_smax <- function(par){
 
   SMAX <- numeric(N_Stk) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   logSMAX <- numeric(N_Stk) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  logAlpha <- numeric(N_Stk)
+  loglogAlpha <- numeric(N_Stk)
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
 
   SMAX_tar <- numeric(N_Pred) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   logSMAX_tar <- numeric(N_Pred) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  logAlpha_tar <- numeric(N_Pred)
+  loglogAlpha_tar <- numeric(N_Pred)
   
   # Simulated line vectors
   line <- length(lineWA)
@@ -152,11 +156,11 @@ f_smax <- function(par){
   
   if (bias.cor) {
 	biaslogSMAX <- -0.5*logSMAX_sd^2 # Global # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	biaslogAlpha <- -0.5*logAlpha_sd^2 # Global
+	biasloglogAlpha <- -0.5*Alpha_sd^2 # Global
 	biaslogRS <- -0.5*(sqrt(1/tauobs))^2 # Stock-specific
   } else {
 	biaslogSMAX <- 0 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	biaslogAlpha <- 0
+	biasloglogAlpha <- 0
 	biaslogRS <- numeric(N_Stk)
   }
   
@@ -168,8 +172,8 @@ f_smax <- function(par){
   nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior bWA
   nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) # Prior bWA
   
-  nll <- nll - sum(dnorm(logAlpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
-  if(lhdiston) nll <- nll - sum(dnorm(logAlpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
+  nll <- nll - sum(dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
+  if(lhdiston) nll <- nll - sum(dnorm(Alpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
@@ -178,9 +182,9 @@ f_smax <- function(par){
     logSMAX[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSMAX_re[i]*logSMAX_sd + biaslogSMAX # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     SMAX[i] <- exp(logSMAX[i]) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     
-	nll <- nll - dnorm(logAlpha_re[i], 0, sd = 1, log = TRUE)
-    if(lhdiston) logAlpha[i] <- logAlpha0 + logAlpha02*type[i] + logAlpha_re[i]*logAlpha_sd + biaslogAlpha
-    else logAlpha[i] <- logAlpha0 + logAlpha_re[i]*logAlpha_sd + biaslogAlpha
+	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
+    if(lhdiston) loglogAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biasloglogAlpha
+    else loglogAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biasloglogAlpha
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
@@ -190,9 +194,9 @@ f_smax <- function(par){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	# logRS_pred[i] <- alpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	
-	alpha_pred <- exp(logAlpha) 
+	logalpha_pred <- exp(loglogAlpha) 
 	# logRS_pred[i] <- exp(logAlpha[stk[i]]) - S[i]/SMAX[stk[i]]
-	logRS_pred[i] <- alpha_pred[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
+	logRS_pred[i] <- logalpha_pred[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
 	# logRS_pred[i] <- logAlpha[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
 
 
@@ -209,8 +213,8 @@ f_smax <- function(par){
   for (i in 1:N_Stk){
     # BETA_r[i] <- logAlpha[i] / SREP[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	BETA_r[i] <- 1/SMAX[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    SMSY_r[i] <- (1 - LambertW0(exp(1 - alpha_pred[i]))) / BETA_r[i]
-	SREP_r[i] <- alpha_pred[i]/BETA_r[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    SMSY_r[i] <- (1 - LambertW0(exp(1 - logalpha_pred[i]))) / BETA_r[i]
+	SREP_r[i] <- logalpha_pred[i]/BETA_r[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   }
 
   ## PREDICTIONS
@@ -221,22 +225,22 @@ f_smax <- function(par){
 
   for (i in 1:N_Pred){
     # NEW: alpha0 prior for LH specific dists.
-    if(lhdiston) logAlpha_tar[i] <- logAlpha0 + logAlpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
-    else logAlpha_tar[i] <- logAlpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    if(lhdiston) loglogAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    else loglogAlpha_tar[i] <- Alpha0 + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
 
     logSMAX_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSMAX # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     SMAX_tar[i] <- exp(logSMAX_tar[i]) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     
-	alpha_tar <- exp(logAlpha_tar)
+	logalpha_tar <- exp(loglogAlpha_tar)
     # Predict BETA
     # BETA[i] <- logAlpha_tar[i]/SREP_tar[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	BETA[i] <- 1/SMAX_tar[i] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     # Predict SMSY
-    SMSY[i] <- (1-LambertW0(exp(1-alpha_tar[i])))/BETA[i]
+    SMSY[i] <- (1 - LambertW0(exp(1 - logalpha_tar[i])))/BETA[i]
     # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(alpha_tar[i])))
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logalpha_tar[i])))
 	# Predict SREP
-	SREP[i] <- alpha_tar[i]/BETA[i]
+	SREP[i] <- logalpha_tar[i]/BETA[i]
   }
   
   # Create predictions on an simulated line
@@ -261,12 +265,12 @@ f_smax <- function(par){
   REPORT(logSMAX_sd)
   REPORT(SMAX) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logSMAX)
-  REPORT(logAlpha) # model logAlpha (25)
-  REPORT(logAlpha0)
-  REPORT(logAlpha02)
-  REPORT(logAlpha_re) # random effect parameter for resampling
-  REPORT(logAlpha_sd)
-  REPORT(alpha_pred) # Also called alpha_pred
+  REPORT(loglogAlpha) # model logAlpha (25)
+  REPORT(Alpha0)
+  REPORT(Alpha02)
+  REPORT(Alpha_re) # random effect parameter for resampling
+  REPORT(Alpha_sd)
+  REPORT(logalpha_pred) # Also called alpha_pred
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(SREP_r) # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -277,8 +281,8 @@ f_smax <- function(par){
   # alpha_tar <- exp(logAlpha_tar)
   REPORT(SMAX_tar)
   REPORT(logSMAX_tar)
-  REPORT(logAlpha_tar)
-  REPORT(alpha_tar)
+  REPORT(loglogAlpha_tar)
+  REPORT(logalpha_tar)
   
   REPORT(BETA)
   REPORT(SMSY)
@@ -296,7 +300,7 @@ f_smax <- function(par){
 
 ## MakeADFun ####
 obj <- RTMB::MakeADFun(f_smax, par,
-    random = c("logAlpha_re", "logSMAX_re"), # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    random = c("Alpha_re", "logSMAX_re"), # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     silent=TRUE)
 
 # LIMITS: Set Upper and Lower Limits ####
@@ -305,8 +309,8 @@ lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
 upper[names(obj$par) == "logSMAX_sd"] <- 100 # Turn off for half dists. # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 lower[names(obj$par) == "logSMAX_sd"] <- 0 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-upper[names(obj$par) == "logAlpha_sd"] <- 100 # Turn off for half dists.
-lower[names(obj$par) == "logAlpha_sd"] <- 0
+upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
+lower[names(obj$par) == "Alpha_sd"] <- 0
 
 # nlminb - MLE ####
 # stan MAP: do mle via optimize - would just be using tmb obj and nlminb:
@@ -327,19 +331,19 @@ init <- function() {
        
        # logRS_pred = rnorm(N_Obs, 0, 1),
        logSMAX_re = rnorm(N_Stk, 0, 1), # Contains negatives # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-       logAlpha0 = rnorm(1, 0.6, 1), # Contains negatives
+       Alpha0 = rnorm(1, 0.6, 1), # Contains negatives
        # logAlpha02 = rnorm(1, 0, 1) , # NEW: alpha0 prior for LH specific dists.
-       logAlpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
+       Alpha_re = rnorm(nrow(dat$WAbase), 0, 1), # Contains negatives
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
        # Should these be 0.01 to 100s? Would that be more accurate?
        logSMAX_sd = runif(1, 0.01, 3), # Positive # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-       logAlpha_sd = runif(1, 0.01, 3) # Positive
+       Alpha_sd = runif(1, 0.01, 3) # Positive
   )
   
   if (lhdiston) {
-    listinit$logAlpha02 <- rnorm(1, 0, 1) # alpha0 prior for LH specific dists.
+    listinit$Alpha02 <- rnorm(1, 0, 1) # alpha0 prior for LH specific dists.
   }
   
   return(listinit)
@@ -395,3 +399,56 @@ derived_obj <- derived_post(fitstan, model = 'SMAX'); beep(2)
 if(dat$prioronly == 1){print("Prior Prediction Mode")} else {print("Posterior Prediction Mode")}
 
 
+
+# CREATE CSV/TABLES ####
+targetnames <- WAin |>
+  rename("Stock_name" = Stock)
+  
+  # SREP ESTIMATE FOR SYNOPTIC POPULATIONS
+dtable <- cbind(targetnames, dsmax$deripost_summary$SREP) |> 
+	rename("SREP_mean" = Mean, "SREP_median" = Median,
+    "SREP_LQ_5" = LQ_5, "SREP_UQ_95" = UQ_95, "SREP_Stocknum" = Stock,
+    "SREP_Mode" = PosteriorMode)
+dtable <- cbind(dtable, dsmax$deripost_summary$SMSY) |> 
+	rename("SMSY_mean" = Mean, "SMSY_median" = Median,
+    "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
+    "SMSY_Mode" = PosteriorMode)
+dtable <- cbind(dtable, dsmax$deripost_summary$SGEN) |> 
+	rename("SGEN_mean" = Mean, "SGEN_median" = Median,
+    "SGEN_LQ_5" = UQ_95, "SGEN_UQ_95" = LQ_5, "SGEN_Stocknum" = Stock,
+    "SGEN_Mode" = PosteriorMode)
+
+dtable <- dtable |> 
+	select(CU_INDEX, Stock_name, WA, lh,
+	SGEN_mean, SGEN_median, SGEN_LQ_5, SGEN_UQ_95,
+	SREP_mean, SREP_median, SREP_LQ_5, SREP_UQ_95,
+	SMSY_mean, SMSY_median, SMSY_LQ_5, SMSY_UQ_95
+	) # INSERTION METHOD
+	
+# Sample table code w/ kable
+# kable(complete, caption = "IWAM Smax Model: SGEN, SREP, and SMSY Estimates for All Stocks",
+      # format.args = list(big.mark = ","))
+# write.csv(dtable, here::here("docs/TableofEstimates_SEPdraftbenchmarks_20262201.csv"), row.names = FALSE)
+
+
+# dtable_adj <- cbind(targetnames, dsmax$deripost_summary$SREP_adj) |> 
+	# rename("SREP_mean" = Mean, "SREP_median" = Median,
+    # "SREP_LQ_5" = LQ_5, "SREP_UQ_95" = UQ_95, "SREP_Stocknum" = Stock,
+    # "SREP_Mode" = PosteriorMode)
+# dtable_adj <- cbind(dtable_adj, dsmax$deripost_summary$SMSY_adj) |> 
+	# rename("SMSY_mean" = Mean, "SMSY_median" = Median,
+    # "SMSY_LQ_5" = LQ_5, "SMSY_UQ_95" = UQ_95, "SMSY_Stocknum" = Stock,
+    # "SMSY_Mode" = PosteriorMode)
+# dtable_adj <- cbind(dtable_adj, dsmax$deripost_summary$SGEN_adj) |> 
+	# rename("SGEN_mean" = Mean, "SGEN_median" = Median,
+    # "SGEN_LQ_5" = UQ_95, "SGEN_UQ_95" = LQ_5, "SGEN_Stocknum" = Stock,
+    # "SGEN_Mode" = PosteriorMode)
+	
+# dtable_adj <- dtable_adj |> 
+	# select(CU_INDEX, Stock_name, WA, lh,
+	# SGEN_mean, SGEN_median, SGEN_LQ_5, SGEN_UQ_95,
+	# SREP_mean, SREP_median, SREP_LQ_5, SREP_UQ_95,
+	# SMSY_mean, SMSY_median, SMSY_LQ_5, SMSY_UQ_95
+	# ) # INSERTION METHOD - could also just delete via '-'
+	
+# write.csv(dtable_adj, here::here("docs/TableofEstimates_marginaladjusted_SEPdraftbenchmarks_20262201.csv"), row.names = FALSE)

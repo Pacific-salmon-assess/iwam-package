@@ -53,8 +53,8 @@ iwam_default <- IWAM_func(WAinraw = c("DataIn/Ordered_backcalculated_noagg.csv")
                           # Default: "DataIn/WCVIStocks_NoAgg.csv"
                           targetname = "Draft", # Naming convention for output files
                           # remove.EnhStocks = FALSE, # Remove enhancement stocks (INPUT choice)
-                          run.predict = TRUE, # Run predictions
-                          run.bootstraps = TRUE, # Run bootstrapping function
+                          predict.syn = TRUE, # Run predictions
+                          predict.tar = TRUE, # Run bootstrapping function
                           bs_nBS = 20000, # Bootstrapping iterations
                           bs_seed = 1, # Bootstrap seed 
                           plot = FALSE, # Produce plotted files for SR curves, etc.
