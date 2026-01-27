@@ -8,8 +8,6 @@ format:
 
 # Integrated Watershed Area Model (IWAM)
 
-## Executive Summary
-
 DFO is tasked with identifying biological benchmarks for data-limited populations of Pacific salmon where time-series of spawner abundances and adult recruits are lacking. The accessible watershed-area model can provide these benchmarks by harnessing the relationship between accessible watershed areas for Chinook salmon and the capacity of the system to sustain salmon populations, spawner abundances at maximum recruitment, $S_{MAX}$. By making informed assumptions about productivity values, benchmarks based on $S_{MSY}$, $S_{REP}$, and $S_{GEN}$ can also be derived. While other habitat variables, such as stream length and gradient may better correlate with population abundances, accessible watershed area was chosen because it is relatively easy to calculate over the broad geographic range of populations considered and performed well in predicting biological quantities (Parken et al. 2006). Watershed area was defined as the drainage area contributing to a series of channels and characterized based on their downstream order and confluence (Leopold et al. 1992, Horton 1945, Strahler 1957). Accessibility was defined by the presence and positioning of barriers. Criteria used to define accessible watershed area is subject to ongoing investigations. These habitat-based benchmarks, $S_{GEN}$ and $S_{MSY}$, have been used for the biological assessment of Chinook CUs (DFO 2016, Holt, et al. 2023).  Future work can consider models that include additional watershed covarites to predict habitat capacity of Chinook.
 
 Here we follow the model formulation described in Liermann et al. (2010), where Ricker spawner-recruit model (@eq-ricker-fig) was fit hierarchically to a set of 25 populations across the NE Pacific where time-series of spawner and recruits were available, with the assumptions of shared information on productivity ($\alpha$) across populations, and $S_{MAX}$ informed by a linear regression on accessible watershed area across populations (@eq-watershed).
@@ -22,7 +20,7 @@ $$
 log⁡(S_{MAX}) = b0 + b0_2 × LH + (b_{WA} + (b_{WA_2} × LH )) × WA
 $$ {#eq-watershed}
 
-where $R$ is adult recruitment, $S$ is spawner abundances, $w$ are random normal deviations, $LH$ is the life-history strategy ($0$ for stream type and $1$ for ocean type), $b0$ is the y-intercept for the watershed-area regression with the subscript $2$ indicating an offset for the ocean-type life-history, $b$ is the slope of the watershed-area regression, and $WA$ is accessible watershed area. These are deterministic equations that capture the two main components off the model. Complete model equations will be available in an upcoming Technical Report.
+where $R$ is adult recruitment, $S$ is spawner abundances, $w$ are random normal deviations, $LH$ is the life-history strategy ($0$ for stream type and $1$ for ocean type), $b0$ is the y-intercept for the watershed-area regression with the subscript $2$ indicating an offset for the ocean-type life-history, $b$ is the slope of the watershed-area regression, and $WA$ is accessible watershed area. These deterministic equations are provided to illustrate the general model structure; uncertainties are captured in a Bayesian estimation of model parameters. Complete model equations will be available in an upcoming Technical Report.
 
 ![Watershed Area Regression Figure](WAreg_SMAXmodel.png)
 
