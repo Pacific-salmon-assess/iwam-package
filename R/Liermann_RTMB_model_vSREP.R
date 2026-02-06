@@ -15,8 +15,6 @@ library(coda) # bayesian package
 library(beepr) # Sounds
 library(viridis) # Colours
 library(ggridges) # Ridge plots
-library(data.table) # Create data tables for pivoting
-library(microbenchmark) # Timing functions
 
 here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
@@ -31,8 +29,7 @@ LambertW0 <- ADjoint(
   function(x, y, dy) {dy / (x + exp(y))}
 )
 
-# Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv") # c("DataIn/WCVIStocks.csv")
+
 
 # For predicting/re-evaluation of synoptic sets: WAbase
     # 1. Run model until setting up data section
@@ -40,13 +37,20 @@ WAin <- c("DataIn/Parken_evalstocks.csv") # c("DataIn/WCVIStocks.csv")
     # 3. And rename logWAshifted to logWAshifted_t
     # 4. And make sure to change type_tar to fit the expected 0:1 indexing
 
+
+
+# Raw data read-in ####
+WAin <- c("DataIn/Parken_evalstocks.csv") 
+# c("DataIn/WCVIStocks.csv")
+# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+
 # Data Manipulations ####
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # Consider _TK ************************************
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 WAin <- read.csv(here::here(WAin))
 
 # Data setup ####
-# Remove Hoko and Hoh stocks - consider removing SKagit OR Chehalis
+# Remove Hoko and Hoh stocks - consider removing Skagit OR Chehalis
 # Due to sampling reasons explained in Parken 2006.
 srdatwna <- srdatwna %>% 
   filter(!Name %in% c("Hoko","Hoh")) # |>
@@ -87,6 +91,8 @@ lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>%
   group_by(Stocknumber) %>% 
   summarize(lh=max(Stream))
 
+
+
 ## RTMB dat and par setup ####
 # Dat
 dat <- list(srdat = srdat,
@@ -103,8 +109,7 @@ N_Stk <- max(srdat$Stocknumber + 1)
 N_Obs <- nrow(srdat)
 stk = srdat$Stocknumber + 1
 
-# NEW: alpha0 prior for LH specific dists.
-lhdiston <- T # T = LH Specific
+lhdiston <- T # T = LH Specific Priors of Alpha
 bias.cor <- F # T = subtract bias correction terms from expontiated mean terms
 
 # Parameters/Initial values
@@ -116,11 +121,13 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             Alpha_re = numeric(nrow(dat$WAbase)), # Zeroes
             tauobs = 0.01 + numeric(N_Stk), # Constrained positive
             logSREP_sd = 1, 
-            logAlpha_sd = 1
-)
+            Alpha_sd = 1
+		)
 if (lhdiston) {
-  par$Alpha02 <- 0
+	par$Alpha02 <- 0
 }
+
+
 
 f_srep <- function(par){
   getAll(dat, par)
@@ -173,15 +180,6 @@ f_srep <- function(par){
   nll <- nll - sum(dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
   if(lhdiston) nll <- nll - sum(dnorm(Alpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
   
-  # Half normal/half student-t/half cauchy for SD parameters
-    # Half normal:
-  # nll <- nll - dnorm(logAlpha_sd, mean = 0, sd = 31.6, log = TRUE)
-  # nll <- nll - dnorm(logSREP_sd, mean = 0, sd = 31.6, log = TRUE)
-    # Half Student: Doesn't perform - particularly logSREP_sd
-  # nll <- nll - dt(logAlpha_sd, df = 1, log = TRUE)
-  # nll <- nll - dt(logSREP_sd, df = 1, log = TRUE)
-    # Half Cauchy: Still unsure how to pull - not a native TMB distribution
-  
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
     nll <- nll - dnorm(logSREP_re[i], 0, sd = 1, log = TRUE) # Median of E
@@ -190,7 +188,7 @@ f_srep <- function(par){
     SREP[i] <- exp(logSREP[i])
     
 	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
-    # Non-centered with scaling of mean by logAlpha_sd
+
     if(lhdiston) loglogAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biasloglogAlpha
     else loglogAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biasloglogAlpha
 
@@ -201,7 +199,7 @@ f_srep <- function(par){
   for (i in 1:N_Obs){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
 	logalpha_pred <- exp(loglogAlpha)
-	logRS_pred[i] <- logalpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	logRS_pred[i] <- logalpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
 
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
@@ -252,9 +250,7 @@ f_srep <- function(par){
     logSREP_line_stream[i] <- b0[1] + (bWA[1])*lineWA[i] + biaslogSREP # DATA - not in likelihood
     SREP_line_stream[i] <- exp(logSREP_line_stream[i])
   }
-  
-  ## ADREPORT - internal values (synoptic specific/Ricker) 
-  
+    
   REPORT(b0) # Testing simulate()
   REPORT(bWA) # Testing simulate()
   
@@ -275,9 +271,7 @@ f_srep <- function(par){
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(tauobs) # Necessary to add back in observation error?
-  
-  # ADREPORT - predicted values from watershed area model
-    # Mean estimate of the median (without bias correction)
+
   # alpha_tar <- exp(logAlpha_tar)
   REPORT(SREP_tar)
   REPORT(logSREP_tar)
@@ -406,15 +400,7 @@ lower[names(obj$par) == "logSREP_sd"] <- 0
 upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "Alpha_sd"] <- 0
 
-# nlminb - MLE ####
-# stan MAP: do mle via optimize - would just be using tmb obj and nlminb:
-# opt <- nlminb(obj$par,
-#               obj$fn,
-#               obj$gr,
-#               control = list(eval.max = 1e5, iter.max = 1e5, trace = 0),
-#               lower = lower,
-#               upper = upper
-# )
+
 
 # MCMC ####
 # RANDOM INIT - MATCHING PRIORS
@@ -454,52 +440,13 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
                    # control = list(adapt_delta = 0.99, max_treedepth = 15),
                    lower = lower, upper = upper,
                    chains = 4, open_progress = FALSE, silent = TRUE); beep(2)
-# tmbstan operates by default with NUTS MCMC sampler see: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
+# tmbstan operates by default with NUTS MCMC sampler see: 
+	# https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
 # Save stan fit object
 # save(fitstan, file = "fitstan.RData")
-# if(dat$prioronly == 1) {save(fitstan, file = "fitstan_prioronly.RData")} else {save(fitstan, file = "fitstan.RData")}
-
-# Test and diagnostic plots ####
-# names(fitstan) for complete list of parameters from stan object
-
-  # TRACE PLOTS
-# mcmc_trace(as.array(fitstan)) # ALL PARAMETER TRACEPLOT
-# mcmc_trace(as.array(fitstan), regex_pars = "b0") # Single regex parameter traceplot e.g. b0
-
-  # PAIRS PLOTS
-# pairs_pars <- c("b0", "bWA", "logAlpha0") # "logAlpha_sd" "logSREP_sd"
-# pairs(fitstan, pars = pairs_pars) # for specific par names from above
-# bayesplot::mcmc_pairs(fitstan, regex_pars = pairs_pars)
-# bayesplot::mcmc_pairs(fitstan, regex_pars = c("tauobs"))
-# bayesplot::mcmc_pairs(fitstan, regex_pars = c("logSREP_re"))
-# bayesplot::mcmc_pairs(fitstan, regex_pars = c("logAlpha_re"))
-
-  # ACF
-# bayesplot::mcmc_acf(fitstan, regex_pars = "b0") # ACF plot for b0
-# bayesplot::mcmc_acf(fitstan) # For every and all - should be a faster way to save them
-
-  # RHAT
-# fitstan |> rhat() |> mcmc_rhat() + yaxis_text() # rhat plot for assessing rhat of each parameter
-
-  # LOO/WAIC etc.
-# Need a log-likelihood matrix to do this - would have to add a generated
-  # quantity in the model to achieve this. Not generated otherwise.
-
-  # Matching Liermann et al. statistics
-# mcmc_chains <- As.mcmc.list(fitstan)
-# autocorr.plot(mcmc_chains)
-# geweke_results <- geweke.diag(mcmc_chains)
-# print(geweke_results)
-# par(mfrow = c(2, 2))  # adjust depending on number of chains
-# for (i in 1:length(mcmc_chains)) {
-  # geweke.plot(mcmc_chains[[i]], main = paste("Chain", i))
-# }
-# heidel_results <- heidel.diag(mcmc_chains)
-# print(heidel_results)
-# effectiveSize(mcmc_chains)
-# gelman.diag(mcmc_chains)
-
+# if(dat$prioronly == 1) {save(fitstan, file = "fitstan_prioronly.RData")} 
+	# else {save(fitstan, file = "fitstan.RData")}
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan, model = 'SREP'); beep(2)
@@ -509,7 +456,7 @@ derived_obj <- derived_post(fitstan, model = 'SREP'); beep(2)
 	
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
-# if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else {save(derived_obj, file = "derived_obj.RData")}
-if(dat$prioronly == 1){print("Prior Prediction Mode")} else {print("Posterior Prediction Mode")}
-
-
+# if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} 
+	# else {save(derived_obj, file = "derived_obj.RData")}
+if(dat$prioronly == 1){print("Prior Prediction Mode")} 
+	else {print("Posterior Prediction Mode")}

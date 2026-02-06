@@ -230,6 +230,7 @@ Sgen.fn4 <- function( a.par, SMAX, explicit = TRUE, plot = FALSE) {
   if (explicit){
     SMSY <- (1 - gsl::lambert_W0(exp(1 - log(a.par) ))) / (b.par)
     }
+  # In instances of a.par > 1 - creates negative SMSY
   
   if( !explicit ){
     SMSY <- log(a.par)/ b.par * (0.5 - 0.07 * log(a.par))

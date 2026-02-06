@@ -426,3 +426,4 @@ R/fitstan_prioronly.RData
 R/figure.png
 R/Liermann_RTMB_model_vBETA.R
 DataOut/LinearReg_SmaxModel_realscale.pdf
+R/simParkenSR.r
