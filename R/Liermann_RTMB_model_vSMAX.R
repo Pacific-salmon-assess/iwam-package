@@ -21,6 +21,8 @@ here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
+source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
+
 
 options(scipen = 999)
 
@@ -130,7 +132,7 @@ if (lhdiston) {
 }
 
 
-
+# Please note all references to alpha are defined explicitly on the log-scale e.g. alpha = log(alpha)
 f_smax <- function(par){
   getAll(dat, par)
   
@@ -145,14 +147,14 @@ f_smax <- function(par){
 
   SMAX <- numeric(N_Stk)
   logSMAX <- numeric(N_Stk)
-  loglogAlpha <- numeric(N_Stk)
+  logAlpha <- numeric(N_Stk) # @@@@
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
 
   SMAX_tar <- numeric(N_Pred)
   logSMAX_tar <- numeric(N_Pred) 
-  loglogAlpha_tar <- numeric(N_Pred)
+  logAlpha_tar <- numeric(N_Pred) # @@@@
   
   # Simulated line vectors
   line <- length(lineWA)
@@ -163,11 +165,11 @@ f_smax <- function(par){
   
   if (bias.cor) {
 	biaslogSMAX <- -0.5*logSMAX_sd^2 # Global 
-	biasloglogAlpha <- -0.5*Alpha_sd^2 # Global
+	biaslogAlpha <- -0.5*Alpha_sd^2 # Global # @@@@
 	biaslogRS <- -0.5*(sqrt(1/tauobs))^2 # Stock-specific
   } else {
 	biaslogSMAX <- 0 
-	biasloglogAlpha <- 0
+	biaslogAlpha <- 0 # @@@@
 	biaslogRS <- numeric(N_Stk)
   }
   
@@ -195,16 +197,16 @@ f_smax <- function(par){
     logSMAX[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSMAX_re[i]*logSMAX_sd + biaslogSMAX
     SMAX[i] <- exp(logSMAX[i])
     	
-    if(lhdiston) loglogAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biasloglogAlpha
-    else loglogAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biasloglogAlpha
+    if(lhdiston) logAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biaslogAlpha # @@@@
+    else logAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biaslogAlpha # @@@@
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
-	logalpha_pred <- exp(loglogAlpha) 
-	logRS_pred[i] <- logalpha_pred[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
+	Alpha_pred <- exp(logAlpha) # @@@@
+	logRS_pred[i] <- Alpha_pred[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]] # @@@@
 	# logRS_pred[i] <- logAlpha[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # Old Ricker parameterization
 
@@ -219,10 +221,9 @@ f_smax <- function(par){
   SREP_r = numeric(nrow(WAbase))
   
   for (i in 1:N_Stk){
-    # BETA_r[i] <- logAlpha[i] / SREP[i] 
 	BETA_r[i] <- 1/SMAX[i] 
-    SMSY_r[i] <- (1 - LambertW0(exp(1 - logalpha_pred[i]))) / BETA_r[i]
-	SREP_r[i] <- logalpha_pred[i]/BETA_r[i] 
+    SMSY_r[i] <- (1 - LambertW0(exp(1 - Alpha_pred[i]))) / BETA_r[i] # @@@@
+	SREP_r[i] <- Alpha_pred[i]/BETA_r[i] # @@@@
   }
 
   ## PREDICTIONS
@@ -234,22 +235,22 @@ f_smax <- function(par){
   for (i in 1:N_Pred){
 	# Impose a new alpha here ...
 	
-    if(lhdiston) loglogAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
-    else loglogAlpha_tar[i] <- Alpha0 + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    if(lhdiston) logAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2 # @@@@
+    else logAlpha_tar[i] <- Alpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2 # @@@@
 
     logSMAX_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSMAX
     SMAX_tar[i] <- exp(logSMAX_tar[i]) 
     
-	logalpha_tar <- exp(loglogAlpha_tar)
+	Alpha_tar <- exp(logAlpha_tar) # @@@@
     # Predict BETA
     # BETA[i] <- logAlpha_tar[i]/SREP_tar[i] 
 	BETA[i] <- 1/SMAX_tar[i] 
     # Predict SMSY
-    SMSY[i] <- (1 - LambertW0(exp(1 - logalpha_tar[i])))/BETA[i]
+    SMSY[i] <- (1 - LambertW0(exp(1 - Alpha_tar[i])))/BETA[i] # @@@@
     # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logalpha_tar[i])))
-	# Predict SREP
-	SREP[i] <- logalpha_tar[i]/BETA[i]
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i]))) # @@@@
+	# Predict SREP 
+	SREP[i] <- Alpha_tar[i]/BETA[i] # @@@@
   }
   
   # Create predictions on an simulated line
@@ -272,12 +273,12 @@ f_smax <- function(par){
   REPORT(logSMAX_sd)
   REPORT(SMAX) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logSMAX)
-  REPORT(loglogAlpha) # model logAlpha (25)
+  REPORT(logAlpha) # model logAlpha (25) # @@@@
   REPORT(Alpha0)
   REPORT(Alpha02)
   REPORT(Alpha_re) # random effect parameter for resampling
   REPORT(Alpha_sd)
-  REPORT(logalpha_pred) # Also called alpha_pred
+  REPORT(Alpha_pred) # Also called alpha_pred # @@@@
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(SREP_r) 
@@ -286,8 +287,8 @@ f_smax <- function(par){
   # alpha_tar <- exp(logAlpha_tar)
   REPORT(SMAX_tar)
   REPORT(logSMAX_tar)
-  REPORT(loglogAlpha_tar)
-  REPORT(logalpha_tar)
+  REPORT(logAlpha_tar) # @@@@
+  REPORT(Alpha_tar) # @@@@
   
   REPORT(BETA)
   REPORT(SMSY)
@@ -373,16 +374,15 @@ dsmax <- derived_obj
 fitsmax <- fitstan
 
 # Simulate alternative priors
-source(here::here("R/Liermann_RTMB_model_Bootstrap.R"))
-simsmax <- dobootstrap(bsiters = 2500, # 20,000 for full iterations
-						adj = FALSE,
-						bias.cor = FALSE,
-						prod = c("LifeStageModel"),
-						MCMC = TRUE,
-						model = c("SMAX"),
-						Ricprior = c(1, 0.3),
-						round = FALSE,
-						WAinname = c("DataIn/Parken_evalstocks.csv"))
+# BS.smax <- dobootstrap(bsiters = 2500, # 20,000 for full iterations
+						# adj = FALSE,
+						# bias.cor = FALSE,
+						# prod = c("LifeStageModel"),
+						# MCMC = TRUE,
+						# model = c("SMAX"),
+						# Ricprior = c(1, 0.3),
+						# round = FALSE,
+						# WAinname = c("DataIn/Parken_evalstocks.csv"))
 
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")

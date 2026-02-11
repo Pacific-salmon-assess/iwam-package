@@ -132,18 +132,18 @@ derived_obj <- dsmax # dsrep
 sAlpha0 <- derived_obj$deripost_full$Alpha0 # dim(10000, 1)
 sAlpha02 <- derived_obj$deripost_full$Alpha02 # dim(10000, 1)
 sAlpha_sd <- derived_obj$deripost_full$Alpha_sd # dim(10000, 1)
-simloglogAlpha_s <- matrix(NA, nrow = dim(sAlpha0)[1], ncol = dim(sAlpha0)[2])
-simloglogAlpha_o <- matrix(NA, nrow = dim(sAlpha0)[1], ncol = dim(sAlpha0)[2])
+simlogAlpha_s <- matrix(NA, nrow = dim(sAlpha0)[1], ncol = dim(sAlpha0)[2])
+simlogAlpha_o <- matrix(NA, nrow = dim(sAlpha0)[1], ncol = dim(sAlpha0)[2])
 for (i in 1:dim(sAlpha0)[1]){
-  simloglogAlpha_s[i] <- sAlpha0[i] + rnorm(1, mean = 0, sd = sAlpha_sd[i])
-  simloglogAlpha_o[i] <- simloglogAlpha_s[i] + sAlpha02[i]
+  simlogAlpha_s[i] <- sAlpha0[i] + rnorm(1, mean = 0, sd = sAlpha_sd[i])
+  simlogAlpha_o[i] <- simlogAlpha_s[i] + sAlpha02[i]
 }
 
 # pdf(here::here("DataOut/SRcurve_smaxmodel.pdf"), width = plotdims[1], height = plotdims[2])
 ggplot() +
-  geom_density(aes(x = simloglogAlpha_s), # For a new STREAM observation
+  geom_density(aes(x = simlogAlpha_s), # For a new STREAM observation
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
-  geom_density(aes(x = simloglogAlpha_o), # For a new OCEAN observation
+  geom_density(aes(x = simlogAlpha_o), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
   labs(x = "Mean of uncentered log(log(Alpha)) Posterior Predictive Distribution (Stream and Ocean)", 
@@ -154,9 +154,9 @@ ggplot() +
 
 # pdf(here::here("DataOut/logalphaposteriorpredictivedist.pdf"), width = 7, height = 7)
 ggplot() +
-  geom_density(aes(x = exp(simloglogAlpha_s)), # For a new STREAM observation
+  geom_density(aes(x = exp(simlogAlpha_s)), # For a new STREAM observation
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
-  geom_density(aes(x = exp(simloglogAlpha_o)), # For a new OCEAN observation
+  geom_density(aes(x = exp(simlogAlpha_o)), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
   labs(x = "Mean of uncentered log(Alpha) Posterior Predictive Distribution (Stream and Ocean)", 
@@ -175,7 +175,7 @@ ggplot() +
 
 # Posterior OR Prior Distribution ridge plot: logAlpha ##########################################################################
   # IF Prior - then its pushforward - its a per stock value - NOT a new observ.
-dfalpharidge <- derived_obj$deripost_full$loglogAlpha[, 1:25]
+dfalpharidge <- derived_obj$deripost_full$logAlpha[, 1:25]
 Stocknames <- WAbase$Name
 colnames(dfalpharidge) <- Stocknames
 alpharidgetable <- as.data.table(dfalpharidge)
@@ -298,7 +298,7 @@ RRmedian <- lineAlphamedian <- lineSMAXmedian <- SSmedian <- NA
 rowsample <- sample(1:10000, 1000)
 
 lineSMAXdraws <- dsmax$deripost_full$SMAX # 10000, 25
-lineAlphadraws <- exp(dsmax$deripost_full$loglogAlpha) # 10000, 25
+lineAlphadraws <- exp(dsmax$deripost_full$logAlpha) # 10000, 25
 rowsample <- sample(1:10000, 100) # 1:10000, 1000
 
 Smsylines <- dsmax$deripost_summary$SMSY_r$Median

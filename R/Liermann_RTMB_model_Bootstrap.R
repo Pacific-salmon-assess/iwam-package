@@ -114,12 +114,12 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 				logSMAX_SD <- apply(log(dsmax$deripost_full$SMAX_tar), 2, sd) # 25 val per pop
 				
 				# Pull alpha posteriors in order to get alpha_SD
-				logALPHA <- dsmax$deripost_summary$logalpha_tar$Median 
-				logALPHA_SD <- apply(dsmax$deripost_full$logalpha_tar, 2, sd)
+				ALPHA <- dsmax$deripost_summary$Alpha_tar$Median 
+				ALPHA_SD <- apply(dsmax$deripost_full$Alpha_tar, 2, sd)
 				
 				# Calculate rho cor() for alpha and beta (1/SMAX) as a list PER POPULATION
-				rho <- sapply(1:ncol(dsmax$deripost_full$logalpha_tar), 
-					function(i) cor(dsmax$deripost_full$logalpha_tar[,i], log(dsmax$deripost_full$SMAX_tar[,i])))
+				rho <- sapply(1:ncol(dsmax$deripost_full$Alpha_tar), 
+					function(i) cor(dsmax$deripost_full$Alpha_tar[,i], log(dsmax$deripost_full$SMAX_tar[,i])))
 				# rho_re <- sapply(1:nrow(dsmax$deripost_full$Alpha_re), 
 					# function(i) cor(dsmax$deripost_full$Alpha_re[i,], log(dsmax$deripost_full$SMAX_tar[i,])))
 					# random effects aren't correlated and neither are their posteriors
@@ -129,9 +129,9 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		sigma_matrix <- list()
 		for (i in 1:length(rho)) {
 			sigma_matrix[[i]] <- matrix(c(logSMAX_SD[i]^2, 
-							 rho[i] * logSMAX_SD[i] * logALPHA_SD[i],
-							 rho[i] * logSMAX_SD[i] * logALPHA_SD[i], 
-							 logALPHA_SD[i]^2),
+							 rho[i] * logSMAX_SD[i] * ALPHA_SD[i],
+							 rho[i] * logSMAX_SD[i] * ALPHA_SD[i], 
+							 ALPHA_SD[i]^2),
 							 nrow = 2)
 		}
 	  
@@ -184,9 +184,9 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 			new_samples <- matrix(NA, nrow = 2, ncol = 25)
 			new_beta <- c()
 			for (i in 1:length(rho)){
-				delta[i] <- log(Ric.A[i]) - logALPHA[i]
+				delta[i] <- log(Ric.A[i]) - ALPHA[i]
 				
-				adjustment_mean[i] <- rho[i] * (logSMAX_SD[i] / logALPHA_SD[i]) * delta[i]
+				adjustment_mean[i] <- rho[i] * (logSMAX_SD[i] / ALPHA_SD[i]) * delta[i]
 				adjustment_sd[i] <- sqrt(logSMAX_SD[i]^2 - (rho[i] * logSMAX_SD[i])^2)
 				
 				new_beta[i] <- rnorm(1, logSMAX[i] + adjustment_mean[i], adjustment_sd[i]) # logSMAX_SD[i]
@@ -226,8 +226,8 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 			}
 		  
 			# Skip above - take loga, SREP, SMSY, and BETA from MCMC
-			if (adj == T) lnalphamc <- derived_obj$deripost_summary$logAlpha_tar_adj$Median else 
-				lnalphamc <- derived_obj$deripost_summary$logAlpha_tar$Median 
+			if (adj == T) lnalphamc <- derived_obj$deripost_summary$Alpha_tar_adj$Median else 
+				lnalphamc <- derived_obj$deripost_summary$Alpha_tar$Median 
 		  
 			# Again: conditional or marginal estimates? 
 				# Mean, Median, or Mode?
