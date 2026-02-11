@@ -372,9 +372,21 @@ derived_obj <- derived_post(fitstan, model = 'SMAX'); beep(2)
 dsmax <- derived_obj
 fitsmax <- fitstan
 
+# Simulate alternative priors
+source(here::here("R/Liermann_RTMB_model_Bootstrap.R"))
+simsmax <- dobootstrap(bsiters = 2500, # 20,000 for full iterations
+						adj = FALSE,
+						bias.cor = FALSE,
+						prod = c("LifeStageModel"),
+						MCMC = TRUE,
+						model = c("SMAX"),
+						Ricprior = c(1, 0.3),
+						round = FALSE,
+						WAinname = c("DataIn/Parken_evalstocks.csv"))
+
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else {save(derived_obj, file = "derived_obj.RData")}
 
-if(dat$prioronly == 1){print("Prior Prediction Mode")} 
-	else {print("Posterior Prediction Mode")}
+if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
+	{print("Posterior Prediction Mode")}

@@ -304,7 +304,7 @@ rowsample <- sample(1:10000, 100) # 1:10000, 1000
 Smsylines <- dsmax$deripost_summary$SMSY_r$Median
 
 # plotdims <- dev.size()
-pdf(here::here("DataOut/SRcurve_smaxmodel.pdf"), width = plotdims[1], height = plotdims[2])
+# pdf(here::here("DataOut/SRcurve_smaxmodel.pdf"), width = plotdims[1], height = plotdims[2])
 par(mfrow = c(5, 5), mar = c(2, 2, 1, 0.1) + 0.1, oma = c(3, 3, 1, 1))
 
 for (i in 1:25) {
@@ -334,7 +334,7 @@ for (i in 1:25) {
 
 mtext("Spawners", side = 1, line = 1, outer = TRUE, cex = 1.3)
 mtext("Recruitment", side = 2, line = 1, outer = TRUE, cex = 1.3)
-dev.off()
+# dev.off()
 
 #### RESIDUALS ######################################################################################################################################
 #### For the relationship between capacity and watershed size 
@@ -648,7 +648,7 @@ ggplot() +
              # position = position_nudge(+0.2),
              # aes(x = fct_reorder(Stock_name, log(WA)), y = Value_IWAM_SREP, color = "IWAM")) +
   
-  geom_hline(yintercept = 1, lty = 'dashed', colour = 'grey') +
+  # geom_hline(yintercept = 1, lty = 'dashed', colour = 'grey') +
   theme_classic() +
   scale_y_continuous(transform = "log", 
                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
@@ -720,7 +720,7 @@ ggplot() +
   
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
                                      y = Value_SMSY,
-                                     ymin = pmax(lwr_SMSY, 1), # caps the error bar at 0
+                                     ymin = lwr_SMSY, # pmax(lwr_SMSY, 1) caps the error bar at 0
                                      ymax = upr_SMSY,
                                  color = "Liermann SMAX Bootstrap",
                                  width=.1),
@@ -740,7 +740,7 @@ ggplot() +
              # position = position_nudge(+0.2),
              # aes(x = fct_reorder(Stock_name, log(WA)), y = Value_IWAM_SREP, color = "IWAM")) +
   
-  geom_hline(yintercept = 1, lty = 'dashed', colour = 'grey') +
+  # geom_hline(yintercept = 1, lty = 'dashed', colour = 'grey') +
   theme_classic() +
   scale_y_continuous(transform = "log", 
                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +

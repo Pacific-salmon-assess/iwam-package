@@ -10,9 +10,7 @@ options(scipen = 999)
 
 derived_post <- function(x, model) {
 	post <- as.matrix(x)
-	  
-	# mcmc_dens(post, regex_pars = "b0")
-	  
+	
 	# MATRIX EXTRACTION of full samples
 	n_rows <- dim(x)[1] * dim(x)[2] # dim(fitstan) - 4500 post-warmup draws * 4 chains = 18000
 	n_cols <- sapply(obj$report(post), function(x) length(x)) # Number of columns/stocks PER parameter
@@ -23,12 +21,9 @@ derived_post <- function(x, model) {
 	})
 	names(matrices) <- names(obj$report(post[1,]))
   
-  
-	# Current version
-	pb <- txtProgressBar(min = 0, max = n_rows, style = 3, title = "Matrix Extraction")
+  	pb <- txtProgressBar(min = 0, max = n_rows, style = 3, title = "Matrix Extraction")
 	start_time <- Sys.time()
   
-	# res = NULL
 	for (i in seq_len(n_rows)) {  
 		report_i <- obj$report(post[i,])
 		for (k in seq_len(n_matrices)) { 
