@@ -143,14 +143,14 @@ f_srep <- function(par){
 
   SREP <- numeric(N_Stk)
   logSREP <- numeric(N_Stk)
-  loglogAlpha <- numeric(N_Stk)
+  logAlpha <- numeric(N_Stk)
   
   # Why is logRS_pred not a parameter or vector input here?
   logRS_pred <- numeric(N_Obs) # Does this still report if not a vector?
 
   SREP_tar <- numeric(N_Pred)
   logSREP_tar <- numeric(N_Pred)
-  loglogAlpha_tar <- numeric(N_Pred)
+  logAlpha_tar <- numeric(N_Pred)
   
   # Simulated line vectors
   line <- length(lineWA)
@@ -161,11 +161,11 @@ f_srep <- function(par){
   
   if (bias.cor) {
 	biaslogSREP <- -0.5*logSREP_sd^2 # Global
-	biasloglogAlpha <- -0.5*Alpha_sd^2 # Global
+	biaslogAlpha <- -0.5*Alpha_sd^2 # Global
 	biaslogRS <- -0.5*(sqrt(1/tauobs))^2 # Stock-specific
   } else {
 	biaslogSREP <- 0
-	biasloglogAlpha <- 0
+	biaslogAlpha <- 0
 	biaslogRS <- numeric(N_Stk)
   }
   
@@ -189,8 +189,8 @@ f_srep <- function(par){
     
 	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
 
-    if(lhdiston) loglogAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biasloglogAlpha
-    else loglogAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biasloglogAlpha
+    if(lhdiston) logAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biaslogAlpha
+    else logAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biaslogAlpha
 
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
@@ -198,8 +198,8 @@ f_srep <- function(par){
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
-	logalpha_pred <- exp(loglogAlpha)
-	logRS_pred[i] <- logalpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
+	Alpha_pred <- exp(logAlpha)
+	logRS_pred[i] <- Alpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
 
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
@@ -211,8 +211,8 @@ f_srep <- function(par){
   BETA_r = numeric(nrow(WAbase))
   
   for (i in 1:N_Stk){
-    BETA_r[i] <- logalpha_pred[i] / SREP[i]
-    SMSY_r[i] <- (1 - LambertW0(exp(1 - logalpha_pred[i]))) / BETA_r[i]
+    BETA_r[i] <- Alpha_pred[i] / SREP[i]
+    SMSY_r[i] <- (1 - LambertW0(exp(1 - Alpha_pred[i]))) / BETA_r[i]
   }
 
   ## PREDICTIONS
@@ -225,21 +225,21 @@ f_srep <- function(par){
 	# Conditioning on a random site, but the conditional mean
   for (i in 1:N_Pred){
     # NEW: alpha0 prior for LH specific dists.
-    if(lhdiston) loglogAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
-    else loglogAlpha_tar[i] <- Alpha0 + biasloglogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    if(lhdiston) logAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
+    else logAlpha_tar[i] <- Alpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2
 
     logSREP_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSREP # + biaslogSREP + logSREP_sd^2/2
 		# add -0.5*logSREP_sd^2 OR
 		# do the random normal when extracting the posterior
     SREP_tar[i] <- exp(logSREP_tar[i])
     
-	logalpha_tar <- exp(loglogAlpha_tar)
+	Alpha_tar <- exp(logAlpha_tar)
     # Predict BETA
-    BETA[i] <- logalpha_tar[i]/SREP_tar[i]
+    BETA[i] <- Alpha_tar[i]/SREP_tar[i]
     # Predict SMSY
-    SMSY[i] <- (1-LambertW0(exp(1 - logalpha_tar[i])))/BETA[i]
+    SMSY[i] <- (1-LambertW0(exp(1 - Alpha_tar[i])))/BETA[i]
     # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(logalpha_tar[i])))
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i])))
   }
   
   # Create predictions on an simulated line
@@ -254,20 +254,19 @@ f_srep <- function(par){
   REPORT(b0) # Testing simulate()
   REPORT(bWA) # Testing simulate()
   
-  REPORT(logRS_pred)
-  
-  # alpha <- exp(logAlpha)
+  REPORT(logRS_pred)  
   # REPORT(logRS) # logRS for all 501 data points
+  
   REPORT(logSREP_re)
   REPORT(logSREP_sd)
   REPORT(SREP) # E (Srep) for all synoptic data set rivers (25)
   REPORT(logSREP)
-  REPORT(loglogAlpha) # model logAlpha (25)
+  REPORT(logAlpha) # model logAlpha (25)
   REPORT(Alpha0)
   REPORT(Alpha02)
   REPORT(Alpha_re) # random effect parameter for resampling
   REPORT(Alpha_sd)
-  REPORT(logalpha_pred)
+  REPORT(Alpha_pred)
   REPORT(SMSY_r)
   REPORT(BETA_r)
   REPORT(tauobs) # Necessary to add back in observation error?
@@ -275,8 +274,8 @@ f_srep <- function(par){
   # alpha_tar <- exp(logAlpha_tar)
   REPORT(SREP_tar)
   REPORT(logSREP_tar)
-  REPORT(loglogAlpha_tar)
-  REPORT(logalpha_tar)
+  REPORT(logAlpha_tar)
+  REPORT(Alpha_tar)
   
   REPORT(BETA)
   REPORT(SMSY)
@@ -295,99 +294,6 @@ f_srep <- function(par){
 obj <- RTMB::MakeADFun(f_srep, par,
     random = c("Alpha_re", "logSREP_re"),
     silent=TRUE)
-
-# Alternative approach from Sean ####
-  # rnorms for each of alpha prior
-  # a function that takes in parameters (Vectored) and creates a logRS, etc., 
-  # and then pipe through vector - recreating what REPORT() does
-  # this can then be done for all forms of prior/posterior prediction
-  # just avoids all the behind the scene work of the RTMB framework
-# PRIOR PUSHFORWARD APPROACH: Random Generation ####
-randomgenmethod <- F # Turn on or off for now
-if(randomgenmethod == T){
-  # Create however many vectors of parameters you wish to test/investigate
-  geniters <- 1000
-  psimalpha <- vector("list", geniters) # Vector start
-  psimlogRS_pred <- vector("list", geniters) # Vector start
-  psimlogAlpha_re <- vector("list", geniters) # Vector start
-  
-  for (i in 1:geniters){
-    # Random parameter creation: Random parameter starts for prior simulation
-    parp <- function() {
-      # Random parameter starts for prior simulation
-      logSREP_sd <- runif(1, 0, 100)
-      logAlpha_sd <- runif(1, 0, 100)
-      listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
-        bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
-        logSREP_sd = logSREP_sd, # This isn't being saved internally
-        Alpha_sd = Alpha_sd, # This isn't being saved internally
-        
-        logSREP_re = rnorm(N_Stk, 0, logSREP_sd),
-        Alpha0 = rnorm(1, 0.6, 0.45),
-        Alpha02 = rnorm(1, 0, 31.6),
-        Alpha_re = rnorm(nrow(dat$WAbase), 0, Alpha_sd),
-        
-        tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
-        )
-      
-      # Alternative priors from Liermann et al. 2010 - comment on/off for now
-      logSREP_sdalt <- runif(1, 0, 20)
-      logAlpha_sdalt <- runif(1, 0, 20)
-      listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
-        bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
-        logSREP_sd = logSREP_sdalt, # This isn't being saved internally
-        logAlpha_sd = logAlpha_sdalt, # This isn't being saved internally
-    
-        logSREP_re = rnorm(N_Stk, 0, sd = logSREP_sd),
-        logAlpha0 = rnorm(1, 0, sd = 0.71),
-        logAlpha02 = rnorm(1, 0, sd = 31.6),
-        logAlpha_re = rnorm(nrow(dat$WAbase), 0, sd = logAlpha_sd),
-    
-        tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
-        )
-      
-      return(listinitprior) # listinitprior or listinitialternate
-    }
-	
-    parpar <- parp()
-    
-    objpp <- RTMB::MakeADFun(f_srep,
-                         parpar,
-                         random = c("logAlpha_re", "logSREP_re"),
-                         silent=TRUE)
-
-    # simulate for each desired term
-    psimalpha[[i]] <- objpp$simulate()$alpha
-    psimlogAlpha_re[[i]] <- objpp$simulate()$logAlpha_re # why logAlpha_re? - if I want to do PP?
-    # ... other derived parameters?
-      # psimlogAlpha0[[i]] <- objpp$simulate()$logAlpha0 - doesn't exist - not derived
-      # $SREP ?
-    
-    psimlogRS_pred[[i]] <- objpp$simulate()$logRS_pred
-    
-    # add in observation error?
-        # look at how I did it for derived_post.R?
-  }
-  
-  # Plot distributions for PRIOR PUSHFORWARD
-  ppsimalpha <- unlist(psimalpha) 
-  ppsimlogRS <- unlist(psimlogRS_pred)
-  
-  hist(ppsimalpha, breaks = 100, freq = TRUE) # Graphical hiccups
-  hist(unlist(psimlogAlpha_re))
-  plot(ppsimlogRS, ylim = c(-100, 100))
-  
-  # Plotting logRS by simulated logRS (INCOMPLETE)
-  plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
-  for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
-  
-  # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
-  
-  # Plot distributions for PRIOR PREDICTIVE
-  # First: add in observation error to logRS_pred
-  # ...
-  # Second: plot the distribution of logRS_pred with observation error
-}
 
 
 
@@ -453,10 +359,21 @@ derived_obj <- derived_post(fitstan, model = 'SREP'); beep(2)
 	# add stocknames - see extra code from _Plots.R
 	dsrep <- derived_obj
 	fitsrep <- fitstan
-	
+
+# Simulate alternative priors
+# BS.smax <- dobootstrap(bsiters = 2500, # 20,000 for full iterations
+						# adj = FALSE,
+						# bias.cor = FALSE,
+						# prod = c("LifeStageModel"),
+						# MCMC = TRUE,
+						# model = c("SMAX"),
+						# Ricprior = c(1, 0.3),
+						# round = FALSE,
+						# WAinname = c("DataIn/Parken_evalstocks.csv"))
+
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} 
 	# else {save(derived_obj, file = "derived_obj.RData")}
-if(dat$prioronly == 1){print("Prior Prediction Mode")} 
-	else {print("Posterior Prediction Mode")}
+if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
+	{print("Posterior Prediction Mode")}

@@ -220,6 +220,104 @@ ggplot(alpharidgetable_long, aes(x = exp(Value), y = Stock, fill = interaction(T
 
 
 
+# Running Instructions ###################################################################################################
+		# The below approach to prior pushforward testing must be run before MCMC
+		# on the RTMB object 'obj'
+# Alternative approach from Sean #########################################################################################
+  # rnorms for each of alpha prior
+  # a function that takes in parameters (Vectored) and creates a logRS, etc., 
+  # and then pipe through vector - recreating what REPORT() does
+  # this can then be done for all forms of prior/posterior prediction
+  # just avoids all the behind the scene work of the RTMB framework
+# PRIOR PUSHFORWARD APPROACH: Random Generation ##########################################################################
+randomgenmethod <- F # Turn on or off for now
+if(randomgenmethod == T){
+  # Create however many vectors of parameters you wish to test/investigate
+  geniters <- 1000
+  psimalpha <- vector("list", geniters) # Vector start
+  psimlogRS_pred <- vector("list", geniters) # Vector start
+  psimAlpha_re <- vector("list", geniters) # Vector start
+  
+  for (i in 1:geniters){
+    # Random parameter creation: Random parameter starts for prior simulation
+    parp <- function() {
+      # Random parameter starts for prior simulation
+      logSREP_sd <- runif(1, 0, 100)
+      Alpha_sd <- runif(1, 0, 100)
+      listinitprior <- list(b0 = c(rnorm(1, 10, 31.6), rnorm(1, 0, 31.6)),
+        bWA = c(rnorm(1, 0, 31.6), rnorm(1, 0 ,31.6)),
+        logSREP_sd = logSREP_sd, # This isn't being saved internally
+        Alpha_sd = Alpha_sd, # This isn't being saved internally
+        
+        logSREP_re = rnorm(N_Stk, 0, logSREP_sd),
+        Alpha0 = rnorm(1, 0.6, 0.45),
+        Alpha02 = rnorm(1, 0, 31.6),
+        Alpha_re = rnorm(nrow(dat$WAbase), 0, Alpha_sd),
+        
+        tauobs = rgamma(N_Stk, shape = 0.001, scale = 1/0.001)
+        )
+      
+      # Alternative priors from Liermann et al. 2010 - comment on/off for now
+      logSREP_sdalt <- runif(1, 0, 20)
+      Alpha_sdalt <- runif(1, 0, 20)
+      listinitalternate <- list(b0 = c(rnorm(1, 7, sd = 31.6), rnorm(1, 0, sd = 10)),
+        bWA = c(rnorm(1, 0, sd = 10), rnorm(1, 0 , sd = 10)),
+        logSREP_sd = logSREP_sdalt, # This isn't being saved internally
+        Alpha_sd = Alpha_sdalt, # This isn't being saved internally
+    
+        logSREP_re = rnorm(N_Stk, 0, sd = logSREP_sd),
+        Alpha0 = rnorm(1, 0, sd = 0.71),
+        Alpha02 = rnorm(1, 0, sd = 31.6),
+        Alpha_re = rnorm(nrow(dat$WAbase), 0, sd = Alpha_sd),
+    
+        tauobs = rgamma(N_Stk, shape = 0.0001, scale = 1/0.0001)
+        )
+      
+      return(listinitprior) # listinitprior or listinitialternate
+    }
+	
+    parpar <- parp()
+    
+    objpp <- RTMB::MakeADFun(f_srep,
+                         parpar,
+                         random = c("Alpha_re", "logSREP_re"),
+                         silent=TRUE)
+
+    # simulate for each desired term
+    psimalpha[[i]] <- objpp$simulate()$alpha
+    psimAlpha_re[[i]] <- objpp$simulate()$Alpha_re # why logAlpha_re? - if I want to do PP?
+    # ... other derived parameters?
+      # psimlogAlpha0[[i]] <- objpp$simulate()$logAlpha0 - doesn't exist - not derived
+      # $SREP ?
+    
+    psimlogRS_pred[[i]] <- objpp$simulate()$logRS_pred
+    
+    # add in observation error?
+        # look at how I did it for derived_post.R?
+  }
+  
+  # Plot distributions for PRIOR PUSHFORWARD
+  ppsimalpha <- unlist(psimalpha) 
+  ppsimlogRS <- unlist(psimlogRS_pred)
+  
+  hist(ppsimalpha, breaks = 100, freq = TRUE) # Graphical hiccups
+  hist(unlist(psimAlpha_re))
+  plot(ppsimlogRS, ylim = c(-100, 100))
+  
+  # Plotting logRS by simulated logRS (INCOMPLETE)
+  plot(psimlogRS_pred[[1]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)
+  for (i in 2:100) {points(psimlogRS_pred[[i]], dat$logRS, col = rgb(0, 0, 0, 0.1), pch = 16)}
+  
+  # Useful bayesplot info: https://mc-stan.org/bayesplot/reference/pp_check.html
+  
+  # Plot distributions for PRIOR PREDICTIVE
+  # First: add in observation error to logRS_pred
+  # ...
+  # Second: plot the distribution of logRS_pred with observation error
+}
+
+
+
 #### Posterior Distributions of b0 and bWA ##########################################################################################################
 pdf(here::here("DataOut/b0_posteriordensity.pdf"), width = 7, height = 7)
 ggplot() +
@@ -240,6 +338,7 @@ ggplot() +
   theme_classic() +
   labs(x = "bWA", y = "Density")
 dev.off()
+
 
 
 #### Plot SR Relationship Curves - based on SREP ####################################################################################################################
