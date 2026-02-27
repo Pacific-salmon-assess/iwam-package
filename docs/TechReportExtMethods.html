@@ -2962,11 +2962,11 @@ vertical-align: -.125em;
   <ul class="collapse">
   <li><a href="#model-encoding" id="toc-model-encoding" class="nav-link" data-scroll-target="#model-encoding">Model Encoding</a>
   <ul class="collapse">
-  <li><a href="#stage-1-creating-rtmb-model-function" id="toc-stage-1-creating-rtmb-model-function" class="nav-link" data-scroll-target="#stage-1-creating-rtmb-model-function">Stage 1: Creating RTMB model function</a></li>
+  <li><a href="#creating-rtmb-model-function" id="toc-creating-rtmb-model-function" class="nav-link" data-scroll-target="#creating-rtmb-model-function">Creating RTMB model function</a></li>
   <li><a href="#limits-bounds-and-inits" id="toc-limits-bounds-and-inits" class="nav-link" data-scroll-target="#limits-bounds-and-inits">Limits, bounds, and inits</a></li>
   <li><a href="#seeds" id="toc-seeds" class="nav-link" data-scroll-target="#seeds">Seeds</a></li>
   </ul></li>
-  <li><a href="#stage-3-extracting-the-posterior" id="toc-stage-3-extracting-the-posterior" class="nav-link" data-scroll-target="#stage-3-extracting-the-posterior">Stage 3: Extracting the posterior</a></li>
+  <li><a href="#extracting-the-posterior" id="toc-extracting-the-posterior" class="nav-link" data-scroll-target="#extracting-the-posterior">Extracting the posterior</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -3016,8 +3016,8 @@ cursor: pointer;
 <li>extract posteriors from the MCMC chains to access output benchmark estimates.</li>
 </ol>
 <p>This section will outline the more technical considerations of these three stages and conclude with a discussion of model convergence.</p>
-<section id="stage-1-creating-rtmb-model-function" class="level3">
-<h3 class="anchored" data-anchor-id="stage-1-creating-rtmb-model-function">Stage 1: Creating RTMB model function</h3>
+<section id="creating-rtmb-model-function" class="level3">
+<h3 class="anchored" data-anchor-id="creating-rtmb-model-function">Creating RTMB model function</h3>
 <p>The first stage of the model process is the creation of the rTMB model object. The pertinent data components in the RTMB model were:</p>
 <ol type="1">
 <li>the raw spawner-recruit dataset which supplies identification of number of stocks, number of observations, and spawner observations,</li>
@@ -3035,8 +3035,8 @@ cursor: pointer;
 <p>For testing purposes, the seed was set before each and every time the MCMC sampling function was run. This allows for consistent stochasticity, making distinguishing differences during model development an easier task. Given the uncertainty in the model, without a set seed, every run will and can vary by significant digits. Due to the nature of using this model to inform fisheries science advice and as advice for fisheries management, we recommend that set seeds be used to prevent confusion when communicating final benchmarks.</p>
 </section>
 </section>
-<section id="stage-3-extracting-the-posterior" class="level2">
-<h2 class="anchored" data-anchor-id="stage-3-extracting-the-posterior">Stage 3: Extracting the posterior</h2>
+<section id="extracting-the-posterior" class="level2">
+<h2 class="anchored" data-anchor-id="extracting-the-posterior">Extracting the posterior</h2>
 <p>Once MCMC samples are drawn, the posterior distributions for both model parameters and derived quantities are extracted from the chains. This was done using a custom written function, available at (LINK TO GITHUB – specific file?), which extracts derived quantities and model parameters from the MCMC chains using the RTMB report simulation function, and calculates marginal estimates and distributional statistics. For reference, derived quantities are defined as the model variables not defined by the parameter list encoded into the RTMB model. These values are stored in a matrix per variable, which can then be used to calculate the distributional statistics; mean, median, posterior mode , and upper (95%) and lower (5%) quantiles. We calculate the marginal distribution statistics for <span class="math inline">\(S_{MAX}\)</span> (tar) and <span class="math inline">\(log\alpha\)</span> (tar) by drawing from a random normal distribution whose mean is the posterior draw and standard deviation is the draws of <span class="math inline">\(log{S_{MAX}}_{SD}\)</span> and <span class="math inline">\({log\alpha}_{SD}\)</span> respectively. Once the marginal mean distributions of <span class="math inline">\(S_{MAX}\)</span> (tar) and <span class="math inline">\(log\alpha\)</span> (tar) are calculated, they are used to for the marginal mean estimates of , <span class="math inline">\(S_{MSY}\)</span>, and <span class="math inline">\(S_{GEN}\)</span>. With this step complete, we have access to all benchmark estimates and necessary model check requirements in the same form as Liermann et al. (2010).</p>
 </section>
 </section>

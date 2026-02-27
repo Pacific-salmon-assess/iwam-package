@@ -13,7 +13,8 @@ Welcome to the IWAM package documentation homepage.
 ## Documentation
 
 - [Executive Summary](Execsummary.html) - Overview of the IWAM model, key equations, and applications
-- [Extended Figures Section](TechReportExtFigures.html) - The Technical Report (Pending Publication) Extended Figures Section
+- [Extended Methods Section](TechReportExtMethods.html) - The Technical Report (Pending Publication) Extended Methods Section
+- [Extended Results Section](TechReportExtFigures.html) - The Technical Report (Pending Publication) Extended Results Section
 
 ## Repository
 
