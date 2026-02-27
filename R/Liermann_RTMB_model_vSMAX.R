@@ -47,8 +47,8 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv") 
-# c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv")
+# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
 # WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
 
 # Data Manipulations ####
@@ -232,11 +232,16 @@ f_smax <- function(par){
   SGEN = numeric(nrow(WAin))
   SREP = numeric(nrow(WAin))
 
+  # NOTE: For simplicity with RTMB and TMBstan, predictions were calculated as part of the posterior and excluded from the negative log-likelihood.
   for (i in 1:N_Pred){
 	# Impose a new alpha here ...
 	
     if(lhdiston) logAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2 
     else logAlpha_tar[i] <- Alpha0 + biaslogAlpha # + biaslogAlpha + logAlpha_sd^2/2 
+	
+	# posterior predictive alpha?
+	# if(lhdiston) logAlpha_tar[i] <- Alpha0 + Alpha02*type_tar[i] + biaslogAlpha
+	# else logAlpha_tar[i] <- Alpha0 + biaslogAlpha
 
     logSMAX_tar[i] <- b0[1] + b0[2]*type_tar[i] + (bWA[1] + bWA[2]*type_tar[i])*WAin$logWAshifted_t[i] + biaslogSMAX
     SMAX_tar[i] <- exp(logSMAX_tar[i]) 
@@ -362,8 +367,8 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 
 
 # Save stan fit object
-# if(dat$prioronly == 1) {save(fitstan, file = "fitstan_prioronly.RData")} 
-	# else {save(fitstan, file = "fitstan.RData")}
+# if(dat$prioronly == 1) {save(fitstan, file = "fitstan_prioronly.RData")} else 
+	# {save(fitstan, file = "fitstan.RData")}
 
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan, model = 'SMAX'); beep(2)
@@ -372,19 +377,21 @@ dsmax <- derived_obj
 fitsmax <- fitstan
 
 # Simulate alternative priors
-# BS.smax <- dobootstrap(bsiters = 2500, # 20,000 for full iterations
-						# adj = FALSE,
-						# bias.cor = FALSE,
-						# prod = c("LifeStageModel"),
-						# MCMC = TRUE,
-						# model = c("SMAX"),
-						# Ricprior = c(1, 0.3),
-						# round = FALSE,
-						# WAinname = c("DataIn/Parken_evalstocks.csv"))
+BS.smax <- dobootstrap(bsiters = 20000, # 20,000 for full iterations
+						adj = TRUE,
+						bias.cor = FALSE,
+						prod = c("LifeStageModel"),
+						MCMC = TRUE,
+						model = c("SMAX"),
+						Ricprior = c(1, 0.3),
+						round = FALSE,
+						WAinname = c("DataIn/Parken_evalstocks.csv")) # c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
+BS.smax <- BS.smax$BS.dfout
 
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
-# if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else {save(derived_obj, file = "derived_obj.RData")}
+# if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else 
+	# {save(derived_obj, file = "derived_obj.RData")}
 
 if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
 	{print("Posterior Prediction Mode")}

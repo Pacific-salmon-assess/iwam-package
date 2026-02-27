@@ -103,9 +103,16 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		if (model == 'SMAX') {
 			if (adj == T) { # Looks very skewed in distribution
 				SMAX <- dsmax$deripost_summary$SMAX_tar_adj$Median # 25 val
+				logSMAX <- log(SMAX)
 				SMAX_logSE <- (log(SMAX) - log(dsmax$deripost_summary$SMAX_tar_adj$LQ_5)) / 1.96 # 25 val
 				SMAX_SE <- (SMAX - dsmax$deripost_summary$SMAX_tar_adj$LQ_5) / 1.96 # 25 val
-				SMAX_SD <- sd(SMAX) # 1 val
+				logSMAX_SD <- apply(log(dsmax$deripost_full$SMAX_tar_adj), 2, sd) 
+				
+				ALPHA <- dsmax$deripost_summary$Alpha_tar_adj$Median 
+				ALPHA_SD <- apply(dsmax$deripost_full$Alpha_tar_adj, 2, sd)
+				
+				rho <- sapply(1:ncol(dsmax$deripost_full$Alpha_tar_adj), 
+					function(i) cor(dsmax$deripost_full$Alpha_tar_adj[,i], log(dsmax$deripost_full$SMAX_tar_adj[,i])))
 			} else {
 				SMAX <- dsmax$deripost_summary$SMAX_tar$Median # 25 val per pop
 				logSMAX <- log(SMAX)

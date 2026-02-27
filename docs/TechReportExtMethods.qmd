@@ -1,0 +1,62 @@
+---
+title: "Technical Report Extended Methods Section"
+format: 
+    html:
+        toc: true
+        toc-title: Contents
+        toc-depth: 3
+        toc-expand: 1
+        embed-resources: true
+---
+
+```{=html}
+<style>
+details {
+  margin: 0.5em 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.5em 1em;
+  background-color: #f9f9f9;
+}
+summary {
+  font-size: 1.1em;
+  font-weight: bold;
+  cursor: pointer;
+}
+</style>
+```
+
+# Document Introduction
+
+The purpose of this page is to provide a complete description of the interface of the TMB model and TMBstan will be detailed below during the discussion of MCMC sampling and model convergence. This documentation was taken from an early version of the (TITLE) Technical Report (CITATION). 
+
+## Model Encoding
+
+The model sampling process follows 3 major stages; 
+
+(1) model creation/encoding in TMB, 
+(2) model sampling in STAN (CITATION) through TMBstan (CITATION), 
+(3) extract posteriors from the MCMC chains to access output benchmark estimates.
+
+This section will outline the more technical considerations of these three stages and conclude with a discussion of model convergence.
+
+### Creating RTMB model function
+
+The first stage of the model process is the creation of the rTMB model object. The pertinent data components in the RTMB model were: 
+
+(1) the raw spawner-recruit dataset which supplies identification of number of stocks, number of observations, and spawner observations, 
+(2) the synoptic watershed area dataset which supplies the watershed areas associated with the SR population data, and 
+(3) the target watershed area dataset for the stocks we desire to predict benchmark estimates for. 
+
+The parameters of the RTMB model were (also listed in Methods Section XXXX): (1) $b0$, (2) $bWA$, (3) $log{S_{MAX}}_{re}$, (4) $\alpha_0$, (5) $\alpha_{re}$, (6) $\tau$, (7) $log{S_{MAX}}_{SD}$, (8) $\alpha_{SD}$, (9) $\alpha_{LH}$. With the core components of the model the second stage is to encode the model equations as the negative log likelihood. During this stage we recommend non-centered priors for their improvements on model sampling and convergence (CITATION) for complex models. Examples of non-centering can be found in Equations XX and XX. A greater discussion on convergence is available later in Section (XX). It is in this stage that data can be excluded from the negative log likelihood if you would like to explore the prior predictive model. With the modelling stage completed, the third stage of the RTMB function includes preparing the target predictions, as described in Stage 3 - Posterior Predictions for Targets without Spawner-Recruit Data. The only caveat for model encoding is to ensure that these predictions are not part of the negative log-likelihood. Our method of calculating benchmark estimates internally does not account for random effects and therefore supplies our conditional posterior means, conditioning on random effects being equal to zero. Marginal posterior means are calculated externally after sampling. The inclusion of predictions within the RTMB function is not necessary, and is done here to compartmentalize the code for readability and future package development.  With the RTMB model function prepared, we are left to define the random effects, parameter bounds, and initial parameter start points prior to MCMC sampling. When compiling this RTMB model, we explicitly state that there are two random effects terms; $\alpha_{re}$, and $log{S_{MAX}}_{re}$. Their scalar terms, $\alpha_{SD}$ and $log{S_{MAX}}_{SD}$, are not random terms. Once identified here, they do not need to be identified as such during sampling with tmbstan(). For more information on model coding specifics, please refer to the guidance of Kasper () available at (INSERT GITHUB LINK CITATION).
+
+### Limits, bounds, and inits
+Given what distributions are available through the RTMB package, in order to effectively set priors for some parameters, we must instead give upper and lower bounds for a select parameter list. In our case; $\tau$, $log{S_{MAX}}_{SD}$, and ${log\alpha}_{SD}$, which were constrained either as non-zero, or with Uniform distributions between $0$ and $100$. For alternative prior cases, these bounds would need to be changed, in addition to the parameter input sections in the above model encoding sections. All parameters were otherwise bounded between negative infinity and infinity. These bounds are used by both the MCMC sampler, or nlminb() (CITATION) if using a frequentist approximation. The initial values for the sampler can be either be static or random. Best practices dictate that random initial start points be used. TMBstan will generate random start points if not supplied, but in order to improve warmup time, convergence, and improving mixing it is recommended to specify initial start points with guidance. While testing the modelling for convergence and mixing, it is not recommended to use static start points, as it will be difficult to conclude that you have not biased your sampler (CITATION). This is a departure from the methods outlined by Liermann et al. (2010), where the initial values were assigned by the two-step regression approach of Parken et al. (2006). 
+
+### Seeds
+For testing purposes, the seed was set before each and every time the MCMC sampling function was run. This allows for consistent stochasticity, making distinguishing differences during model development an easier task. Given the uncertainty in the model, without a set seed, every run will and can vary by significant digits. Due to the nature of using this model to inform fisheries science advice and as advice for fisheries management, we recommend that set seeds be used to prevent confusion when communicating final benchmarks.
+
+## Extracting the posterior
+Once MCMC samples are drawn, the posterior distributions for both model parameters and derived quantities are extracted from the chains. This was done using a custom written function, available at (LINK TO GITHUB – specific file?), which extracts derived quantities and model parameters from the MCMC chains using the RTMB report simulation function, and calculates marginal estimates and distributional statistics. For reference, derived quantities are defined as the model variables not defined by the parameter list encoded into the RTMB model. These values are stored in a matrix per variable, which can then be used to calculate the distributional statistics; mean, median, posterior mode , and upper (95%) and lower (5%) quantiles. We calculate the marginal distribution statistics for $S_{MAX}$ (tar) and $log\alpha$ (tar) by drawing from a random normal distribution whose mean is the posterior draw and standard deviation is the draws of $log{S_{MAX}}_{SD}$ and ${log\alpha}_{SD}$ respectively. Once the marginal mean distributions of $S_{MAX}$ (tar) and $log\alpha$ (tar) are calculated, they are used to for the marginal mean estimates of \beta, $S_{MSY}$, and $S_{GEN}$. With this step complete, we have access to all benchmark estimates and necessary model check requirements in the same form as Liermann et al. (2010).
+
+

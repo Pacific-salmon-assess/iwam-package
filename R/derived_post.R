@@ -109,6 +109,7 @@ derived_post <- function(x, model) {
 			matrices$logSMAX_line_stream_adj <- apply(matrices$logSMAX_line_stream, 2, 
 				FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
 
+			# Does this calculate the marginal posterior OR the posterior predictive distribution?
 			matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
 				FUN = function(x)rnorm(length(x), x, sd = matrices$Alpha_sd))
 

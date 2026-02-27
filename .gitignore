@@ -428,3 +428,9 @@ R/Liermann_RTMB_model_vBETA.R
 DataOut/LinearReg_SmaxModel_realscale.pdf
 R/simParkenSR.r
 DataOut/dsmaxtestout.csv
+R/archive/comparealphas.R
+R/archive/HiearchicalRicker.r
+R/archive/IWAMfunctionrun.r
+R/archive/Liermann_RTMB_model_vBETA.R
+R/archive/PosteriorPredictiveSample.r
+R/archive/tmbstan_vignetteexample.R

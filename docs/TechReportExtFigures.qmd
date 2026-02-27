@@ -1,5 +1,5 @@
 ---
-title: "Technical Report Extended Figures"
+title: "Technical Report Extended Results Section"
 format: 
     html:
         toc: true
@@ -177,7 +177,7 @@ dat <- list(srdat = srdat,
             WAin = WAin,
             lineWA =  seq(min(WAbase$logWAshifted), 
                           max(WAbase$logWAshifted), 0.1), # Not added to NLL
-			mean_logWA = mean_logWA,
+			      mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 0) # 0-run with data, 1-prior prediction mode
 
