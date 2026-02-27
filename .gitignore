@@ -434,3 +434,6 @@ R/archive/IWAMfunctionrun.r
 R/archive/Liermann_RTMB_model_vBETA.R
 R/archive/PosteriorPredictiveSample.r
 R/archive/tmbstan_vignetteexample.R
+DataIn/archive/ParkenSREP.csv
+DataIn/archive/ParkenSMSY.csv
+DataIn/archive/ParkenRicSig.csv
