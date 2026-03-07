@@ -1,4 +1,4 @@
-# Liermann Srep (E) RTMB Model with MCMC Sampling ####
+# Liermann SMAX (B) RTMB Model with MCMC Sampling ####
 
 # Libaries ####
 library(RTMB)
@@ -31,12 +31,6 @@ LambertW0 <- ADjoint(
   function(x){gsl::lambert_W0(x)},
   function(x, y, dy) {dy / (x + exp(y))}
 )
-
-
-
-# Begin IWAM model function: ####
-
-
 
 # For predicting/re-evaluation of synoptic sets: WAbase
     # 1. Run model until setting up data section
