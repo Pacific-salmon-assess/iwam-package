@@ -26,26 +26,84 @@ options(scipen = 999)
 compiler::enableJIT(0)
 
 # parIWAM <- function(){} # pars for RTMB function
-# priorIWAM <- function(){ # priors for RTMB function - assumes you have set 'par'
-	# priorb0[1] <- dnorm(b0[1], 10, sd = 31.6, log = TRUE)
-	# priorb0[2] <- dnorm(b0[2], 0, sd = 31.6, log = TRUE)
-	# priorbWA[1] <- dnorm(bWA[1], 0, sd = 31.6, log = TRUE)
-	# priorbWA[2] <- dnorm(bWA[2], 0, sd = 31.6, log = TRUE)
+# priorIWAM_1 <- function(prior = c("b01", "b02", "bWA1", "bWA2", 
+								# "Alpha0", "Alpha02", "logSMAX_re", "Alpha_re", "tauobs"),
+					# mub01 = 10, sdb01 = 31.6,
+					# mub02 = 0, sdb02 = 31.6,
+					# mubWA1 = 0, sdbWA1 = 31.6,
+					# mubWA2 = 0, sdbWA2 = 31.6,
+					# muAlpha0 = 0.6, sdAlpha0 = 0.45,
+					# muAlpha02 = 0, sdAlpha02 = 31.6,
+					# mulogSMAX_re = 0, sdlogSMAX_re = 1,
+					# muAlpha_re = 0, sdAlpha_re = 1,
+					# shapetauobs = 0.0001, scaletauobs = 1/0.0001
+	# ){
 	
-	# priorAlpha0 <- dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)
-	# priorAlpha02 <- dnorm(Alpha02, 0, sd = 31.6, log = TRUE)
+	# prior <- match.arg(prior)
 	
-	# priorlogSMAX_re <- dnorm(logSMAX_re[i], 0, sd = 1, log = TRUE)
-	# priorAlpha_re <- dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
-	
-	# return(list(
-		# priorb0 = priorb0,
-		# priorbWA = priorbWA,
-		# priorAlpha0 = priorAlpha0,
-		# priorAlpha02 = priorAlpha02,
+	# switch(prior,
+		# b01 = dnorm(par$b0[1], mub01, sd = sdb01, log = TRUE),
+		# b02 = dnorm(par$b0[2], mub02, sd = sdb02, log = TRUE),
+		# bWA1 = dnorm(par$bWA[1], mubWA1, sd = sdbWA1, log = TRUE),
+		# bWA2 = dnorm(par$bWA[2], mubWA2, sd = sdbWA2, log = TRUE),
 		
-	# ))
+		# Alpha0 = dnorm(par$Alpha0, muAlpha0, sd = sdAlpha0, log = TRUE),
+		# Alpha02 = dnorm(par$Alpha02, muAlpha02, sd = sdAlpha02, log = TRUE),
+		
+		# logSMAX_re = dnorm(par$logSMAX_re, mulogSMAX_re, sd = sdlogSMAX_re, log = TRUE),
+		# Alpha_re = dnorm(par$Alpha_re, muAlpha_re, sd = sdAlpha_re, log = TRUE),
+		
+		# tauobs = dgamma(par$tauobs, shape = shapetauobs, scale = scaletauobs, log = TRUE)
+	# )
 # }
+
+priorIWAM <- function(mub01 = 10,        sdb01 = 31.6,
+					mub02 = 0,         sdb02 = 31.6,
+					mubWA1 = 0,        sdbWA1 = 31.6,
+					mubWA2 = 0,        sdbWA2 = 31.6,
+					muAlpha0 = 0.6,    sdAlpha0 = 0.45,
+					muAlpha02 = 0,     sdAlpha02 = 31.6,
+					mulogSMAX_re = 0,  sdlogSMAX_re = 1,
+					muAlpha_re = 0,    sdAlpha_re = 1,
+					shapetauobs = 0.0001, scaletauobs = 1/0.0001
+	) {
+	
+	list(b0 = c(mub01, mub02, sdb01, sdb02),
+	bWA = c(mubWA1, mubWA2, sdbWA1, sdbWA2),
+	Alpha0 = c(muAlpha0, sdAlpha0),
+	Alpha02 = c(muAlpha02, sdAlpha02),
+	logSMAX_re = c(mulogSMAX_re, sdlogSMAX_re),
+	Alpha_re = c(muAlpha_re, sdAlpha_re),
+	tauobs = c(shapetauobs, scaletauobs)
+    )
+	
+	# instead do the dnorms for all the priors
+	# and then save them as a vectored list as above so they can be called
+	# then add a prior object to IWAM() so that it takes an object created
+	# by priorIWAM
+}
+
+check_prior <- function(prior) {
+  
+  expected_lengths <- c(b0 = 4, bWA = 4, Alpha0 = 2, Alpha02 = 2, 
+                        logSMAX_re = 2, Alpha_re = 2, tauobs = 2)
+  
+  # Check that prior is a list
+  if (!is.list(prior)) {
+    stop("'prior' must be a list.")
+  }
+  
+  # Check lengths of each element
+  for (nm in names(expected_lengths)) {
+    if (length(prior[[nm]]) != expected_lengths[nm]) {
+      stop(paste0("'prior$", nm, "' must have length ", expected_lengths[nm], 
+                  ", but has length ", length(prior[[nm]]), "."))
+    }
+  }
+  
+  message("'prior' passed all checks.")
+}
+
 # initIWAM <- function(){} # Random inits matching priors for sampling 
 # coreIWAM <- function(){} # Only core data processing, function - draws from above
 
@@ -54,6 +112,7 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 					lhdiston = TRUE,
 					bias.cor = FALSE,
 					
+					# prior = priorIWAM,
 					# parb0 = c(10,0),
 					# parbWA = c(0,0),
 					# parlogSMAX_re = numeric(), # is a numeric of length
@@ -68,13 +127,13 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 					# biaslogAlpha = 0,
 					# biaslogRS = numeric(), # is a numeric of length
 					
-					priorb0 = c(10, 31.6, 0, 31.6),
-					priorbWA = c(0, 31.6, 0, 31.6),
-					priorAlpha0 = c(0.6, 0.45),
-					priorAlpha02 = c(0, 31.6),
-					priorlogSMAX_re = c(0, 1),
-					priorAlpha_re = c(0, 1),
-					priortauobs = c(0.0001, 1/0.0001),
+					# priorb0 = c(10, 31.6, 0, 31.6),
+					# priorbWA = c(0, 31.6, 0, 31.6),
+					# priorAlpha0 = c(0.6, 0.45),
+					# priorAlpha02 = c(0, 31.6),
+					# priorlogSMAX_re = c(0, 1),
+					# priorAlpha_re = c(0, 1),
+					# priortauobs = c(0.0001, 1/0.0001),
 					
 					random = c("Alpha_re", "logSMAX_re"),
 					
@@ -196,6 +255,8 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 	  par$Alpha02 <- 0
 	}
 
+	check_prior(prior) ## CHECK ##
+	prior <- priorIWAM()
 
 	# Please note all references to alpha are defined explicitly on the log-scale e.g. alpha = log(alpha)
 	f_smax <- function(par){
@@ -241,18 +302,18 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 	  nll <- 0
 	  
 	  # Can I remove the sum() from these arguments?
-	  nll <- nll - sum(dnorm(b0[1], priorb0[1], sd = priorb0[2], log = TRUE)) # Prior b0
-	  nll <- nll - sum(dnorm(b0[2], priorb0[3], sd = priorb0[4], log = TRUE)) # Prior b0
-	  nll <- nll - sum(dnorm(bWA[1], priorbWA[1], sd = priorbWA[2], log = TRUE)) # Prior bWA
-	  nll <- nll - sum(dnorm(bWA[2], priorbWA[3], sd = priorbWA[4], log = TRUE)) # Prior bWA
+	  nll <- nll - sum(dnorm(b0[1], prior$b0[1], sd = prior$b0[3], log = TRUE)) # Prior b0
+	  nll <- nll - sum(dnorm(b0[2], prior$b0[2], sd = prior$b0[4], log = TRUE)) # Prior b0
+	  nll <- nll - sum(dnorm(bWA[1], prior$bWA[1], sd = prior$bWA[3], log = TRUE)) # Prior bWA
+	  nll <- nll - sum(dnorm(bWA[2], prior$bWA[2], sd = prior$bWA[4], log = TRUE)) # Prior bWA
 	  
-	  nll <- nll - sum(dnorm(Alpha0, priorAlpha0[1], sd = priorAlpha0[2], log = TRUE)) # Prior (rM)
-	  if(lhdiston) nll <- nll - sum(dnorm(Alpha02, priorAlpha02[1], sd = priorAlpha02[2], log = TRUE)) # Prior (rD)
+	  nll <- nll - sum(dnorm(Alpha0, prior$Alpha0[1], sd = prior$Alpha0[2], log = TRUE)) # Prior (rM)
+	  if(lhdiston) nll <- nll - sum(dnorm(Alpha02, prior$Alpha02[1], sd = prior$Alpha02[2], log = TRUE)) # Prior (rD)
 	  
 	  ## Second level of hierarchy - Ricker parameters:
 	  for (i in 1:N_Stk){
-		nll <- nll - dnorm(logSMAX_re[i], priorlogSMAX_re[1], sd = priorlogSMAX_re[2], log = TRUE)
-		nll <- nll - dnorm(Alpha_re[i], priorAlpha_re[1], sd = priorAlpha_re[2], log = TRUE)
+		nll <- nll - dnorm(logSMAX_re[i], prior$logSMAX_re[1], sd = prior$logSMAX_re[2], log = TRUE)
+		nll <- nll - dnorm(Alpha_re[i], prior$Alpha_re[1], sd = prior$Alpha_re[2], log = TRUE)
 
 		# nll <- nll - dmvnorm(c(logSMAX_re[i],Alpha_re[i]), c(0,0), Sig_RE, log = TRUE) # make logSMAX_re and Alpha_re correlated
 		# Sig_RE = cbind(c(1,corr_par),c(corr_par,1)) or do it without correlation to test same results, where corr_par = 0
@@ -265,7 +326,7 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 		if(lhdiston) logAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biaslogAlpha
 		else logAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biaslogAlpha
 
-		nll <- nll - dgamma(tauobs[i], shape = priortauobs[1], scale = priortauobs[2], log = TRUE)
+		nll <- nll - dgamma(tauobs[i], shape = prior$tauobs[1], scale = prior$tauobs[2], log = TRUE)
 	  }
 
 	  ## First level of hierarchy: Ricker model:
@@ -276,7 +337,7 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 		# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # Old Ricker parameterization
 
 		if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
-		  nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) 
+		  nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
 		} 
 	  }
 	  
@@ -408,11 +469,11 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 			logSMAX_sd = runif(1, 0.01, 3), # Positive 
 			Alpha_sd = runif(1, 0.01, 3) # Positive
 		)
-	  
+	
 		if (lhdiston) {
 			listinit$Alpha02 <- rnorm(1, 0, 1) # alpha0 prior for LH specific dists.
 		}
-	  
+	
 		return(listinit)
 	}
 
