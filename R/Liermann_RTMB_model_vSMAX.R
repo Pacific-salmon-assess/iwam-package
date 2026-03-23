@@ -41,7 +41,8 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv")
+# WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- c("DataIn/Nanaimo_test.csv")
 # c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
 # WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
 
@@ -103,6 +104,9 @@ dat <- list(srdat = srdat,
 			mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 0) # 0-run with data, 1-prior prediction mode
+
+if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
+	{print("Posterior Prediction Mode")}
 
 N_Stk <- max(srdat$Stocknumber + 1)
 N_Obs <- nrow(srdat)
@@ -379,13 +383,10 @@ BS.smax <- dobootstrap(bsiters = 20000, # 20,000 for full iterations
 						model = c("SMAX"),
 						Ricprior = c(1, 0.3),
 						round = FALSE,
-						WAinname = c("DataIn/Parken_evalstocks.csv")) # c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
+						WAinname = c("DataIn/Nanaimo_test.csv")) # c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
 BS.smax <- BS.smax$BS.dfout
 
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else 
 	# {save(derived_obj, file = "derived_obj.RData")}
-
-if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
-	{print("Posterior Prediction Mode")}

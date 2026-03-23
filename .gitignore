@@ -797,3 +797,5 @@ archive/TMB_Files/lambert.cpp
 archive/TMB_Files/lambert.dll
 archive/TMB_Files/lambert.o
 archive/TMB_Files/Liermann_PriorRicSig_PriorDeltaSig.cpp
+DataIn/Nanaimo_test.csv
+R/examplepriorfunction.r
