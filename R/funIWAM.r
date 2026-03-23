@@ -108,6 +108,7 @@ check_prior <- function(prior) {
 # coreIWAM <- function(){} # Only core data processing, function - draws from above
 
 IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
+					# srdat = c(''), # User inputted path for private SR data
 					prioronly = 0, # 1 = ...
 					lhdiston = TRUE,
 					bias.cor = FALSE,
@@ -176,8 +177,8 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 	# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
 
 	# Data Manipulations ####
-	srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # Consider _TK **** as alternative with longer dataset
-	WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
+	srdatwna <- read.csv(here::here("inst/extdata/SRinputfile.csv")) # Consider _TK **** as alternative with longer dataset
+	WAbase <- read.csv(here::here("inst/extdata/WatershedArea.csv"))
 	WAin <- read.csv(here::here(WAin))
 
 	# Data setup ####

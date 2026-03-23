@@ -802,3 +802,4 @@ R/examplepriorfunction.r
 archive/DataIn/ParkenSREP.csv
 archive/DataIn/ParkenSMSY.csv
 archive/DataIn/ParkenRicSig.csv
+inst/extdata/SRinputfile.csv
