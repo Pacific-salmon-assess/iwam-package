@@ -32,7 +32,8 @@ alpha0seq <-  seq(mean(post[,1]) - 4*sd(post[,1]), mean(post[,1]) + 4*sd(post[,1
 alpha0dnorm <- dnorm(alpha0seq, mean = mean(post[,1]), sd = sd(post[,1]))
 alpha0df <- data.frame(x = alpha0seq, y = alpha0dnorm)
 
-logalphak <- rnorm(1, Ricprior[1], Ricprior[2])
+# logalphak <- rnorm(1, Ricprior[1], Ricprior[2])
+logalphak <- Ricprior[1]
 # stream type (base case)
 mu_new <- mu[-1] + covmatrix[-1,1]/covmatrix[1,1]*(logalphak - mu[1])
 var_new <- covmatrix[-1,-1] - (covmatrix[-1,1, drop = FALSE] / covmatrix[1,1]) %*% covmatrix[1,-1, drop = FALSE]
@@ -64,9 +65,9 @@ p_scatter <- ggplot(data.frame(x = exp(dsmax$deripost_full$Alpha0), y = dsmax$de
 	aes(x = x, y = y)) +
 	geom_point(alpha = 0.2, show.legend = FALSE) + 
 	# point for mean of new distribution
-	geom_point(aes(x = mean(RicAseq), y = mean(b0newseq)), color = "red", size = 4) + # MEAN LINE POINT
-	geom_point(data = data.frame(x = logalphai, y = bnewi), aes(x = logalphai, y = bnewi), color = "royalblue", size = 3, alpha = 0.4) +
-	xlab(TeX("global mean $log(\\alpha)$")) + 
+	annotate("point", x = mean(RicAseq), y = mean(b0newseq), color = 'red', size = 4) + 
+	geom_point(data = data.frame(x = logalphai, y = bnewi), aes(x = logalphai, y = bnewi), color = "pink", size = 3, alpha = 0.4) +
+	xlab(TeX("$log(\\alpha)$")) + 
 	ylab(TeX("$b0$ (Intercept of the Regression) for stream-type")) + 
 	theme_classic() + 
 	theme(legend.position="none") + 
@@ -114,8 +115,8 @@ p_right <- ggplot() +
 
 # patchwork setup
 (p_top + plot_spacer() + p_scatter + p_right) + 
-	plot_layout(ncol    = 2, widths  = c(3, 1), heights = c(1, 3)) # + 
-	# plot_annotation(title = "From the posterior - conditional on random effects being equal to zero")
+	plot_layout(ncol    = 2, widths  = c(3, 1), heights = c(1, 3)) + 
+	plot_annotation(title = "Relationship of logAlpha and the Regression Intercept for Stream-type Populations")
 	# plot_annotation(title = "From the posterior predictive (random effects marginalized)")
 		# using _adj posterior values
 		
@@ -147,17 +148,20 @@ newlogSMAXdf <- data.frame(x = newlogSMAXseq, y = newlogSMAXdnorm)
 newSMAXrnorm <- rnorm(newlogSMAXseq, mean = newlogSMAX, logSMAX_sd)	
 RicArnorm <- rnorm(RicAseq, mean = Ricprior[1], sd = Ricprior[2])
 BETA <- 1/exp(newSMAXrnorm)
+
+# NEW SMSY
 SMSY <- (1 - LambertW0(exp(1 - RicArnorm))) / BETA
 logSMSY <- log(SMSY)
 newSMSYseq <- seq(mean(logSMSY) - 4*sd(logSMSY), mean(logSMSY) + 4*sd(logSMSY), length.out = 500)
 newSMSYdnorm <- dnorm(newSMSYseq, mean = mean(logSMSY), sd = sd(logSMSY))
 
-# Original SMSY
+# ORIGINAL SMSY
 SMSYmu <- log(dsmax$deripost_summary$SMSY_adj$Median) # mean of the medians 
 SMSYsd <- apply(log(dsmax$deripost_full$SMSY_adj), 2, sd)
 SMSYseq <- seq(SMSYmu[10] - 4*SMSYsd[10], SMSYmu[10] + 4*SMSYsd[10], length.out = 500)
 SMSYdnorm <- dnorm(SMSYseq, mean = SMSYmu[10], sd = SMSYsd[10])
 
+# NEW SGEN
 SGEN <- -1/BETA * LambertW0(-BETA * SMSY/(exp(RicArnorm)))
 logSGEN <- log(SGEN)
 newSGENseq <- seq(mean(logSGEN) - 4*sd(logSGEN), mean(logSGEN) + 4*sd(logSGEN), length.out = 500)
@@ -169,13 +173,30 @@ SGENsd <- apply(log(dsmax$deripost_full$SGEN_adj), 2, sd)
 SGENseq <- seq(SGENmu[10] - 4*SGENsd[10], SGENmu[10] + 4*SGENsd[10], length.out = 500)
 SGENdnorm <- dnorm(SGENseq, mean = SGENmu[10], sd = SGENsd[10])
 
+# NEW SREP
+logSREP <- log(RicArnorm/BETA)
+newSREPseq <- seq(mean(logSREP) - 4*sd(logSREP), mean(logSREP) + 4*sd(logSREP), length.out = 500)
+newSREPdnorm <- dnorm(newSREPseq, mean = mean(logSREP), sd = sd(logSREP))
+
+# ORIGINAL SREP
+SREPmu <- log(dsmax$deripost_summary$SREP_adj$Median) # mean of the medians 
+SREPsd <- apply(log(dsmax$deripost_full$SREP_adj), 2, sd)
+SREPseq <- seq(SREPmu[10] - 4*SREPsd[10], SREPmu[10] + 4*SREPsd[10], length.out = 500)
+SREPdnorm <- dnorm(SREPseq, mean = SREPmu[10], sd = SREPsd[10])
+
 # SET LIMITS TO MATCH ACROSS FACETS
 x_lim2 <- c(4, 11)
 # y_lim2 <- c(3, 12)
 
+# Populations to investigate:
+	# [10] - Louis, WA - 519 (Mid-size) (Ocean)
+	# [25] - Maria, WA - 33 (Smallest) (Stream)
+	# 
+
 p_bottom1 <- ggplot() + # SMAX
 	geom_line(aes(x = SMAXseq, y = SMAXdnorm), linewidth = 1.2) + # smoothed SMAX original
-	geom_line(aes(x = newlogSMAXseq, y = newlogSMAXdnorm), color = "red", linewidth = 1.2) +
+	geom_line(aes(x = newlogSMAXseq, y = newlogSMAXdnorm), 
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
 	xlab(TeX("$log(S_{MAX})$")) + 
 	ylab("Density") + 
 	theme_classic() +
@@ -186,7 +207,8 @@ p_bottom1 <- ggplot() + # SMAX
 	
 p_bottom2 <- ggplot() + # SMSY
 	geom_line(aes(x = SMSYseq, y = SMSYdnorm), linewidth = 1.2) + # smoothed SMAX original
-	geom_line(aes(x = newSMSYseq, y = newSMSYdnorm), color = "red", linewidth = 1.2) +
+	geom_line(aes(x = newSMSYseq, y = newSMSYdnorm),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
 	xlab(TeX("$log(S_{MSY})$")) + 
 	ylab("Density") + 
 	theme_classic() +
@@ -197,7 +219,8 @@ p_bottom2 <- ggplot() + # SMSY
 	
 p_bottom3 <- ggplot() + # SGEN
 	geom_line(aes(x = SGENseq, y = SGENdnorm), linewidth = 1.2) + # smoothed SMAX original
-	geom_line(aes(x = newSGENseq, y = newSGENdnorm), color = "red", linewidth = 1.2) +
+	geom_line(aes(x = newSGENseq, y = newSGENdnorm),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
 	xlab(TeX("$log(S_{GEN})$")) + 
 	ylab("Density") + 
 	theme_classic() +
@@ -206,5 +229,18 @@ p_bottom3 <- ggplot() + # SGEN
 	coord_cartesian(xlim = x_lim2) +
 	labs(title = "C")
 	
-(p_bottom1 + p_bottom2 + p_bottom3) + 
-	plot_layout(ncol = 1)
+p_bottom4 <- ggplot() + # SREP
+		geom_line(aes(x = SREPseq, y = SREPdnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSREPseq, y = newSREPdnorm),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{REP})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "D")
+	
+(p_bottom1 + p_bottom2 + p_bottom3 + p_bottom4) + 
+	plot_layout(ncol = 1) +
+	plot_annotation(title = "Example Benchmarks from Louis")
