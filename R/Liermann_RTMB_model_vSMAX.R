@@ -21,7 +21,6 @@ here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
-source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
 
 
 options(scipen = 999)
@@ -41,13 +40,14 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-# WAin <- c("DataIn/Parken_evalstocks.csv")
-WAin <- c("DataIn/Nanaimo_test.csv")
-# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
-# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv")
+	# c("DataIn/WCVIStocks.csv") or 
+	# c("DataIn/Parken_evalstocks.csv") or 
+	# c("DataIn/Ordered_backcalculated_noagg.csv")
 
 # Data Manipulations ####
-srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # Consider _TK **** as alternative with longer dataset
+srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) 
+	# Consider _TK **** as alternative with longer dataset
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 WAin <- read.csv(here::here(WAin))
 
@@ -82,7 +82,7 @@ WAbase <- WAbase %>%
 	mutate(logWA = log(WA)) |> 
 	filter(!is.na(Stocknumber))
 
-# Shift log WA for the mean - base - makes estimation easier
+# Shift log WA for the (mean - base), makes estimation easier
 mean_logWA <- mean(WAbase$logWA)
 WAbase$logWAshifted <- WAbase$logWA - mean_logWA
 
@@ -115,9 +115,9 @@ stk = srdat$Stocknumber + 1
 lhdiston <- T # T = LH Specific
 bias.cor <- F # T = subtract bias correction terms from expontiated mean terms
 
+# Please note all references to alpha are defined explicitly on the log-scale e.g. alpha = log(alpha)
 par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
 			bWA = c(0, 0), # Inital values for WA regression slopes
-            # logRS_pred = numeric(nrow(srdat)), # Zeroes - testing as a parameter
             logSMAX_re = numeric(N_Stk), # Zeroes 
             Alpha0 = 0.6,
             Alpha_re = numeric(nrow(dat$WAbase)), # Zeroes
@@ -129,8 +129,7 @@ if (lhdiston) {
   par$Alpha02 <- 0
 }
 
-
-# Please note all references to alpha are defined explicitly on the log-scale e.g. alpha = log(alpha)
+# Please search for '@@' for the code cross-walk when comparing Tech Report equations.
 f_smax <- function(par){
   getAll(dat, par)
   
@@ -173,41 +172,61 @@ f_smax <- function(par){
   
   nll <- 0
   
-  # Can I remove the sum() from these arguments?
-  nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE)) # Prior b0
-  nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) # Prior b0
-  nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior bWA
-  nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) # Prior bWA
-  
-  nll <- nll - sum(dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
-  if(lhdiston) nll <- nll - sum(dnorm(Alpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
+  # IWAM EQUATION(S): 12 - 15 @@
+	# Explanation: Prior distributions of the watershed area regression slope and intercept parameters.
+  nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE)) 
+  nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) 
+  nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) 
+  nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) 
+	# Can I remove the sum() from these arguments?
+
+  # IWAM EQUATION(S): 6 and 7 @@
+	# Explanation: The prior for mean log(productivity) for stream-type and adjustment for ocean-type.
+  nll <- nll - sum(dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM) in Liermann et al. (2010)
+  if(lhdiston) nll <- nll - sum(dnorm(Alpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD) in Liermann et al. (2010)
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
+	# IWAM EQUATION(S): 5 (8), and 10 (11) @@
+	  # Explanation: Eq. 5 is the population level log productivity, with Uniform prior (8) for standard deviation.
+	  # Eq. 10 is the random effect term accounting for process error, with a Uniform prior (11) for standard deviation.
     nll <- nll - dnorm(logSMAX_re[i], 0, sd = 1, log = TRUE)
 	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
 
-	# nll <- nll - dmvnorm(c(logSMAX_re[i],Alpha_re[i]), c(0,0), Sig_RE, log = TRUE) # make logSMAX_re and Alpha_re correlated
-	# Sig_RE = cbind(c(1,corr_par),c(corr_par,1)) or do it without correlation to test same results, where corr_par = 0
+	# cov_par <- corxy*logSMAX_sd*Alpha_sd
+	# Sig_RE = cbind(c(logSMAX_sd^2, cov_par), c(cov_par, Alpha_sd^2)) # or do it without correlation to test same results, where corr_par = 0
+	# nll <- nll - RTMB::dmvnorm(x = c(logSMAX_re[i], Alpha_re[i]), mu = c(0, 0), Sigma = Sig_RE, log = TRUE) # make logSMAX_re and Alpha_re correlated
 		## corr_par has to be from -1 to 1 - so I would set a limit specifically for corr_par
 		## corr_par would need a prior e.g. Uniform -1 to 1
 	
+	# IWAM EQUATION(S): 9 @@
+	  # Explanation: The watershed area regression equation, parameterized for SMAX.
     logSMAX[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSMAX_re[i]*logSMAX_sd + biaslogSMAX
-    SMAX[i] <- exp(logSMAX[i])
-    	
+    
+	SMAX[i] <- exp(logSMAX[i])
+    
+	# IWAM EQUATION(S): 4 @@
+	  # Explanation: The Ricker stock-specific (i) productivity.
     if(lhdiston) logAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biaslogAlpha
     else logAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biaslogAlpha
 
+	# IWAM EQUATION(S): 3 @@
+	  # Explanation: The prior for the stock-specific (i) precision for the spawner-recruit model.
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
   ## First level of hierarchy: Ricker model:
   for (i in 1:N_Obs){
 	Alpha_pred <- exp(logAlpha)
+	
+	# IWAM EQUATION(S): 1 @@
+	  # Explanation: The Ricker spawner-recruit model, parameterized for SMAX.
 	logRS_pred[i] <- Alpha_pred[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
 	# logRS_pred[i] <- logAlpha[stk[i]] - S[i]/SMAX[stk[i]] + biaslogRS[stk[i]]
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]] # Old Ricker parameterization
 
+	# IWAM EQUATION(S): 2 @@
+	  # Explanation: The deviation in recruits per spawners.
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE) 
     } 
@@ -218,6 +237,9 @@ f_smax <- function(par){
   BETA_r = numeric(nrow(WAbase))
   SREP_r = numeric(nrow(WAbase))
   
+  # IWAM EQUATION(S): 17 and 19 @@
+	# Explanation: The calculation of the population management benchmarks SMSY and SREP, and Ricker
+	# parameter Beta.
   for (i in 1:N_Stk){
 	BETA_r[i] <- 1/SMAX[i] 
     SMSY_r[i] <- (1 - LambertW0(exp(1 - Alpha_pred[i]))) / BETA_r[i] 
@@ -245,13 +267,20 @@ f_smax <- function(par){
     SMAX_tar[i] <- exp(logSMAX_tar[i]) 
     
 	Alpha_tar <- exp(logAlpha_tar)
+	
     # Predict BETA
     # BETA[i] <- logAlpha_tar[i]/SREP_tar[i] 
 	BETA[i] <- 1/SMAX_tar[i] 
+	
     # Predict SMSY
     SMSY[i] <- (1 - LambertW0(exp(1 - Alpha_tar[i])))/BETA[i] 
-    # Predict SGEN
-    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i]))) 
+	
+    # Predict SGEN 
+	# IWAM EQUATION(S): 20 @@
+		# Explanation: The calculation of the population management benchmark SGEN using Lambert's W function
+		# as described in Scheuerell (2006).
+    SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i])))
+	
 	# Predict SREP 
 	SREP[i] <- Alpha_tar[i]/BETA[i] 
   }
@@ -265,15 +294,13 @@ f_smax <- function(par){
     SMAX_line_stream[i] <- exp(logSMAX_line_stream[i])
   }
   
-  REPORT(b0) # Testing simulate()
-  REPORT(bWA) # Testing simulate()
-
+  REPORT(b0) 
+  REPORT(bWA) 
   REPORT(logRS_pred)
-  
   # REPORT(logRS) # logRS for all 501 data points
   REPORT(logSMAX_re)
   REPORT(logSMAX_sd)
-  REPORT(SMAX) # E (Srep) for all synoptic data set rivers (25)
+  REPORT(SMAX) 
   REPORT(logSMAX)
   REPORT(logAlpha) # model logAlpha (25)
   REPORT(Alpha0)
@@ -290,7 +317,6 @@ f_smax <- function(par){
   REPORT(logSMAX_tar)
   REPORT(logAlpha_tar) 
   REPORT(Alpha_tar) 
-  
   REPORT(BETA)
   REPORT(SMSY)
   REPORT(SGEN)
@@ -323,8 +349,7 @@ lower[names(obj$par) == "Alpha_sd"] <- 0
 
 
 
-# MCMC ####
-# RANDOM INIT - MATCHING PRIORS
+# RANDOM INIT - MATCHING PRIORS ####
 init <- function() {
 	listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
 		bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
@@ -362,8 +387,6 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # tmbstan operates by default with NUTS MCMC sampler see: 
 	# https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0197954
 
-
-
 # Save stan fit object
 # if(dat$prioronly == 1) {save(fitstan, file = "fitstan_prioronly.RData")} else 
 	# {save(fitstan, file = "fitstan.RData")}
@@ -375,16 +398,27 @@ dsmax <- derived_obj
 fitsmax <- fitstan
 
 # Simulate alternative priors
-BS.smax <- dobootstrap(bsiters = 20000, # 20,000 for full iterations
-						adj = TRUE,
-						bias.cor = FALSE,
-						prod = c("LifeStageModel"),
-						MCMC = TRUE,
-						model = c("SMAX"),
-						Ricprior = c(1, 0.3),
-						round = FALSE,
-						WAinname = c("DataIn/Nanaimo_test.csv")) # c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") 
+# source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
+# BS.smax.og <- dobootstrap(bsiters = 20000, # 20,000 for full iterations
+						# adj = TRUE,
+						# bias.cor = FALSE,
+						# prod = c("LifeStageModel"),
+						# MCMC = TRUE,
+						# model = c("SMAX"),
+						# Ricprior = c(1, 0.3),
+						# prior_rho = c(-0.4),
+						# round = FALSE,
+						# WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
+						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv")
+# BS.smax.og <- BS.smax.og$BS.dfout
+# BS.bpar <- BS.smax$bpar
+
+source(here::here("R/simalpha.r"))
+BS.smax <- simalpha(bsiters = 20000, newalpha = c(1, 0.3), WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
 BS.smax <- BS.smax$BS.dfout
+
+# head(BS.smax$upr - BS.smax$lwr)
+# head(BS.smax.og$upr - BS.smax.og$lwr)
 
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")

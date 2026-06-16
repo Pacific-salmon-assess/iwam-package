@@ -1,1 +1,7 @@
 ^LICENSE\.md$
+^docs$
+^archive$
+^DataIn$
+^DataOut$
+^\.RData$
+^iwam-package\.Rproj$

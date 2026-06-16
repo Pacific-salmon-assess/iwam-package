@@ -803,3 +803,7 @@ archive/DataIn/ParkenSREP.csv
 archive/DataIn/ParkenSMSY.csv
 archive/DataIn/ParkenRicSig.csv
 inst/extdata/SRinputfile.csv
+R/bootstrappingcontourplotexample.r
+R/examplebootstrap.r
+R/bootstrappingwalkthroughexample.r
+R/Liermann_RTMB_model_vSMAX_cor.R

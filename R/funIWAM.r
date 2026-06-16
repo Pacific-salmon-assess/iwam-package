@@ -1,3 +1,20 @@
+#' The Integrated Watershed Area Model
+#'
+#' A longer description of what the function does. Can span
+#' multiple lines.
+#'
+#' @param param1 Description of parameter 1
+#' @param param2 Description of parameter 2
+#'
+#' @return Description of what the function returns
+#'
+#' @examples
+#' \dontrun{
+#' my_function(param1, param2)
+#' }
+#'
+#' @export
+
 # Liermann SMAX (B) RTMB Model with MCMC Sampling ####
 # Begin IWAM model function: ####
 	# The purpose of this function is a simple - no input - function for running IWAM
@@ -7,13 +24,13 @@
 	# For a function designed for single WA see: funIWAMsingle
 
 # Libaries ####
-library(RTMB)
-library(dplyr)
-library(tidyverse) 
-library(progress) 
-library(tmbstan) 
-library(beepr) 
-library(here)
+# library(RTMB) # Core
+# library(tmbstan) # Core
+# library(dplyr) # Utility
+## library(tidyverse) # metapackage - used for development not necessary
+# library(progress) # Utility 
+# library(beepr) # Utility
+# library(here) # Utility
 
 here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
@@ -177,8 +194,8 @@ IWAM <- function(WAin = c('DataIn/Parken_evalstocks.csv'),
 	# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
 
 	# Data Manipulations ####
-	srdatwna <- read.csv(here::here("inst/extdata/SRinputfile.csv")) # Consider _TK **** as alternative with longer dataset
-	WAbase <- read.csv(here::here("inst/extdata/WatershedArea.csv"))
+	srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # Consider _TK **** as alternative with longer dataset
+	WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 	WAin <- read.csv(here::here(WAin))
 
 	# Data setup ####

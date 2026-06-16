@@ -64,7 +64,7 @@ library(tictoc)
 # from *.Proj files, a simple source("R/helperFunctions.R") should work.Correct?
 source (here::here("R/helperFunctions.R"))
 source(here::here("R/PlotFunctions.R"))
-source(here::here("R/Get_LRP_bs.R"))
+source(here::here("archive/R/Get_LRP_bs.R"))
 
 #### Test wrapper function objects for internal usage  ----------------------------------------
 
@@ -95,7 +95,7 @@ bias.cor = TRUE
 random = TRUE # Turn random = "logA" on by default - Turn off for the fixed effect model
 bs_seed = 1 # seed for bootstrapping
 bs_nBS = 10 # trials for bootstrapping
-plot = F # whether or not to create plots stored in DataOut/
+plot = FALSE # whether or not to create plots stored in DataOut/
 est.table = FALSE # store kable tables as per wcvi_workedexample.RMD
 # Norm, InvGamma, Cauchy, Gamma alt
 static_nusigma = c(-0.412) # Static nu sigma value
@@ -512,7 +512,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   #   dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   # } else {print("File not loaded.")}
   
-  try({dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+  try({dyn.unload(dynlib(here::here(paste("archive/TMB_Files/", mod, sep=""))))
     print("The .dll was loaded and has been successfully unloaded.")
     }, silent = TRUE)
     # tries to unload the .dll
@@ -527,13 +527,13 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   
   # dyn.unload(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
   
-  compile(here::here(paste("TMB_Files/", mod, ".cpp", sep="")))
+  compile(here::here(paste("archive/TMB_Files/", mod, ".cpp", sep="")))
     # Needs to be run to re-create the .dll and .o files from a new .cpp file
     # Creates an error: "make: Nothing to be done for 'all'/
       # Current assumed to mean that there were NO changes detected in the .cpp
       # and thus the run continues WITHOUT compiling.
   
-  dyn.load(dynlib(here::here(paste("TMB_Files/", mod, sep=""))))
+  dyn.load(dynlib(here::here(paste("archive/TMB_Files/", mod, sep=""))))
   
   if (!random) { # if random = FALSE
     obj <- TMB::MakeADFun(data, param, DLL=mod, silent=TRUE)
@@ -844,17 +844,18 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
   # What is All_Est? --> pars
   # saveRDS(pars, paste( "DataOut/pars_", title_plot, sep="") )
   # if statements to follow titles for png pasting titles - so they don't get overwritten
-  if (isigricprior == 2 && isigdeltaprior == 2) {
-    saveRDS(pars, paste(here::here(), "/DataOut/pars_", 
-                        targetname, "_", pngcombotitle, mod, sep="") )
-    print(paste("DataOut/pars_", targetname, "_", pngcombotitle, mod, sep=""))
+  
+  # if (isigricprior == 2 && isigdeltaprior == 2) {
+    # saveRDS(pars, paste(here::here(), "/DataOut/pars_", 
+                        # targetname, "_", pngcombotitle, mod, sep="") )
+    # print(paste("DataOut/pars_", targetname, "_", pngcombotitle, mod, sep=""))
     # removed pngtitle_waprior - see above notes
-  } else {
-    saveRDS(pars, paste(here::here(), "/DataOut/pars_", 
-                        targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, sep="") )
-    print(paste("DataOut/pars_", targetname, "_", 
-                pngtitle_ricprior, pngtitle_waprior, mod, sep=""))  
-  }
+  # } else {
+    # saveRDS(pars, paste(here::here(), "/DataOut/pars_", 
+                        # targetname, "_", pngtitle_ricprior, pngtitle_waprior, mod, sep="") )
+    # print(paste("DataOut/pars_", targetname, "_", 
+                # pngtitle_ricprior, pngtitle_waprior, mod, sep=""))  
+  # }
   
   #### Predictions
   # old verison was entire section under run.predict
@@ -1214,7 +1215,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # For NO ENHANCEMENT datasets
       if (remove.EnhStocks) {
         if (all(WAin$lh == 0)) { # stream only
-          outname <- paste("DataOut/", targetname, "_dataout_target_stream_noEnh.csv", sep = "")
+          outname <- paste("archive/DataOut/", targetname, "_dataout_target_stream_noEnh.csv", sep = "")
           if(remove.EnhStocks) write.csv(data_out_stream, here::here(outname))
           if(remove.EnhStocks) datain <- c(outname)
           print("Stream life histories detected and moved forward.")
@@ -1222,7 +1223,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
           
         }
         if (all(WAin$lh == 1)) { # ocean only
-          outname <- paste("DataOut/", targetname, "_dataout_target_ocean_noEnh.csv", sep = "")
+          outname <- paste("archive/DataOut/", targetname, "_dataout_target_ocean_noEnh.csv", sep = "")
           if(remove.EnhStocks) write.csv(data_out_ocean, here::here(outname))
           if(remove.EnhStocks) datain <- c(outname)
           print("Ocean life histories detected and moved forward.")
@@ -1230,7 +1231,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
           
         }
         if (all(c(0, 1) %in% WAin$lh)) { # stream and ocean 
-          outname <- paste("DataOut/", targetname, "_dataout_target_noEnh.csv", sep = "")
+          outname <- paste("archive/DataOut/", targetname, "_dataout_target_noEnh.csv", sep = "")
           if(remove.EnhStocks) write.csv(data_out_combined, here::here(outname))
           if(remove.EnhStocks) datain <- c(outname)
           print("Stream and ocean life histories detected, combined, and moved forward.")
@@ -1242,7 +1243,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
     # For ENHANCEMENT datasets
       if (!remove.EnhStocks) {
         if (all(WAin$lh == 0)) { # stream
-          outname <- paste("DataOut/", targetname, "_dataout_target_stream_wEnh.csv", sep = "")
+          outname <- paste("archive/DataOut/", targetname, "_dataout_target_stream_wEnh.csv", sep = "")
           if(!remove.EnhStocks) write.csv(data_out_stream, here::here(outname))
           if(!remove.EnhStocks) datain <- c(outname)
           print("Stream life histories detected and moved forward.")
@@ -1250,7 +1251,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
           
         } 
         if (all(WAin$lh == 1)) { # ocean
-          outname <- paste("DataOut/", targetname, "_dataout_target_ocean_wEnh.csv", sep = "")
+          outname <- paste("archive/DataOut/", targetname, "_dataout_target_ocean_wEnh.csv", sep = "")
           if(!remove.EnhStocks) write.csv(data_out_ocean, here::here(outname))
           if(!remove.EnhStocks) datain <- c(outname)
           print("Ocean life histories detected and moved forward.")
@@ -1258,7 +1259,7 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
           
         }
         if (all(c(0, 1) %in% WAin$lh)) { # combined
-          outname <- paste("DataOut/", targetname, "_dataout_target_wEnh.csv", sep = "")
+          outname <- paste("archive/DataOut/", targetname, "_dataout_target_wEnh.csv", sep = "")
           if(!remove.EnhStocks) write.csv(data_out_combined, here::here(outname))
           if(!remove.EnhStocks) datain <- c(outname)
           print("Stream and ocean life histories detected, combined, and moved forward.")
@@ -1416,8 +1417,8 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
       # Add a function for IWAM_func to rename outputs?
       dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE) # ?
         # targetname
-      write.csv(dfout, here::here(paste("DataOut/", targetname, "_getLRP-BootstrappedRPs.csv", sep = "")))
-      print(paste("DataOut/", targetname, "_getLRP-BootstrappedRPs.csv", sep = ""))
+      write.csv(dfout, here::here(paste("archive/DataOut/", targetname, "_getLRP-BootstrappedRPs.csv", sep = "")))
+      print(paste("archive/DataOut/", targetname, "_getLRP-BootstrappedRPs.csv", sep = ""))
   
     }
 
@@ -1554,3 +1555,13 @@ IWAM_func <- function(WAinraw = "DataIn/WCVIStocks.csv", # insert Watershed area
 #                    plot = FALSE, # whether or not to create plots stored in DataOut/
 #                    est.table = FALSE
 #                    )
+
+test <- IWAM_func(WAin = "DataIn/Parken_evalstocks.csv", # insert Watershed areas file location within the base repository
+                   run.bootstraps = TRUE, # to turn on or off the bootstrap function added at the end
+                   bs_seed = 1, # seed for bootstrapping
+                   bs_nBS = 5000, # trials for bootstrapping
+                   # mod = "IWAM_Liermann", # TMB model name for .cpp
+                   remove.EnhStocks = FALSE,
+                   plot = FALSE, # whether or not to create plots stored in DataOut/
+                   est.table = FALSE
+                   )

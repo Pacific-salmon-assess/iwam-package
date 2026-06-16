@@ -60,6 +60,7 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 						MCMC = TRUE, # RENAME - TRUE use posterior alpha in parken assumption
 						model = c("SMAX"), # IWAM Input model version
 						Ricprior = c(1, 0.3), # LifeStageModel assumed alpha prior
+						prior_rho = c(-0.4), # default rho value for covariance matrix
 						round = FALSE, # Round final reported values
 						WAinname = c("DataIn/Parken_evalstocks.csv") # Comparison stocks
 						) {
@@ -67,6 +68,7 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 	WAin <- read.csv(here::here(WAinname))	
 	outBench <- list()
 	outAlpha <- list()
+	outBpar <- list()
 	
 	set.seed(1) ; if (BS == TRUE) {
   
@@ -77,14 +79,32 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		# Use mean SREP on realscale
 		# Conditional if bias corrected, Marginal if rnorm (?)
 		if (model == 'SREP'){
-		if (adj == T) { # These should be means - not medians!!!
-			SREP <- dsrep$deripost_summary$SREP_tar_adj$Median 
-			SREP_logSE <- (log(SREP) - log(dsrep$deripost_summary$SREP_tar_adj$LQ_5)) / 1.96 
-			SREP_SE <- (SREP - dsrep$deripost_summary$SREP_tar_adj$LQ_5) / 1.96
-		} else {
-			SREP <- dsrep$deripost_summary$SREP_tar$Median
-			SREP_logSE <- (log(SREP) - log(dsrep$deripost_summary$SREP_tar$LQ_5)) / 1.96 
-			SREP_SE <- (SREP - dsrep$deripost_summary$SREP_tar$LQ_5) / 1.96 
+			poplen <- ncol(dsrep$deripost_full$Alpha_tar_adj)
+			
+			if (adj == T) { # These should be means - not medians!!!
+				SREP <- dsrep$deripost_summary$SREP_tar_adj$Median 
+				SREP_logSE <- (log(SREP) - log(dsrep$deripost_summary$SREP_tar_adj$LQ_5)) / 1.96 
+				SREP_SE <- (SREP - dsrep$deripost_summary$SREP_tar_adj$LQ_5) / 1.96
+				
+				logSREP <- log(SREP)
+				logSREP_SD <- apply(log(dsrep$deripost_full$SREP_tar_adj), 2, sd)
+				ALPHA <- dsrep$deripost_summary$Alpha_tar_adj$Median 
+				ALPHA_SD <- apply(dsrep$deripost_full$Alpha_tar_adj, 2, sd)
+				
+				rho <- sapply(1:ncol(dsrep$deripost_full$Alpha_pred), 
+					function(i) cor(dsrep$deripost_full$Alpha_pred[,i], log(dsrep$deripost_full$SREP[,i])))
+			} else {
+				SREP <- dsrep$deripost_summary$SREP_tar$Median
+				SREP_logSE <- (log(SREP) - log(dsrep$deripost_summary$SREP_tar$LQ_5)) / 1.96 
+				SREP_SE <- (SREP - dsrep$deripost_summary$SREP_tar$LQ_5) / 1.96 
+				
+				logSREP <- log(SREP)
+				logSREP_SD <- apply(log(dsrep$deripost_full$SREP_tar), 2, sd)
+				ALPHA <- dsrep$deripost_summary$Alpha_tar$Median 
+				ALPHA_SD <- apply(dsrep$deripost_full$Alpha_tar, 2, sd)
+				
+				rho <- sapply(1:ncol(dsrep$deripost_full$Alpha_pred), 
+					function(i) cor(dsrep$deripost_full$Alpha_pred[,i], log(dsrep$deripost_full$SREP[,i])))
 		}}
 	
 		# SREP summaries FROM the SMAX model)
@@ -101,6 +121,8 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		# }}
 	
 		if (model == 'SMAX') {
+			poplen <- ncol(dsmax$deripost_full$Alpha_tar_adj)
+
 			if (adj == T) { # Looks very skewed in distribution
 				SMAX <- dsmax$deripost_summary$SMAX_tar_adj$Median # 25 val
 				logSMAX <- log(SMAX)
@@ -111,8 +133,10 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 				ALPHA <- dsmax$deripost_summary$Alpha_tar_adj$Median 
 				ALPHA_SD <- apply(dsmax$deripost_full$Alpha_tar_adj, 2, sd)
 				
-				rho <- sapply(1:ncol(dsmax$deripost_full$Alpha_tar_adj), 
-					function(i) cor(dsmax$deripost_full$Alpha_tar_adj[,i], log(dsmax$deripost_full$SMAX_tar_adj[,i])))
+				# rho_posteriorchain <- sapply(1:ncol(dsmax$deripost_full$Alpha_tar_adj), 
+					# function(i) cor(dsmax$deripost_full$Alpha_tar_adj[,i], log(dsmax$deripost_full$SMAX_tar_adj[,i])))
+				rho <- sapply(1:ncol(dsmax$deripost_full$Alpha_pred), 
+					function(i) cor(dsmax$deripost_full$Alpha_pred[,i], log(dsmax$deripost_full$SMAX[,i])))
 			} else {
 				SMAX <- dsmax$deripost_summary$SMAX_tar$Median # 25 val per pop
 				logSMAX <- log(SMAX)
@@ -125,22 +149,32 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 				ALPHA_SD <- apply(dsmax$deripost_full$Alpha_tar, 2, sd)
 				
 				# Calculate rho cor() for alpha and beta (1/SMAX) as a list PER POPULATION
-				rho <- sapply(1:ncol(dsmax$deripost_full$Alpha_tar), 
-					function(i) cor(dsmax$deripost_full$Alpha_tar[,i], log(dsmax$deripost_full$SMAX_tar[,i])))
+				# rho_posteriorchain <- sapply(1:ncol(dsmax$deripost_full$Alpha_tar), 
+					# function(i) cor(dsmax$deripost_full$Alpha_tar[,i], dsmax$deripost_full$SMAX_tar[,i]))
+				rho <- sapply(1:ncol(dsmax$deripost_full$Alpha_pred), 
+					function(i) cor(dsmax$deripost_full$Alpha_pred[,i], log(dsmax$deripost_full$SMAX[,i])))
+					
+				# rho <- sapply(1:ncol(dsmax$deripost_full$Alpha0), 
+					# function(i) cor(dsmax$deripost_full$Alpha0, dsmax$deripost_full$b0[,1]))
+					
+				# rho <- sapply(1:ncol(dsmax$deripost_full$logAlpha_tar_adj[,1:13]), 
+					# function(i) cor(dsmax$deripost_full$logAlpha_tar_adj[,1:13], dsmax$deripost_full$b0[,1]))
+				# rho <- sapply(1:ncol(dsmax$deripost_full$logAlpha_tar_adj[,14:25]), 
+					# function(i) cor(dsmax$deripost_full$logAlpha_tar_adj[,14:25], dsmax$deripost_full$b0[,1] + dsmax$deripost_full$b0[,2]))
 				# rho_re <- sapply(1:nrow(dsmax$deripost_full$Alpha_re), 
 					# function(i) cor(dsmax$deripost_full$Alpha_re[i,], log(dsmax$deripost_full$SMAX_tar[i,])))
 					# random effects aren't correlated and neither are their posteriors
 		}}
-	
+				
 		# Establish the correlation/covariance matrix
-		sigma_matrix <- list()
-		for (i in 1:length(rho)) {
-			sigma_matrix[[i]] <- matrix(c(logSMAX_SD[i]^2, 
-							 rho[i] * logSMAX_SD[i] * ALPHA_SD[i],
-							 rho[i] * logSMAX_SD[i] * ALPHA_SD[i], 
-							 ALPHA_SD[i]^2),
-							 nrow = 2)
-		}
+		# sigma_matrix <- list()
+		# for (i in 1:length(rho)) {
+			# sigma_matrix[[i]] <- matrix(c(logSMAX_SD[i]^2, 
+							 # rho[i] * logSMAX_SD[i] * ALPHA_SD[i],
+							 # rho[i] * logSMAX_SD[i] * ALPHA_SD[i], 
+							 # ALPHA_SD[i]^2),
+							 # nrow = 2)
+		# }
 	  
 		if (model == 'SREP' & prod == 'RunReconstruction'){
 		inSREP <- derived_obj$deripost_summary$SREP_tar_adj |>
@@ -155,12 +189,12 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		  # Could USE POSTERIOR MODE INSTEAD OF MEAN - more likely to be closer to the MLE
 		if (prod == "LifeStageModel") {
 			Mean.Ric.A <- Ricprior[1] # Default = 1
-			Sig.Ric.A <- Ricprior[2] # Default = 0.51
+			Sig.Ric.A <- Ricprior[2] # Default = 0.3, originally 0.5
 		  
 			# if (model == 'SREP') Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, 0))
 			# if (model == 'SMAX') Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, 0))
-			if (model == 'SREP') Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A)) 
-			if (model == 'SMAX') Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, Sig.Ric.A))
+			if (model == 'SREP') Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A)) # PER POPULATION
+			if (model == 'SMAX') Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, Sig.Ric.A)) # PER POPULATION
 			# if (model == 'SREP') if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SREP), Mean.Ric.A, Sig.Ric.A))
 			# if (model == 'SMAX') if(min(Ric.A)<=0) Ric.A <- exp(rnorm(length(SMAX), Mean.Ric.A, Sig.Ric.A))
 		  
@@ -183,38 +217,65 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 				sMAX <- exp(rnorm(length(SMAX), log(SMAX), SMAX_logSE))
 				if(min(sMAX)<=0)   sMAX <- exp(rnorm(length(SMAX), SMAX, SMAX_SE))
 			}}
-		  
+			
+			# Correlation method
 			delta <- c()
 			adjustment_mean <- c()
 			adjustment_sd <- c()
-			  
+			# rho <- rho # try -1, -0.5, -0.3, 0
+			# rho <- median(rho)
+			rho <- prior_rho
 			new_samples <- matrix(NA, nrow = 2, ncol = 25)
-			new_beta <- c()
-			for (i in 1:length(rho)){
-				delta[i] <- log(Ric.A[i]) - ALPHA[i]
-				
-				adjustment_mean[i] <- rho[i] * (logSMAX_SD[i] / ALPHA_SD[i]) * delta[i]
-				adjustment_sd[i] <- sqrt(logSMAX_SD[i]^2 - (rho[i] * logSMAX_SD[i])^2)
-				
-				new_beta[i] <- rnorm(1, logSMAX[i] + adjustment_mean[i], adjustment_sd[i]) # logSMAX_SD[i]
-				# conditional on alpha draw a new beta
-				
-				# Old mvnorm function:
-				# new_samples[,i] <- rmvnorm(n = c(1,1), 
-					# mean = c(logSMAX[i] + adjustment[i], log(Ric.A[i])), # ifelse(log.a<0,0,log.a) #  + adjustment[i]
-					# sigma = sigma_matrix[[i]])
+
+			# SREP
+			if (model == 'SREP'){
+				new_srep <- c()
+				for (i in 1:poplen){
+					# IWAM EQUATION(S): 21-24 @@
+					  # Explanation: The adjustment to the distribution of Beta drawn for an independent alpha.
+					delta[i] <- log(Ric.A[i]) - ALPHA[i]
+					
+					adjustment_mean[i] <- rho * (logSREP_SD[i] / ALPHA_SD[i]) * delta[i]
+					adjustment_sd[i] <- sqrt(logSREP_SD[i]^2 - (rho * logSREP_SD[i])^2)
+					
+					new_srep[i] <- rnorm(1, logSREP[i] + adjustment_mean[i], adjustment_sd[i])
+				}
 			}
-		  
+			
+			# SMAX
+			if (model == 'SMAX'){
+				new_smax <- c()
+				for (i in 1:poplen){
+					# IWAM EQUATION(S): 21-24 @@
+					  # Explanation: The adjustment to the distribution of Beta drawn for an independent alpha.
+					delta[i] <- log(Ric.A[i]) - ALPHA[i]
+					
+					adjustment_mean[i] <- rho * (logSMAX_SD[i] / ALPHA_SD[i]) * delta[i]
+					adjustment_sd[i] <- sqrt(logSMAX_SD[i]^2 - (rho * logSMAX_SD[i])^2)
+					
+					# conditional on alpha draw a new beta
+					new_smax[i] <- rnorm(1, logSMAX[i] + adjustment_mean[i], adjustment_sd[i]) # logSMAX_SD[i]
+					
+					# add in site specific noise
+					new_smax[i] <- new_smax[i] + rnorm(1, 0, sd = logSMAX_SD)
+					
+					# Old mvnorm function:
+					# new_samples[,i] <- rmvnorm(n = c(1,1), 
+						# mean = c(logSMAX[i] + adjustment[i], log(Ric.A[i])), # ifelse(log.a<0,0,log.a) #  + adjustment[i]
+						# sigma = sigma_matrix[[i]])
+				}
+			}
+			
 			# METHODS of Forcing alpha above log(0) AFTER BEING DRAWN
 			# new_samples[1,] <- ifelse(new_samples[1,] < 0, 0.01, new_samples[1,]) # Not letting it go negative either 0 or 0.01
 			# Ric.A <- ifelse(Ric.A < 1, 1.01, Ric.A)
 		  
-			if (model == 'SREP') SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
+			# if (model == 'SREP') SGENcalcs <- purrr::map2_dfr (Ric.A, sREP, Sgen.fn2)
 			# if (model == 'SMAX') SGENcalcs <- purrr::map2_dfr (Ric.A, sMAX, Sgen.fn4)
 		  
 			# NEW SGENcalcs for mvnorm version:
-			# if (model == 'SMAX') SGENcalcs <- purrr::map2_dfr (exp(new_samples[2,]), exp(new_samples[1,]), Sgen.fn4)
-			if (model == 'SMAX') SGENcalcs <- purrr::map2_dfr (Ric.A, exp(new_beta), Sgen.fn4)
+			if (model == 'SREP') SGENcalcs <- purrr::map2_dfr (Ric.A, exp(new_srep), Sgen.fn2)
+			if (model == 'SMAX') SGENcalcs <- purrr::map2_dfr (Ric.A, exp(new_smax), Sgen.fn4)
 			# The main difference from .fn2 is that the beta par here is unaffected by the NEW assumed alpha
 			# In .fn2 - the b.par is affected by the residual information in SREP AND the NEW assumed alpha - which warps it
 			# When you use the SMAX model - but calculate b.par THROUGH SREP - you can get to similar answers
@@ -277,17 +338,17 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		# 3. RUN RECONSTRUCTION
 		if(prod == "RunReconstruction"){ # Requires Inlet devisions per stocks
 			lnalpha_inlet <- read.csv(here::here("DataIn/CUPars_wBC.csv")) %>% 
-				select(alpha,stkName) %>% 
+				dplyr::select(alpha,stkName) %>% 
 				rename(inlets=stkName, lnalpha=alpha)
 			lnalpha_nBC_inlet <- read.csv(here::here("DataIn/CUPars_nBC.csv")) %>% 
-				select(alpha,stkName) %>% 
+				dplyr::select(alpha,stkName) %>% 
 				rename(inlets=stkName, lnalpha_nBC=alpha)
 			targetstocks <- read.csv(here::here("DataIn/WCVIStocks.csv")) %>% # Previously WCVIStocks - Changed to: Parken_evalstocks
 				# filter (Stock != "Cypre") %>%
 				rename(inlets=Inlet)
 			Ric.A <- lnalpha_inlet %>% 
 				left_join(targetstocks, by="inlets") %>% 
-				select(c(lnalpha,inlets,CU,Stock))
+				dplyr::select(c(lnalpha,inlets,CU,Stock))
 			
 			inSREP <- inSREP %>% 
 				left_join(Ric.A, by = join_by(Stock, CU, inlets)) %>% 
@@ -346,7 +407,7 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 					inlets = "Quatsino", 
 					a.RR = inSREP[inSREP$inlets=="Quatsino",]$a.RR[1])
 			
-			inSREP <- inSREP %>% select(-c(inlets, CU, lnalpha)) %>% rename(a.par=a.RR)
+			inSREP <- inSREP %>% dplyr::select(-c(inlets, CU, lnalpha)) %>% rename(a.par=a.RR)
 			
 			Sig.Ric.A <- 0.51 # 0.255 for a narrower plausible bound
 			
@@ -367,10 +428,12 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		elapsed_time <- difftime(current_time, start_time, units = "secs")
 		cat(sprintf("\rElapsed time: %s seconds", round(as.numeric(elapsed_time), 2)))
 		
-		out <- list(bench = select(SGENcalcs, -apar, -bpar))
+		out <- list(bench = dplyr::select(SGENcalcs, -apar, -bpar),
+					bpar = dplyr::select(SGENcalcs, bpar))
 		outBench[[k]] <- out$bench
+		outBpar[[k]] <- out$bpar
 		
-		# oute <- list(bench = select(SGENcalcs_e, -apar, -bpar))
+		# oute <- list(bench = dplyr::select(SGENcalcs_e, -apar, -bpar))
 		# outBenche[[k]] <- oute$bench
 		
 		if (prod == "Parken" & MCMC == F) outA <- list(alpha = exp(median(lnalpha_Parkin$loga))) # else
@@ -395,38 +458,38 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 		pull(Stock)
 	stockNames <- unique(stockNames)
   
-	SGEN.bs <- select(as.data.frame(outBench), starts_with("SGEN"))
+	SGEN.bs <- dplyr::select(as.data.frame(outBench), starts_with("SGEN"))
 	rownames(SGEN.bs) <- stockNames
 	SGEN.boot <- data.frame(SGEN= apply(SGEN.bs, 1, quantile, 0.5), 
                           lwr=apply(SGEN.bs, 1, quantile, 0.025),
                           upr=apply(SGEN.bs, 1, quantile, 0.975) )
   
-	SMSY.bs <- select(as.data.frame(outBench), starts_with("SMSY"))
+	SMSY.bs <- dplyr::select(as.data.frame(outBench), starts_with("SMSY"))
 	rownames(SMSY.bs) <- stockNames
 	SMSY.boot <- data.frame(SMSY= apply(SMSY.bs, 1, quantile, 0.5), 
                           lwr=apply(SMSY.bs, 1, quantile, 0.025),
                           upr=apply(SMSY.bs, 1, quantile, 0.975) )
   
-	SREP.bs <- select(as.data.frame(outBench), starts_with("SREP"))
+	SREP.bs <- dplyr::select(as.data.frame(outBench), starts_with("SREP"))
 	rownames(SREP.bs) <- stockNames
 	SREP.boot <- data.frame(SREP= apply(SREP.bs, 1, quantile, 0.5), 
                           lwr=apply(SREP.bs, 1, quantile, 0.025),
                           upr=apply(SREP.bs, 1, quantile, 0.975) )
 
-	SMAX.bs <- select(as.data.frame(outBench), starts_with("SMAX"))
+	SMAX.bs <- dplyr::select(as.data.frame(outBench), starts_with("SMAX"))
 	rownames(SMAX.bs) <- stockNames
 	SMAX.boot <- data.frame(SMAX= apply(SMAX.bs, 1, quantile, 0.5), 
                           lwr=apply(SMAX.bs, 1, quantile, 0.025),
                           upr=apply(SMAX.bs, 1, quantile, 0.975) )
   
 	if (prod == "LifeStageModel" | prod == "RunReconstruction") {
-		APAR.bs <- select(as.data.frame(outAlpha), starts_with("alpha"))
+		APAR.bs <- dplyr::select(as.data.frame(outAlpha), starts_with("alpha"))
 		rownames(APAR.bs) <- stockNames
 		APAR.boot <- data.frame(APAR = apply(APAR.bs, 1, quantile, 0.5), 
                             lwr = apply(APAR.bs, 1, quantile, 0.025),
                             upr = apply(APAR.bs, 1, quantile, 0.975) )
 	}
-  
+
 	boot <- list(SGEN.boot=SGEN.boot, SMSY.boot=SMSY.boot, 
                 SREP.boot=SREP.boot, SMAX.boot=SMAX.boot) # , APAR.boot=APAR.boot)
 	if (prod == "LifeStageModel" | prod == "RunReconstruction") boot$APAR.boot <- APAR.boot
@@ -451,20 +514,21 @@ dobootstrap <- function(BS = TRUE, # Can be removed
 	rownames(dfout) <- NULL
   
 	if (round == TRUE) {
-		dfout <- dfout %>% mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits
+		dfout <- dfout %>% dplyr::mutate(Value=signif(Value, 2)) %>% # Rounded to 2 signif digits
 			mutate(lwr=signif(lwr,2)) %>% 
 		    mutate (upr=signif(upr,2))
 	}
 	
 	wasample <- WAin %>% 
-        select("Stock", "WA", "lh") %>% 
-        mutate(WA = round(WA, 0))
+        dplyr::select("Stock", "WA", "lh") %>% 
+        dplyr::mutate(WA = round(WA, 0))
   
 	BS.dfout <- merge(dfout, wasample, by="Stock", all.x=TRUE, sort=FALSE)
 	if (prod == "Parken") alphaout <- outAlpha$alpha
-	}; beep(2)
+	}
 
-bsout <- list(BS.dfout = BS.dfout)
+bsout <- list(BS.dfout = BS.dfout,
+			bpar = outBpar)
 
 if (prod == "Parken") {
   bsout$alphaout <- alphaout

@@ -30,6 +30,16 @@ summary {
 
 The purpose of this page is to provide a complete description of the interface of the TMB model and TMBstan will be detailed below during the discussion of MCMC sampling and model convergence. This documentation was taken from an early version of the (TITLE) Technical Report (CITATION). 
 
+## Alternative Assumptions of Productivity
+
+### Assumptions of productivity overview
+
+This method was adapted, initially by Holt et al. (2023), into the assumption that infers an $\alpha$ based on the watershed-area model's mean predictions of $S_{MSY}$ and $S_{REP}$. The result is simulated estimates of $\alpha$, of which the median (invariant to monotonic-transforms) is taken and used to re-calculate $S_{MSY}$ and $S_{REP}$. These are optimized to find $S_{GEN}$ using the new estimates of $\alpha$, $\beta$, and $S_{MSY}$. Because of its dependence on the ratio of $S_{MSY}$ and $S_{REP}$, and ultimately shared information of $\alpha$ and $\beta$, this value changes depending on the base model parameterization used, even if apparent differences are small. This point is particularly relevant when comparing the models of Parken et al. (2006) and Liermann et al. (2010), which utilize different Ricker parameterizations.  
+
+### The Scheurell et al. (2016) Solution
+
+There is an explicit solution for $\alpha$, adapted from Scheurell et al. (2016), that is being tested for numerical accuracy that may supplement this method in the future.
+
 ## Model Encoding
 
 The model sampling process follows 3 major stages; 

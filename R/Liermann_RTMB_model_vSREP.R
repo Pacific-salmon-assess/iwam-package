@@ -20,6 +20,7 @@ here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
+source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
 
 options(scipen = 999)
 
@@ -41,11 +42,13 @@ LambertW0 <- ADjoint(
 
 # Raw data read-in ####
 WAin <- c("DataIn/Parken_evalstocks.csv") 
-# c("DataIn/WCVIStocks.csv")
-# WAin <- c("DataIn/Ordered_backcalculated_noagg.csv")
+	# c("DataIn/WCVIStocks.csv") or 
+	# c("DataIn/Parken_evalstocks.csv") or 
+	# c("DataIn/Ordered_backcalculated_noagg.csv")
 
 # Data Manipulations ####
-srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) # Consider _TK ************************************
+srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) 
+	# Consider _TK ************************************
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 WAin <- read.csv(here::here(WAin))
 
@@ -104,6 +107,9 @@ dat <- list(srdat = srdat,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 0) # 0-run with data, 1-prior prediction mode
 
+if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
+	{print("Posterior Prediction Mode")}
+
 # External vectors
 N_Stk <- max(srdat$Stocknumber + 1)
 N_Obs <- nrow(srdat)
@@ -128,7 +134,7 @@ if (lhdiston) {
 }
 
 
-
+# Please search for '@@' for the code cross-walk when comparing Tech Report equations.
 f_srep <- function(par){
   getAll(dat, par)
   
@@ -209,9 +215,11 @@ f_srep <- function(par){
   ## Calculate SMSY for Synoptic set - for plotting
   SMSY_r = numeric(nrow(WAbase))
   BETA_r = numeric(nrow(WAbase))
+  SMAX_r = numeric(nrow(WAbase))
   
   for (i in 1:N_Stk){
     BETA_r[i] <- Alpha_pred[i] / SREP[i]
+	SMAX_r[i] <- 1/BETA_r[i]
     SMSY_r[i] <- (1 - LambertW0(exp(1 - Alpha_pred[i]))) / BETA_r[i]
   }
 
@@ -219,6 +227,7 @@ f_srep <- function(par){
   BETA = numeric(nrow(WAin))
   SMSY = numeric(nrow(WAin))
   SGEN = numeric(nrow(WAin))
+  SMAX = numeric(nrow(WAin))
 
   # Conditional posterior predictions
 	# Conditioning on the random effect being equal to zero if bias.cor <- F
@@ -236,6 +245,8 @@ f_srep <- function(par){
 	Alpha_tar <- exp(logAlpha_tar)
     # Predict BETA
     BETA[i] <- Alpha_tar[i]/SREP_tar[i]
+	# Predict SMAX
+	SMAX[i] <- 1/BETA[i]
     # Predict SMSY
     SMSY[i] <- (1-LambertW0(exp(1 - Alpha_tar[i])))/BETA[i]
     # Predict SGEN
@@ -269,6 +280,7 @@ f_srep <- function(par){
   REPORT(Alpha_pred)
   REPORT(SMSY_r)
   REPORT(BETA_r)
+  REPORT(SMAX_r)
   REPORT(tauobs) # Necessary to add back in observation error?
 
   # alpha_tar <- exp(logAlpha_tar)
@@ -276,8 +288,8 @@ f_srep <- function(par){
   REPORT(logSREP_tar)
   REPORT(logAlpha_tar)
   REPORT(Alpha_tar)
-  
   REPORT(BETA)
+  REPORT(SMAX)
   REPORT(SMSY)
   REPORT(SGEN)
   
@@ -361,19 +373,19 @@ derived_obj <- derived_post(fitstan, model = 'SREP'); beep(2)
 	fitsrep <- fitstan
 
 # Simulate alternative priors
-# BS.smax <- dobootstrap(bsiters = 2500, # 20,000 for full iterations
-						# adj = FALSE,
-						# bias.cor = FALSE,
-						# prod = c("LifeStageModel"),
-						# MCMC = TRUE,
-						# model = c("SMAX"),
-						# Ricprior = c(1, 0.3),
-						# round = FALSE,
-						# WAinname = c("DataIn/Parken_evalstocks.csv"))
+BS.srep <- dobootstrap(bsiters = 2000, # 20,000 for full iterations
+						adj = TRUE,
+						bias.cor = FALSE,
+						prod = c("LifeStageModel"),
+						MCMC = TRUE,
+						model = c("SREP"),
+						Ricprior = c(1, 0.3),
+						round = FALSE,
+						WAinname = c("DataIn/Parken_evalstocks.csv")) ; beep(2)
+						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv")
 
+BS.srep <- BS.srep$BS.dfout
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} 
 	# else {save(derived_obj, file = "derived_obj.RData")}
-if(dat$prioronly == 1){print("Prior Prediction Mode")} else 
-	{print("Posterior Prediction Mode")}
