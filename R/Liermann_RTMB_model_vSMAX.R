@@ -40,10 +40,11 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- c("DataIn/UpperSoGChinook.csv")
 	# c("DataIn/WCVIStocks.csv") or 
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
+	# c("DataIn/UpperSoGChinook.csv")
 
 # Data Manipulations ####
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) 
@@ -395,7 +396,21 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 derived_obj <- derived_post(fitstan, model = 'SMAX'); beep(2)
 	# add stocknames - see extra code from _Plots.R
 dsmax <- derived_obj
+dsmaxs <- derived_obj$deripost_summary
+dsmaxf <- derived_obj$deripost_full
 fitsmax <- fitstan
+
+outpp <- data.frame(
+	Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
+	SREP_median = dsmaxs$SREP_adj$Median, SREP_mean = dsmaxs$SREP_adj$Mean, SREP_lwr5 = dsmaxs$SREP_adj$LQ_5, SREP_upr95 = dsmaxs$SREP_adj$UQ_95, 
+	SMSY_median = dsmaxs$SMSY_adj$Median, SMSY_mean = dsmaxs$SMSY_adj$Mean, SMSY_lwr5 = dsmaxs$SMSY_adj$LQ_5, SMSY_upr95 = dsmaxs$SMSY_adj$UQ_95,
+	SGEN_median = dsmaxs$SGEN_adj$Median, SGEN_mean = dsmaxs$SGEN_adj$Mean, SGEN_lwr5 = dsmaxs$SGEN_adj$LQ_5, SGEN_upr95 = dsmaxs$SGEN_adj$UQ_95,
+	SMAX_median = dsmaxs$SMAX_tar_adj$Median, SMAX_mean = dsmaxs$SMAX_tar_adj$Mean, SMAX_lwr5 = dsmaxs$SMAX_tar_adj$LQ_5, SMAX_upr95 = dsmaxs$SMAX_tar_adj$UQ_95
+)
+outpp <- outpp %>% mutate(across(where(is.numeric), round))
+# outname <- paste("DataOut/", "UpperSoGChinook", "_out_posteriorpredictive.csv", sep = "")
+# write.csv(outpp, here::here(outname), row.names = FALSE)
+
 
 # Simulate alternative priors
 # source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
@@ -409,16 +424,21 @@ fitsmax <- fitstan
 						# prior_rho = c(-0.4),
 						# round = FALSE,
 						# WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
-						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv")
+						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv") or c("DataIn/UpperSoGChinook.csv")
 # BS.smax.og <- BS.smax.og$BS.dfout
 # BS.bpar <- BS.smax$bpar
 
 source(here::here("R/simalpha.r"))
-BS.smax <- simalpha(bsiters = 20000, newalpha = c(1, 0.3), WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
+BS.smax <- simalpha(bsiters = 20000, 
+			newalpha = c(1, 0.3),
+			# prior_rho = c(-0.4),
+			WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
 BS.smax <- BS.smax$BS.dfout
 
 # head(BS.smax$upr - BS.smax$lwr)
 # head(BS.smax.og$upr - BS.smax.og$lwr)
+
+
 
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")

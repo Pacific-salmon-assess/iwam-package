@@ -807,3 +807,5 @@ R/bootstrappingcontourplotexample.r
 R/examplebootstrap.r
 R/bootstrappingwalkthroughexample.r
 R/Liermann_RTMB_model_vSMAX_cor.R
+DataIn/UpperSoGChinook.csv
+DataOut/UpperSoGChinook_out_posteriorpredictive.csv

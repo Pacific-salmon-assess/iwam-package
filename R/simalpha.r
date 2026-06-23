@@ -23,7 +23,7 @@ options(scipen = 999)
 
 simalpha <- function(bsiters = 1000, # Simulation iterations
 					newalpha = c(1, 0.3), # LifeStageModel assumed alpha prior
-					# prior_rho = c(-0.4), # default rho value for covariance matrix
+					prior_rho = c(-0.4), # default rho value for covariance matrix
 					roundfinal = FALSE, # Round final reported values
 					WAinname = c("DataIn/Parken_evalstocks.csv") # Comparison stocks
 					) {
@@ -55,6 +55,15 @@ simalpha <- function(bsiters = 1000, # Simulation iterations
 	# cov is sqrt(cor)*variable
 	# correlation is: covmatrix[1,2]/(sqrt(covmatrix[1,1]*covmatrix[2,2]))
 	# if you have correlation just solve for covaraince
+	
+	# e.g. cov2cor() to find previous correlation matrix
+		# NOTE: for SLOPES (bWA) - stream is very small negative and ocean is very small positive
+			# therefore the slopes are going in different directions
+			# as alpha goes down - stream slope goes up (Steeper)
+			# as alpha goes down - ocean slope goes down (Flatter)
+			# which effectively draws the lines together
+	# covmatrix[1,2] <- covmatrix[2,1] <- prior_rho * sqrt(covmatrix[1,1])*sqrt(covmatrix[2,2]) 
+	# covmatrix2[1,2] <- covmatrix2[2,1] <- prior_rho * sqrt(covmatrix2[1,1])*sqrt(covmatrix2[2,2])
 
     for (k in 1:bsiters){
 	## From https://statproofbook.github.io/P/mvn-cond.html
