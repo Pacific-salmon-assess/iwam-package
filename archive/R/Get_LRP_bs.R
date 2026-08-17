@@ -199,7 +199,7 @@ Get.LRP.bs <- function(datain = "DataOut/dataout_target_ocean_noEnh.csv", # file
     # if(min(sREP)<=0)   sREP <- exp(rnorm(length(Scale), log(RPs$SREP) - 0.5*SREP_logSE$SE^2,
     #                                      SREP_SE$SE))
 
-    SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2)
+    SGENcalcs <- purrr::map2_dfr (Ric.A, sREP/Scale, Sgen.fn2) # This is stock-specific**
       # what are the default parameters of sgen.fn2?
       # explicit=TRUE by default
     # SGENcalcs <- future_map2_dfr(Ric.A, sREP/Scale, Sgen.fn2)

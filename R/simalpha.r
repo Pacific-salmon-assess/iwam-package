@@ -90,7 +90,9 @@ simalpha <- function(bsiters = 1000, # Simulation iterations
 		# newlogSMAX2 <- b2new[1] + b2new[2] * logWAshifted + rnorm(poplen, 0, sd = logSMAX_sd)
 		
 		SGENcalcs <- purrr::map2_dfr (exp(rep(logalphak, poplen)), exp(newlogSMAX), Sgen.fn4)
-		# SGENcalco <- purrr::map2_dfr (exp(rep(logalphak, poplen)), exp(newlogSMAX2), Sgen.fn4)
+		
+		SREPold <- dsmax$deripost_summary$SREP$Median
+		# SGENcalcs <- purrr::map2_dfr (exp(rep(logalphak, poplen)), SREPold, Sgen.fn2)
 		
 		out <- list(bench = dplyr::select(SGENcalcs, -apar, -bpar),
 					bpar = dplyr::select(SGENcalcs, bpar))

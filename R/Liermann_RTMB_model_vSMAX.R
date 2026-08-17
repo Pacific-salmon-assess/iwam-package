@@ -22,7 +22,6 @@ source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 
-
 options(scipen = 999)
 
 # New LambertW0 see: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
@@ -40,8 +39,8 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/UpperSoGChinook.csv")
-	# c("DataIn/WCVIStocks.csv") or 
+WAin <- c("DataIn/WCVIStocks.csv")
+	# c("DataIn/WCVIStocks.csv") or  
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
 	# c("DataIn/UpperSoGChinook.csv")
@@ -100,8 +99,8 @@ lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>%
 dat <- list(srdat = srdat,
             WAbase = WAbase,
             WAin = WAin,
-            lineWA =  seq(min(WAbase$logWAshifted), 
-                          max(WAbase$logWAshifted), 0.1),
+            lineWA =  seq(min(WAbase$logWAshifted) - 0.1, 
+                          max(WAbase$logWAshifted) + 0.1, 0.1),
 			mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 0) # 0-run with data, 1-prior prediction mode
@@ -123,8 +122,8 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             Alpha0 = 0.6,
             Alpha_re = numeric(nrow(dat$WAbase)), # Zeroes
             tauobs = 0.01 + numeric(N_Stk), # Constrained positive
-            logSMAX_sd = 1,
-            Alpha_sd = 1
+            logSMAX_sd = 0, # 1 if Uniform, 0 if prior
+            Alpha_sd = 0 # 1 if Uniform, 0 if prior
 )
 if (lhdiston) {
   par$Alpha02 <- 0
@@ -193,6 +192,14 @@ f_smax <- function(par){
 	  # Eq. 10 is the random effect term accounting for process error, with a Uniform prior (11) for standard deviation.
     nll <- nll - dnorm(logSMAX_re[i], 0, sd = 1, log = TRUE)
 	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
+	
+	# Half-normal Prior
+	nll <- nll - dnorm(logSMAX_sd, 0, sd = 1, log = TRUE)
+	nll <- nll - dnorm(Alpha_sd, 0, sd = 1, log = TRUE)
+	# Half-student-t Prior
+		# Where: half-Cauchy distribution is a special case of the half-t distribution with df=1 degrees of freedom
+	# nll <- nll - dt(logSMAX_sd, df = 1, log = TRUE)
+	# nll <- nll - dt(Alpha_sd, df = 1, log = TRUE)
 
 	# cov_par <- corxy*logSMAX_sd*Alpha_sd
 	# Sig_RE = cbind(c(logSMAX_sd^2, cov_par), c(cov_par, Alpha_sd^2)) # or do it without correlation to test same results, where corr_par = 0
@@ -343,9 +350,9 @@ obj <- RTMB::MakeADFun(f_smax, par,
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
-upper[names(obj$par) == "logSMAX_sd"] <- 100 # Turn off for half dists. 
+# upper[names(obj$par) == "logSMAX_sd"] <- 100 # Turn off for half dists. 
 lower[names(obj$par) == "logSMAX_sd"] <- 0 
-upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
+# upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "Alpha_sd"] <- 0
 
 
@@ -364,8 +371,8 @@ init <- function() {
 		tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
 		# Should these be 0.01 to 100s? Would that be more accurate?
-		logSMAX_sd = runif(1, 0.01, 3), # Positive 
-		Alpha_sd = runif(1, 0.01, 3) # Positive
+		logSMAX_sd = runif(1, 0.01, 3), # Positive for Uniform prior
+		Alpha_sd = runif(1, 0.01, 3) # Positive for Uniform prior
 	)
   
 	if (lhdiston) {
@@ -408,7 +415,7 @@ outpp <- data.frame(
 	SMAX_median = dsmaxs$SMAX_tar_adj$Median, SMAX_mean = dsmaxs$SMAX_tar_adj$Mean, SMAX_lwr5 = dsmaxs$SMAX_tar_adj$LQ_5, SMAX_upr95 = dsmaxs$SMAX_tar_adj$UQ_95
 )
 outpp <- outpp %>% mutate(across(where(is.numeric), round))
-# outname <- paste("DataOut/", "UpperSoGChinook", "_out_posteriorpredictive.csv", sep = "")
+# outname <- paste("DataOut/", "UpperSoGChinook", "_out_posteriorpredictive_NEWWA.csv", sep = "")
 # write.csv(outpp, here::here(outname), row.names = FALSE)
 
 
@@ -432,8 +439,15 @@ source(here::here("R/simalpha.r"))
 BS.smax <- simalpha(bsiters = 20000, 
 			newalpha = c(1, 0.3),
 			# prior_rho = c(-0.4),
-			WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
-BS.smax <- BS.smax$BS.dfout
+			WAinname = c("DataIn/WCVIStocks.csv")); beep(2)
+
+# BS.smax5 <- simalpha(bsiters = 20000, 
+			# newalpha = c(1, 0.5),
+			# WAinname = c("DataIn/WCVIStocks.csv")); beep(2)
+			
+# BS.smax3 <- BS.smax3$BS.dfout
+# BS.smax5 <- BS.smax5$BS.dfout
+# head(BS.smax)
 
 # head(BS.smax$upr - BS.smax$lwr)
 # head(BS.smax.og$upr - BS.smax.og$lwr)

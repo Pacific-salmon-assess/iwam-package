@@ -802,6 +802,8 @@ pvalpp <- sum(mean_simlogRS > mean(dat$logRS))/length(mean_simlogRS) # Proportio
 
 ### Residuals of Posterior Predictive against Years and Observed Spawners
 
+There were visual trends in the temporal relationships of each population, but not in consistent direction. The “strong temporal trends” found by Liermann et al. (2010) were in reference to the base model. Given our intermediate version, in between the base-model and the time-varying alpha, it is expected to see temporal trends .
+
 ```{r residpp by year prep, echo = FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 residlogRS <- matrix(0, nrow = 10000, ncol = 501)

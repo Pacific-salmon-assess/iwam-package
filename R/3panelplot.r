@@ -4,6 +4,7 @@ library(ggplot2)
 library(patchwork)
 library(latex2exp)
 # set.seed(1)
+
 # To create the sequence and dnorm for plotting illustrative distributions
 	# This is repeated alot
 make_dnorm_dist <- function(mu, sigma, n = 500) {
@@ -95,6 +96,12 @@ for (i in 1:100){
 	bnewi2[i] <- (MASS::mvrnorm(1, mu = mu_newi2, var_newi2))[1]
 }
 
+# Create a distribution of b0, assuming a constant SREP
+	# Take in new alphas - logalphai (stream)
+	# Take posterior draws of srep: 
+
+
+
 
 # SET LIMITS TO MATCH ACROSS FACETS
 # x_lim <- range(c(exp(dsmax$deripost_full$Alpha0), RicA$seq))
@@ -113,7 +120,8 @@ p_scatter <- ggplot(data.frame(x = exp(dsmax$deripost_full$Alpha0), y = dsmax$de
 	# point for mean of new distribution
 	annotate("point", x = mean(RicA$seq), y = mean(b0newseq), color = 'red', size = 4) + 
 	geom_point(data = data.frame(x = logalphai, y = bnewi), aes(x = logalphai, y = bnewi), color = "pink", size = 3, alpha = 0.4) +
-	xlab(TeX("$log(\\alpha)$")) + 
+	# abline(slope = -1) + 
+	xlab(TeX("$\\alpha$")) + 
 	ylab(TeX("$b0$ (Intercept of the Regression) for stream-type")) + 
 	theme_classic() + 
 	theme(legend.position="none") + 
@@ -121,6 +129,8 @@ p_scatter <- ggplot(data.frame(x = exp(dsmax$deripost_full$Alpha0), y = dsmax$de
 		axis.title = element_text(size = 18)) +
 	coord_cartesian(xlim = x_lim, ylim = y_lim) + # to map all 3 figures to the same coordinate grid
 	labs(title = "A")
+# Add to scatter: representation of a constant SREP, e.g. holding the ratio of Alpha/b0 constant as Alpha decreases
+	# Would need 
 
 # p_top: logAlpha0 vs. RicAdf
 p_top <- ggplot() + 
@@ -130,7 +140,7 @@ p_top <- ggplot() +
 	geom_vline(xintercept = mean(RicA$seq), alpha = 0.4, color = "red", linetype = "dashed", linewidth = 1.2) + # mean
 	geom_segment(aes(x = mean(alpha0seq), xend = mean(RicA$seq), y = 2, yend = 2),
 		arrow = arrow(length = unit(0.3, "cm")), color = "red", linewidth = 1.2) + # change in mean
-	xlab(TeX("$log(\\alpha)$")) + 
+	xlab(TeX("$\\alpha$")) + 
 	ylab("Density") + 
 	theme_classic() + 
 	theme(axis.text = element_text(size = 18),
@@ -164,7 +174,7 @@ o_scatter <- ggplot(data.frame(x = exp(dsmax$deripost_full$Alpha0 + dsmax$deripo
 	geom_point(alpha = 0.2, show.legend = FALSE) + 
 	annotate("point", x = mean(RicA$seq), y = mean(b02newseq), color = 'red', size = 4) + 
 	geom_point(data = data.frame(x = logalphai2, y = bnewi2), aes(x = logalphai2, y = bnewi2), color = "pink", size = 3, alpha = 0.4) +
-	xlab(TeX("$log(\\alpha)$")) + 
+	xlab(TeX("$\\alpha$")) + 
 	ylab(TeX("$b0$ (Intercept of the Regression) for ocean-type")) + 
 	theme_classic() + 
 	theme(legend.position="none") + 
@@ -182,7 +192,7 @@ o_top <- ggplot() +
 	geom_vline(xintercept = mean(RicA$seq), alpha = 0.4, color = "red", linetype = "dashed", linewidth = 1.2) + # mean
 	geom_segment(aes(x = mean(alpha02seq), xend = mean(RicA$seq), y = 2, yend = 2),
 		arrow = arrow(length = unit(0.3, "cm")), color = "red", linewidth = 1.2) + # change in mean
-	xlab(TeX("$log(\\alpha)$")) + 
+	xlab(TeX("$\\alpha$")) + 
 	ylab("Density") + 
 	theme_classic() + 
 	theme(axis.text = element_text(size = 18),
@@ -210,11 +220,11 @@ o_right <- ggplot() +
 # patchwork setup
 (p_top + plot_spacer() + p_scatter + p_right) + 
 	plot_layout(ncol = 2, widths  = c(3, 1), heights = c(1, 3)) + 
-	plot_annotation(title = "Relationship of logAlpha and the Regression Intercept for Stream-type Populations")
+	plot_annotation(title = TeX("Relationship of $\\alpha$ and the Regression Intercept for Stream-type Populations"))
 
 (o_top + plot_spacer() + o_scatter + o_right) + 
 	plot_layout(ncol = 2, widths  = c(3, 1), heights = c(1, 3)) + 
-	plot_annotation(title = "Relationship of logAlpha and the Regression Intercept for Ocean-type Populations")
+	plot_annotation(title = TeX("Relationship of $\\alpha$ and the Regression Intercept for Ocean-type Populations"))
 
 # Second patchwork of Benchmarks 
 # logSMAX_sd <- dsmax$deripost_summary$logSMAX_sd$Mean
@@ -522,12 +532,248 @@ Thomp_bottom4 <- ggplot() + # SREP
 	
 # two columns
 p_col <- wrap_plots(Louis_bottom1, Louis_bottom2, Louis_bottom3, Louis_bottom4, ncol = 1) + 
-  plot_annotation(title = "Louis (Stream)")
+  plot_annotation(title = "Louis (Stream)") + plot_layout(axis_titles = "collect")
 
 m_col <- wrap_plots(Maria_bottom1, Maria_bottom2, Maria_bottom3, Maria_bottom4, ncol = 1) + 
-  plot_annotation(title = "Maria (Ocean)")
+  plot_annotation(title = "Maria (Ocean)") + plot_layout(axis_titles = "collect")
   
 t_col <- wrap_plots(Thomp_bottom1, Thomp_bottom2, Thomp_bottom3, Thomp_bottom4, ncol = 1) + 
-  plot_annotation(title = "S. Thompson (Ocean)")
+  plot_annotation(title = "S. Thompson (Ocean)") + plot_layout(axis_titles = "collect")
 
 wrap_elements(patchworkGrob(m_col)) | wrap_elements(patchworkGrob(p_col)) | wrap_elements(patchworkGrob(t_col))
+
+
+
+####
+# Consider doing it for WCVI stocks so as to compare against Brown et al. Median LC values?
+Tranquil <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[20], p$sigma[20])) # Artlish - 1
+Kaouk <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[8], p$sigma[8])) # SanJuan - 15
+Somass <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[17], p$sigma[17])) # Gold - 7
+
+# Could also choose
+# Somass (largest) - 17
+# Kaouk (mean WA) - 8
+# Tranquil (smallest) - 20
+
+# What if we just extract mean and sd of each benchmark from bootstrapped simulations?
+newSMAXmu <- log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMAX"]) # SMAX Median
+newSMAXsd <- (log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMAX"]) - log(BS.smax$lwr[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMAX"]))/1.96
+newSMAXseqTranquil <- seq(newSMAXmu - 4*newSMAXsd, newSMAXmu + 4*newSMAXsd, length.out = 500)
+newSMAXdnormTranquil <- dnorm(newSMAXseqTranquil, mean = newSMAXmu, sd = newSMAXsd)
+
+newSMSYmu <- log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMSY"]) # SMAX Median
+newSMSYsd <- (log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMSY"]) - log(BS.smax$lwr[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMSY"]))/1.96
+newSMSYseqTranquil <- seq(newSMSYmu - 4*newSMSYsd, newSMSYmu + 4*newSMSYsd, length.out = 500)
+newSMSYdnormTranquil <- dnorm(newSMSYseqTranquil, mean = newSMSYmu, sd = newSMSYsd)
+
+newSGEMmu <- log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SGEN"]) # SMAX Median
+newSGENsd <- (log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SGEN"]) - log(BS.smax$lwr[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SGEN"]))/1.96
+newSGENseqTranquil <- seq(newSGEMmu - 4*newSGENsd, newSGEMmu + 4*newSGENsd, length.out = 500)
+newSGENdnormTranquil <- dnorm(newSGENseqTranquil, mean = newSGEMmu, sd = newSGENsd)
+
+newSREPmu <- log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SREP"]) # SMAX Median
+newSREPsd <- (log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SREP"]) - log(BS.smax$lwr[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SREP"]))/1.96
+newSREPseqTranquil <- seq(newSREPmu - 4*newSREPsd, newSREPmu + 4*newSREPsd, length.out = 500)
+newSREPdnormTranquil <- dnorm(newSREPseqTranquil, mean = newSREPmu, sd = newSREPsd)
+
+# Somass TEST
+newSMAXmuSomass <- log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SMAX"]) # SMAX Median
+newSMAXsdSomass <- (log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SMAX"]) - log(BS.smax$lwr[BS.smax$Stock == "Somass" & BS.smax$RP == "SMAX"]))/1.96
+newSMAXseqSomass <- seq(newSMAXmuSomass - 4*newSMAXsdSomass, newSMAXmuSomass + 4*newSMAXsdSomass, length.out = 500)
+newSMAXdnormSomass <- dnorm(newSMAXseqSomass, mean = newSMAXmuSomass, sd = newSMAXsdSomass)
+
+newSMSYmuSomass <- log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SMSY"]) # SMAX Median
+newSMSYsdSomass <- (log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SMSY"]) - log(BS.smax$lwr[BS.smax$Stock == "Somass" & BS.smax$RP == "SMSY"]))/1.96
+newSMSYseqSomass <- seq(newSMSYmuSomass - 4*newSMSYsdSomass, newSMSYmuSomass + 4*newSMSYsdSomass, length.out = 500)
+newSMSYdnormSomass <- dnorm(newSMSYseqSomass, mean = newSMSYmuSomass, sd = newSMSYsdSomass)
+
+newSGEMmuSomass <- log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]) # SMAX Median
+newSGENsdSomass <- (log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]) - log(BS.smax$lwr[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]))/1.96
+newSGENseqSomass <- seq(newSGEMmuSomass - 4*newSGENsdSomass, newSGEMmuSomass + 4*newSGENsdSomass, length.out = 500)
+newSGENdnormSomass <- dnorm(newSGENseqSomass, mean = newSGEMmuSomass, sd = newSGENsdSomass)
+
+newSREPmuSomass <- log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SREP"]) # SMAX Median
+newSREPsdSomass <- (log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SREP"]) - log(BS.smax$lwr[BS.smax$Stock == "Somass" & BS.smax$RP == "SREP"]))/1.96
+newSREPseqSomass <- seq(newSREPmuSomass - 4*newSREPsdSomass, newSREPmuSomass + 4*newSREPsdSomass, length.out = 500)
+newSREPdnormSomass <- dnorm(newSREPseqSomass, mean = newSREPmuSomass, sd = newSREPsdSomass)
+
+# Kaouk TEST
+newSMAXmuKaouk <- log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SMAX"]) # SMAX Median
+newSMAXsdKaouk <- (log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SMAX"]) - log(BS.smax$lwr[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SMAX"]))/1.96
+newSMAXseqKaouk <- seq(newSMAXmuKaouk - 4*newSMAXsdKaouk, newSMAXmuKaouk + 4*newSMAXsdKaouk, length.out = 500)
+newSMAXdnormKaouk <- dnorm(newSMAXseqKaouk, mean = newSMAXmuKaouk, sd = newSMAXsdKaouk)
+
+newSMSYmuKaouk <- log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SMSY"]) # SMAX Median
+newSMSYsdKaouk <- (log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SMSY"]) - log(BS.smax$lwr[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SMSY"]))/1.96
+newSMSYseqKaouk <- seq(newSMSYmuKaouk - 4*newSMSYsdKaouk, newSMSYmuKaouk + 4*newSMSYsdKaouk, length.out = 500)
+newSMSYdnormKaouk <- dnorm(newSMSYseqKaouk, mean = newSMSYmuKaouk, sd = newSMSYsdKaouk)
+
+newSGEMmuKaouk <- log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SGEN"]) # SMAX Median
+newSGENsdKaouk <- (log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SGEN"]) - log(BS.smax$lwr[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SGEN"]))/1.96
+newSGENseqKaouk <- seq(newSGEMmuKaouk - 4*newSGENsdKaouk, newSGEMmuKaouk + 4*newSGENsdKaouk, length.out = 500)
+newSGENdnormKaouk <- dnorm(newSGENseqKaouk, mean = newSGEMmuKaouk, sd = newSGENsdKaouk)
+
+newSREPmuKaouk <- log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SREP"]) # SMAX Median
+newSREPsdKaouk <- (log(BS.smax$Value[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SREP"]) - log(BS.smax$lwr[BS.smax$Stock == "Kaouk" & BS.smax$RP == "SREP"]))/1.96
+newSREPseqKaouk <- seq(newSREPmuKaouk - 4*newSREPsdKaouk, newSREPmuKaouk + 4*newSREPsdKaouk, length.out = 500)
+newSREPdnormKaouk <- dnorm(newSREPseqKaouk, mean = newSREPmuKaouk, sd = newSREPsdKaouk)
+
+x_lim2 <- c(2, 14)
+
+Tranquil_bottom1 <- ggplot() + # SMAX
+	geom_line(aes(x = Tranquil$SMAX$seq, y = Tranquil$SMAX$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSMAXseqTranquil, y = newSMAXdnormTranquil), 
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{MAX})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "A")
+	
+Tranquil_bottom2 <- ggplot() + # SMSY
+	geom_line(aes(x = Tranquil$SMSY$seq, y = Tranquil$SMSY$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSMSYseqTranquil, y = newSMSYdnormTranquil),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{MSY})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "B")
+	
+Tranquil_bottom3 <- ggplot() + # SGEN
+	geom_line(aes(x = Tranquil$SGEN$seq, y = Tranquil$SGEN$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSGENseqTranquil, y = newSGENdnormTranquil),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{GEN})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "C")
+	
+Tranquil_bottom4 <- ggplot() + # SREP
+		geom_line(aes(x = Tranquil$SREP$seq, y = Tranquil$SREP$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSREPseqTranquil, y = newSREPdnormTranquil),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{REP})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "D")
+
+# FOR Somass
+Somass_bottom1 <- ggplot() + # SMAX
+	geom_line(aes(x = Somass$SMAX$seq, y = Somass$SMAX$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSMAXseqSomass, y = newSMAXdnormSomass), 
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{MAX})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "A")
+	
+Somass_bottom2 <- ggplot() + # SMSY
+	geom_line(aes(x = Somass$SMSY$seq, y = Somass$SMSY$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSMSYseqSomass, y = newSMSYdnormSomass),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{MSY})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "B")
+	
+Somass_bottom3 <- ggplot() + # SGEN
+	geom_line(aes(x = Somass$SGEN$seq, y = Somass$SGEN$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSGENseqSomass, y = newSGENdnormSomass),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{GEN})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "C")
+	
+Somass_bottom4 <- ggplot() + # SREP
+		geom_line(aes(x = Somass$SREP$seq, y = Somass$SREP$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSREPseqSomass, y = newSREPdnormSomass),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{REP})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "D")
+
+# FOR Kaouk
+Kaouk_bottom1 <- ggplot() + # SMAX
+	geom_line(aes(x = Kaouk$SMAX$seq, y = Kaouk$SMAX$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSMAXseqKaouk, y = newSMAXdnormKaouk), 
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{MAX})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "A")
+	
+Kaouk_bottom2 <- ggplot() + # SMSY
+	geom_line(aes(x = Kaouk$SMSY$seq, y = Kaouk$SMSY$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSMSYseqKaouk, y = newSMSYdnormKaouk),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{MSY})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "B")
+	
+Kaouk_bottom3 <- ggplot() + # SGEN
+	geom_line(aes(x = Kaouk$SGEN$seq, y = Kaouk$SGEN$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSGENseqKaouk, y = newSGENdnormKaouk),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{GEN})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "C")
+	
+Kaouk_bottom4 <- ggplot() + # SREP
+		geom_line(aes(x = Kaouk$SREP$seq, y = Kaouk$SREP$dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(aes(x = newSREPseqKaouk, y = newSREPdnormKaouk),
+		color = "red", linetype = "dashed", linewidth = 1.2, alpha = 0.5) +
+	xlab(TeX("$log(S_{REP})$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim2) +
+	labs(title = "D")
+	
+# two columns
+p_col <- wrap_plots(Tranquil_bottom1, Tranquil_bottom2, Tranquil_bottom3, Tranquil_bottom4, ncol = 1) + 
+  plot_annotation(title = TeX("Tranquil (12 $km^2$) (Ocean)")) + plot_layout(axis_titles = "collect")
+
+m_col <- wrap_plots(Somass_bottom1, Somass_bottom2, Somass_bottom3, Somass_bottom4, ncol = 1) + 
+  plot_annotation(title = TeX("Somass (1057 $km^2$) (Ocean)")) + plot_layout(axis_titles = "collect")
+  
+t_col <- wrap_plots(Kaouk_bottom1, Kaouk_bottom2, Kaouk_bottom3, Kaouk_bottom4, ncol = 1) + 
+  plot_annotation(title = TeX("Kaouk (101 $km^2$) (Ocean)")) + plot_layout(axis_titles = "collect")
+
+wrap_elements(patchworkGrob(p_col)) | wrap_elements(patchworkGrob(t_col)) | wrap_elements(patchworkGrob(m_col))

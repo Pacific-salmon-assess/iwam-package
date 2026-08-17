@@ -180,15 +180,17 @@ ggplot() +
 # dev.off()
 
 # pdf(here::here("DataOut/logalphaposteriorpredictivedist.pdf"), width = 7, height = 7)
-ggplot() +
+ppalpha <- ggplot() +
   geom_density(aes(x = exp(simlogAlpha_s)), # For a new STREAM observation
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
   geom_density(aes(x = exp(simlogAlpha_o)), # For a new OCEAN observation
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  labs(x = "Mean of uncentered log(Alpha) Posterior Predictive Distribution (Stream and Ocean)", 
-         y = "Density")
-# dev.off()
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
+  ylab("Density") +
+  xlab(TeX("Mean of uncentered $\\alpha$ Posterior Predictive Distribution (Stream and Ocean)")) + 
+  ggtitle("(A)")
+
 
 
 #### Pushforward (under prior predictive): logAlpha #################################################################################################
@@ -215,20 +217,24 @@ n_S <- sum(TypeLabels == "S")
 n_O <- sum(TypeLabels == "O")
 
 # pdf(here::here("DataOut/logalpha_ridgeplot.pdf"), width = 7, height = 7)
-ggplot(alpharidgetable_long, aes(x = exp(Value), y = Stock, fill = interaction(Type, Stock))) +
+ridge <- ggplot(alpharidgetable_long, aes(x = exp(Value), y = Stock, fill = interaction(Type, Stock))) +
   geom_density_ridges(color = "gray20", alpha = 0.8, scale = 1.2) +
   theme_classic() +
-  labs(x = "logAlpha", y = "Stock") +
+  ylab("Synoptic Stock") + 
+  xlab(TeX("$\\alpha$")) +
+  ggtitle("(B)") +
   theme(legend.position = "none") +
-  scale_fill_manual(
-    values = c(
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
+  scale_fill_manual(values = c(
       setNames(colorRampPalette(c("#a8e6a3", "#0b6e0b"))(n_S),
                paste("S.", Stocknames[TypeLabels == "S"], sep = "")),
       setNames(colorRampPalette(c("#a3d5ff", "#084a8b"))(n_O),
                paste("O.", Stocknames[TypeLabels == "O"], sep = ""))
-    )
- )
-# dev.off()
+		)
+  )
+ 
+# Figure 2:
+grid.arrange(ppalpha, ridge, nrow = 1)
 
 # ggplot(alpharidge_long, aes(x = Value, y = factor(Index), fill = factor(Index))) +
 #   geom_density_ridges(alpha = 0.5, scale = 1.2, color = "forestgreen") +
@@ -346,26 +352,33 @@ if(randomgenmethod == T){
 
 
 #### Posterior Distributions of b0 and bWA ##########################################################################################################
-pdf(here::here("DataOut/b0_posteriordensity.pdf"), width = 7, height = 7)
-ggplot() +
+# pdf(here::here("DataOut/b0_posteriordensity.pdf"), width = 7, height = 7)
+b0dist <- ggplot() +
   geom_density(aes(x = derived_obj$deripost_full$b0[,1]), 
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
   geom_density(aes(x = (derived_obj$deripost_full$b0[,2] + derived_obj$deripost_full$b0[,1])),
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  labs(x = "b0", y = "Density")
-dev.off()
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
+  xlab(TeX("$b_{0}$")) + 
+  ylab("Density") + 
+  ggtitle("(A)")
+# dev.off()
 
-pdf(here::here("DataOut/bWA_posteriordensity.pdf"), width = 7, height = 7)
-ggplot() +
+# pdf(here::here("DataOut/bWA_posteriordensity.pdf"), width = 7, height = 7)
+bWAdist <- ggplot() +
   geom_density(aes(x = derived_obj$deripost_full$bWA[,1]), 
                fill = "forestgreen", alpha = 0.4, color = "forestgreen", linewidth = 1.2) +
   geom_density(aes(x = (derived_obj$deripost_full$bWA[,2] + derived_obj$deripost_full$bWA[,1])),
               fill = "skyblue", alpha = 0.4, color = "skyblue", linewidth = 1.2) +
   theme_classic() +
-  labs(x = "bWA", y = "Density")
-dev.off()
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
+  xlab(TeX("$b_{WA}$")) + 
+  ylab("Density") + 
+  ggtitle("(B)")
+# dev.off()
 
+grid.arrange(b0dist, bWAdist, nrow = 1)
 
 
 #### Plot SR Relationship Curves - based on SREP ####################################################################################################################
@@ -693,7 +706,8 @@ targetsAll_smax <- cbind(targetsAll_smax, dsmax$deripost_summary$SMAX_tar_adj) |
 # targetsAll_smax <- targetsAll_smax %>%
 	# left_join(BS_wide_smax.og, by = c("Stock_name" = "Stock", "lh"))
 
-BS_wide_smax <- BS.smax %>% # .y values
+# Bootstrapping w/ ~N(1, 0.3) --> .x 
+BS_wide_smax3 <- BS.smax3 %>% # .y values
   pivot_wider(
     id_cols = c(Stock, WA, lh), 
     names_from = RP, 
@@ -701,20 +715,31 @@ BS_wide_smax <- BS.smax %>% # .y values
     names_sep = "_"
   )
 targetsAll_smax <- targetsAll_smax %>%
-	left_join(BS_wide_smax, by = c("Stock_name" = "Stock", "lh"))
+	left_join(BS_wide_smax3, by = c("Stock_name" = "Stock", "lh"))
 
-	# SREP from IWAM
-# dfout - FROM IWAM_model.R
-dfout_wide <- dfout %>%
+# Bootstrapping w/ ~N(1, 0.5) --> .y
+BS_wide_smax5 <- BS.smax5 %>% # .y values
   pivot_wider(
     id_cols = c(Stock, WA, lh), 
     names_from = RP, 
     values_from = c(Value, lwr, upr),
-    names_sep = "_",
-    names_prefix = "IWAM_"
+    names_sep = "_"
   )
 targetsAll_smax <- targetsAll_smax %>%
-  left_join(dfout_wide, by = c("Stock_name" = "Stock", "WA", "lh"))
+	left_join(BS_wide_smax5, by = c("Stock_name" = "Stock", "lh"))
+
+	# SREP from IWAM
+# dfout - FROM IWAM_model.R
+# dfout_wide <- dfout %>%
+  # pivot_wider(
+    # id_cols = c(Stock, WA, lh), 
+    # names_from = RP, 
+    # values_from = c(Value, lwr, upr),
+    # names_sep = "_",
+    # names_prefix = "IWAM_"
+  # )
+# targetsAll_smax <- targetsAll_smax %>%
+  # left_join(dfout_wide, by = c("Stock_name" = "Stock", "WA", "lh"))
 
 # Ricker sigma for SYNOPTIC STOCKS 
   # Re-order Stocks to be in order of Ricker variance
@@ -744,38 +769,38 @@ ggplot() +
   
   # MODEL Posterior Predictive
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)),
-                                     y = SREP_tar_median,
-                                     ymax = SREP_tar_UQ_95, 
-                                     ymin = SREP_tar_LQ_5,
+                                     y = SREP_tar_adj_median,
+                                     ymax = SREP_tar_adj_UQ_95, 
+                                     ymin = SREP_tar_adj_LQ_5,
                                  color = "IWAM Posterior Predictive",
                                  width=.1),
                 position = position_nudge(+0.1)) +
   geom_point(data = targetsAll_smax,
              position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = SREP_tar_median, color = "IWAM Posterior Predictive", shape = as.factor(lh)), size = 2.5) +
+             aes(x = fct_reorder(Stock_name, log(WA.x)), y = SREP_tar_adj_median, color = "IWAM Posterior Predictive", shape = as.factor(lh)), size = 2.5) +
 
   # MODEL bootstraps
-  geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)),
-                                     y = Value_SREP.x,
-                                     ymax = lwr_SREP.x, 
-                                     ymin = upr_SREP.x,
-                                 color = "IWAM Bootstrap (Original)",
-                                 width=.1),
-                position = position_nudge(+0.3)) +
-  geom_point(data = targetsAll_smax,
-             position = position_nudge(+0.3),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SREP.x, color = "IWAM Bootstrap (Original)", shape = as.factor(lh)), size = 2.5) +
+  # geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)),
+                                     # y = Value_SREP.x,
+                                     # ymax = lwr_SREP.x, 
+                                     # ymin = upr_SREP.x,
+                                 # color = "IWAM Bootstrap (Original)",
+                                 # width=.1),
+                # position = position_nudge(+0.3)) +
+  # geom_point(data = targetsAll_smax,
+             # position = position_nudge(+0.3),
+             # aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SREP.x, color = "IWAM Bootstrap (Original)", shape = as.factor(lh)), size = 2.5) +
   
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)),
-                                     y = Value_SREP.y,
-                                     ymax = lwr_SREP.y, 
-                                     ymin = upr_SREP.y,
+                                     y = Value_SREP,
+                                     ymax = lwr_SREP, 
+                                     ymin = upr_SREP,
                                  color = "IWAM Bootstrap",
                                  width=.1),
                 position = position_nudge(+0.2)) +
   geom_point(data = targetsAll_smax,
              position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SREP.y, color = "IWAM Bootstrap", shape = as.factor(lh)), size = 2.5) +
+             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SREP, color = "IWAM Bootstrap", shape = as.factor(lh)), size = 2.5) +
   
   # SMAX MODEL Posterior Predictive
   # geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, logWA),
@@ -832,8 +857,9 @@ ggplot() +
   ylab(TeX("$S_{REP}$ Estimate")) +
   xlab("") + 
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
   scale_shape_manual(name = "Life History Type", labels = c("Stream", "Ocean"), values = c(19, 1)) + 
-  scale_color_manual(name='Model',
+  scale_color_manual(name='IWAM Model Source',
                     breaks=c('Parken',
                             # 'RTMB MLE',
 							'IWAM',
@@ -863,10 +889,10 @@ ggplot() +
 ggplot() +
   
   # PARKEN CASE STUDY STOCKS
-  geom_errorbar(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SMSYp, ymax = SMSYp_95, ymin = SMSYp_5,
-                                    color = "Parken",
-                                    width=.1)) +
-  geom_point(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SMSYp, color = "Parken", shape = as.factor(lh)), size = 2.5) +
+  # geom_errorbar(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SMSYp, ymax = SMSYp_95, ymin = SMSYp_5,
+                                    # color = "Parken",
+                                    # width=.1)) +
+  # geom_point(data = parken, aes(x = fct_reorder(Stock, log(WA)), y = SMSYp, color = "Parken", shape = as.factor(lh)), size = 2.5) +
   
   # SREP MODEL Posterior Predictive
   # geom_errorbar(data = targetsAll_srep, aes(x = fct_reorder(Stock_name, log(WA.x)),
@@ -902,43 +928,55 @@ ggplot() +
                 position = position_nudge(+0.1)) +
   geom_point(data = targetsAll_smax,
             position = position_nudge(+0.1),
-            aes(x = fct_reorder(Stock_name, log(WA.x)), y = SMSY_median, color = "IWAM Posterior Predictive", shape = as.factor(lh)), size = 2.5) +
+            aes(x = fct_reorder(Stock_name, log(WA.x)), y = SMSY_median, color = "IWAM Posterior Predictive"), size = 3) +
   
-  # SMSY BOOTSTRAPS FROM SMAX MODEL
-  geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
-                                     y = Value_SMSY.y,
-                                     ymin = lwr_SMSY.y, # pmax(lwr_SMSY, 1) caps the error bar at 0
-                                     ymax = upr_SMSY.y,
-                                 color = "IWAM Bootstrap",
-                                 width=.1),
-                position = position_nudge(+0.2)) +
-  geom_point(data = targetsAll_smax,
-             position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SMSY.y, color = "IWAM Bootstrap", shape = as.factor(lh)), size = 2.5) +
-			 
-  # SMSY BOOTSTRAPS FROM SMAX MODEL (ORIGINAL METHOD)
+  # SMSY BOOTSTRAPS FROM SMAX MODEL ~N(1, 0.5)
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
                                      y = Value_SMSY.x,
                                      ymin = lwr_SMSY.x, # pmax(lwr_SMSY, 1) caps the error bar at 0
                                      ymax = upr_SMSY.x,
-                                 color = "IWAM Bootstrap (Original)",
+                                 color = "IWAM Bootstrap ~ N(1, 0.3)",
+                                 width=.1),
+                position = position_nudge(+0.2)) +
+  geom_point(data = targetsAll_smax,
+             position = position_nudge(+0.2),
+             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SMSY.x, color = "IWAM Bootstrap ~ N(1, 0.3)"), size = 3) +
+			 
+  # SMSY BOOTSTRAPS FROM SMAX MODEL ~N(1, 0.5)
+  geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
+                                     y = Value_SMSY.y,
+                                     ymin = lwr_SMSY.y, # pmax(lwr_SMSY, 1) caps the error bar at 0
+                                     ymax = upr_SMSY.y,
+                                 color = "IWAM Bootstrap ~ N(1, 0.5)",
                                  width=.1),
                 position = position_nudge(+0.3)) +
   geom_point(data = targetsAll_smax,
              position = position_nudge(+0.3),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SMSY.x, color = "IWAM Bootstrap (Original)", shape = as.factor(lh)), size = 2.5) +
+             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SMSY.y, color = "IWAM Bootstrap ~ N(1, 0.5)"), size = 3) +
+			 
+  # SMSY BOOTSTRAPS FROM SMAX MODEL (ORIGINAL METHOD)
+  # geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
+                                     # y = Value_SMSY.x,
+                                     # ymin = lwr_SMSY.x, # pmax(lwr_SMSY, 1) caps the error bar at 0
+                                     # ymax = upr_SMSY.x,
+                                 # color = "IWAM Bootstrap (Original)",
+                                 # width=.1),
+                # position = position_nudge(+0.3)) +
+  # geom_point(data = targetsAll_smax,
+             # position = position_nudge(+0.3),
+             # aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SMSY.x, color = "IWAM Bootstrap (Original)", shape = as.factor(lh)), size = 2.5) +
   
   # BROWN ET AL. RESULTS
-  # geom_errorbar(data = Brownwcvi, aes(x = fct_reorder(Stock, log(WA)), # Bootstrap
-                                     # y = SMSY_value,
-                                     # ymax = SMSY_upr, 
-                                     # ymin = SMSY_lwr,
-                                 # color = "Holt et al. (2023) Method",
-                                 # width=.1),
-                # position = position_nudge(+0.0)) +
-  # geom_point(data = Brownwcvi,
-             # position = position_nudge(+0.0),
-             # aes(x = fct_reorder(Stock, log(WA)), y = SMSY_value, color = "Holt et al. (2023) Method", shape = as.factor(lh)), size = 2.5) +
+  geom_errorbar(data = Brownwcvi, aes(x = fct_reorder(Stock, log(WA)), # Bootstrap
+                                     y = SMSY_value,
+                                     ymax = SMSY_upr, 
+                                     ymin = SMSY_lwr,
+                                 color = "Brown et al. (2026)",
+                                 width=.1),
+                position = position_nudge(+0.0)) +
+  geom_point(data = Brownwcvi,
+             position = position_nudge(+0.0),
+             aes(x = fct_reorder(Stock, log(WA)), y = SMSY_value, color = "Brown et al. (2026)"), size = 3) + # shape = as.factor(lh)
 
   # OLD IWAM RESULTS
   # geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA)), # Bootstrap
@@ -958,27 +996,29 @@ ggplot() +
                     breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
   ylab(TeX("$S_{MSY}$ Estimate")) +
   xlab("") + 
+  ggtitle("(A)") + # For panels
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
-  scale_shape_manual(name = "Life History Type", labels = c("Stream", "Ocean"), values = c(19, 1)) + 
-  scale_color_manual(name='Model',
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
+  # scale_shape_manual(name = "Life History Type", labels = c("Stream", "Ocean"), values = c(19, 1)) + 
+  scale_color_manual(name='IWAM Model Source',
                     breaks=c('Parken',
-							'Holt et al. (2023) Method',
                             'Liermann MCMC Cond.',
                             'Liermann MCMC Marg.',
 							'Liermann SREP PP',
 							'Liermann SREP Bootstrap',
+							'Brown et al. (2026)',
 							'IWAM Posterior Predictive',
-							'IWAM Bootstrap',
-							'IWAM Bootstrap (Original)'),
+							'IWAM Bootstrap ~ N(1, 0.3)',
+							'IWAM Bootstrap ~ N(1, 0.5)'),
                     values=c('Parken' = "black",
-							'Holt et al. (2023) Method' = 'orange',
                             'Liermann MCMC Cond.' = "skyblue",
                             'Liermann MCMC Marg.' = "royalblue",
 							'Liermann SREP PP' = 'skyblue',
 							'Liermann SREP Bootstrap' = 'royalblue',
+							'Brown et al. (2026)' = 'orange',
 							'IWAM Posterior Predictive' = 'skyblue',
-							'IWAM Bootstrap' = 'royalblue',
-							'IWAM Bootstrap (Original)' = 'orange'))
+							'IWAM Bootstrap ~ N(1, 0.3)' = 'royalblue',
+							'IWAM Bootstrap ~ N(1, 0.5)' = 'black'))
 # dev.off()
 							  
 							  
@@ -988,6 +1028,7 @@ ggplot() +
 # brownsgen <- 
 ggplot() +
   
+  # SREP Model Posterior
   # geom_errorbar(data = targetsAll_srep, aes(x = fct_reorder(Stock_name, log(WA.x)),
                                      # y = SGEN_median,
                                      # ymax = SGEN_UQ_95, 
@@ -999,6 +1040,7 @@ ggplot() +
              # position = position_nudge(+0.3),
              # aes(x = fct_reorder(Stock_name, log(WA.x)), y = SGEN_median, color = "Srep model posterior")) +
 
+  # IWAM Posterior Predictive
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)),
                                      y = SGEN_median,
                                      ymax = SGEN_UQ_95, 
@@ -1008,59 +1050,63 @@ ggplot() +
                 position = position_nudge(+0.1)) +
   geom_point(data = targetsAll_smax,
              position = position_nudge(+0.1),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = SGEN_median, color = "IWAM Posterior Predictive", shape = as.factor(lh)), size = 2.5) +
+             aes(x = fct_reorder(Stock_name, log(WA.x)), y = SGEN_median, color = "IWAM Posterior Predictive"), size = 3) +
   
+  # IWAM Bootstrap
   geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)),
-                                     y = Value_SGEN.y,
-                                     ymax = upr_SGEN.y, 
-                                     ymin = lwr_SGEN.y,
+                                     y = Value_SGEN,
+                                     ymax = upr_SGEN, 
+                                     ymin = lwr_SGEN,
                                  color = "IWAM Bootstrap",
                                  width=.1),
                 position = position_nudge(+0.2)) +
   geom_point(data = targetsAll_smax,
              position = position_nudge(+0.2),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SGEN.y, color = "IWAM Bootstrap", shape = as.factor(lh)), size = 2.5) +
+             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SGEN, color = "IWAM Bootstrap"), size = 3) + # shape = as.factor(lh))
   
-  geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
-                                     y = Value_SGEN.x,
-                                     ymax = upr_SGEN.x, 
-                                     ymin = lwr_SGEN.x,
-                                 color = "IWAM Bootstrap (Original)",
-                                 width=.1),
-                position = position_nudge(+0.3)) +
-  geom_point(data = targetsAll_smax,
-             position = position_nudge(+0.3),
-             aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SGEN.x, color = "IWAM Bootstrap (Original)", shape = as.factor(lh)), size = 2.5) +
+  # IWAM Bootstrap (ORIGINAL METHOD)
+  # geom_errorbar(data = targetsAll_smax, aes(x = fct_reorder(Stock_name, log(WA.x)), # Bootstrap
+                                     # y = Value_SGEN.x,
+                                     # ymax = upr_SGEN.x, 
+                                     # ymin = lwr_SGEN.x,
+                                 # color = "IWAM Bootstrap (Original)",
+                                 # width=.1),
+                # position = position_nudge(+0.3)) +
+  # geom_point(data = targetsAll_smax,
+             # position = position_nudge(+0.3),
+             # aes(x = fct_reorder(Stock_name, log(WA.x)), y = Value_SGEN.x, color = "IWAM Bootstrap (Original)", shape = as.factor(lh)), size = 2.5) +
   
   # BROWN ET AL. RESULTS
-  # geom_errorbar(data = Brownwcvi, aes(x = fct_reorder(Stock, log(WA)), # Bootstrap
-                                     # y = SGEN_value,
-                                     # ymax = SGEN_upr, 
-                                     # ymin = SGEN_lwr,
-                                 # color = "Holt et al. (2023) Method",
-                                 # width=.1),
-                # position = position_nudge(+0.0)) +
-  # geom_point(data = Brownwcvi,
-             # position = position_nudge(+0.0),
-             # aes(x = fct_reorder(Stock, log(WA)), y = SGEN_value, color = "Holt et al. (2023) Method")) +
+  geom_errorbar(data = Brownwcvi, aes(x = fct_reorder(Stock, log(WA)), # Bootstrap
+                                     y = SGEN_value,
+                                     ymax = SGEN_upr, 
+                                     ymin = SGEN_lwr,
+                                 color = "Brown et al. (2026)",
+                                 width=.1),
+                position = position_nudge(+0.0)) +
+  geom_point(data = Brownwcvi,
+             position = position_nudge(+0.0),
+             aes(x = fct_reorder(Stock, log(WA)), y = SGEN_value, color = "Brown et al. (2026)"), size = 3) +
   
   theme_classic() +
   scale_y_continuous(transform = "log", 
                      breaks = c(0, 10, 100, 1000, 10000, 100000, 1000000, 10000000)) +
   ylab(TeX("$S_{GEN}$ Estimate")) +
   xlab("") + 
+  ggtitle("(B)") + # For panels
   theme(axis.text.x = element_text(angle = 90, vjust=0.3, hjust = 1)) +
-  scale_shape_manual(name = "Life History Type", labels = c("Stream", "Ocean"), values = c(19, 1)) +
-  scale_color_manual(name='Model',
+  theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
+  # scale_shape_manual(name = "Life History Type", labels = c("Stream", "Ocean"), values = c(19, 1)) +
+  scale_color_manual(name='IWAM Model Source',
                      breaks=c('Srep model PP',
-                              'IWAM Posterior Predictive',
-							  'Holt et al. (2023) Method',
+							  'Brown et al. (2026)',
+							  'IWAM Posterior Predictive',
 							  'IWAM Bootstrap',
 							  'IWAM Bootstrap (Original)',
 							  'Liermann SREP'),
                      values=c('Srep model PP' = "lightgreen",
-                              'IWAM Posterior Predictive' = "skyblue",
-							  'Holt et al. (2023) Method' = 'orange',
+							  'Brown et al. (2026)' = 'orange',
+							  'IWAM Posterior Predictive' = "skyblue",
 							  'IWAM Bootstrap' = 'royalblue',
 							  'IWAM Bootstrap (Original)' = 'orange',
 							  'Liermann SREP' = 'forestgreen'))
@@ -1718,7 +1764,7 @@ ggplot() +
 # derived_obj$deripost_summary$SREP_line_ocean and SREP_line_ocean including their marginal variants
 # Plot lineWA against SREP/SMAX
 
-dpars_srep <- dsrep$deripost_summary
+# dpars_srep <- dsrep$deripost_summary
 dpars_smax <- dsmax$deripost_summary
 
 baselinescatter <- data.frame(
@@ -1728,6 +1774,8 @@ baselinescatter <- data.frame(
 	WAlh = WAbase$lh,
 	WAlhtarget = dat$WAin$lh, # 0 and 1's # ONLY WORKS IF SAME NUMBER ****
 	SMAX = dpars_smax$SMAX$Median, # ? # or dpars_smax
+	SMAX_LQ = dpars_smax$SMAX$LQ_5,
+	SMAX_UQ = dpars_smax$SMAX$UQ_95,
 	SMAX_tar = dpars_smax$SMAX_tar$Median # ONLY WORKS IF SAME NUMBER **** # or dpars_smax
 ) # dat$mean_logWA
 
@@ -1742,9 +1790,11 @@ posteriorline <- data.frame(
 )
 
 # On Logged scales
-pdf(here::here("DataOut/LinearReg_SmaxModel_loglogscale.pdf"), width = 7, height = 7) # 2. print to pdf
-ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SMAX), color = WAlh)) + # base observation scatter plot ???????????????????????????????
+# pdf(here::here("DataOut/LinearReg_SmaxModel_loglogscale.pdf"), width = 7, height = 7) # 2. print to pdf
+logwareg <- ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SMAX), color = WAlh)) + # base observation scatter plot ???????????????????????????????
 	geom_point(alpha = 0.8, size = 3) + # colours, etc. for observation scatter plot
+	# errorbars
+	geom_errorbar(data = baselinescatter, aes(x = WAbaseshifted, y = log(SMAX), ymin = log(SMAX_LQ), ymax = log(SMAX_UQ), color = WAlh)) +
 	# scale_color_manual(values = c('stream' = 'forestgreen', 'ocean' = 'skyblue'), guide = "none") +
 	scale_color_manual(name = "Life History", 
 		values = c('stream' = 'forestgreen', 'ocean' = 'skyblue'), 
@@ -1758,6 +1808,7 @@ ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SMAX), color = WAl
 	geom_ribbon(data = posteriorline, aes(x = lineWA, ymin = lower_ocean_line, ymax = upper_ocean_line), fill = "skyblue", alpha = 0.3, inherit.aes = FALSE) + 
 	theme_classic() + 
 	theme(legend.position = "none") + 
+	theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
 	theme(legend.position = c(0.02, 0.98),  # x, y coordinates (0-1 scale)
 		legend.justification = c(0, 1),    # anchor at top-left of legend box
 		# legend.background = element_rect(fill = "white", color = "black", size = 0.5),
@@ -1765,8 +1816,9 @@ ggplot(data = baselinescatter, aes(x = WAbaseshifted, y = log(SMAX), color = WAl
 		legend.text = element_text(size = 10)) +
 	# scale_x_log10() +
 	# scale_y_log10() + 
-	labs(x = "Log Mean Centered Accessible Watershed Area", y = TeX("$S_{MAX}$ (Spawners at Max Recruitment)"))
-dev.off()
+	labs(x = "Log Mean Centered Accessible Watershed Area", y = TeX("$log(S_{MAX})$ (Spawners at Max Recruitment)")) +
+	ggtitle("(A)")
+# dev.off()
 
 # Processing
 # Do I need to add back in mean_logWA? for the shifted WA's?
@@ -1776,7 +1828,7 @@ eb02 <- dsmax$deripost_full$b0[,2]
 ebWA1 <- dsmax$deripost_full$bWA[,1]
 ebWA2 <- dsmax$deripost_full$bWA[,2]
 
-realWAline <- exp(seq(log(min(dat$WAbase$WA, na.rm=TRUE)), log(max(dat$WAbase$WA, na.rm=TRUE)), length.out = 72))
+realWAline <- exp(seq(log(min(dat$WAbase$WA, na.rm=TRUE)), log(max(dat$WAbase$WA, na.rm=TRUE)), length.out = 74)) # Was originally 72
 posteriorline$logWAline <- log(realWAline)
 
 unc1 <- eb01 -  ebWA1 * dat$mean_logWA
@@ -1807,9 +1859,11 @@ posteriorline$hdi_hi1 <- hdi_list1[2, ]
 posteriorline$hdi_lo2 <- hdi_list2[1, ]
 posteriorline$hdi_hi2 <- hdi_list2[2, ]
 
-pdf(here::here("DataOut/LinearReg_SmaxModel_realscale.pdf"), width = 7, height = 7) # 2. print to pdf
-ggplot(data = baselinescatter, aes(x = WAreal, y = SMAX, color = WAlh)) + # base observation scatter plot ???????????????????????????????
+# pdf(here::here("DataOut/LinearReg_SmaxModel_realscale.pdf"), width = 7, height = 7) # 2. print to pdf
+wareg <- ggplot(data = baselinescatter, aes(x = WAreal, y = SMAX, color = WAlh)) + # base observation scatter plot ???????????????????????????????
 	geom_point(alpha = 0.8, size = 3) + # colours, etc. for observation scatter plot
+	geom_errorbar(data = baselinescatter, aes(x = WAreal, y = SMAX, ymin = SMAX_LQ, ymax = SMAX_UQ, color = WAlh)) +
+	
 	scale_color_manual(name = "Life History", 
 		values = c('stream' = 'forestgreen', 'ocean' = 'skyblue'), 
 		labels = c('stream' = 'Stream Type', 'ocean' = 'Ocean Type'),
@@ -1838,6 +1892,7 @@ ggplot(data = baselinescatter, aes(x = WAreal, y = SMAX, color = WAlh)) + # base
 	
 	theme_classic() + 
 	theme(legend.position = "none") + 
+	theme(axis.text = element_text(size = 18), axis.title = element_text(size = 18)) +
 	
 	theme(legend.position = c(0.02, 0.98),  # x, y coordinates (0-1 scale)
 		legend.justification = c(0, 1),    # anchor at top-left of legend box
@@ -1848,10 +1903,12 @@ ggplot(data = baselinescatter, aes(x = WAreal, y = SMAX, color = WAlh)) + # base
 	scale_x_log10(labels = function(x) format(x, scientific = FALSE, trim = TRUE, big.mark = ",")) +
 	scale_y_log10(labels = function(x) format(x, scientific = FALSE, trim = TRUE, big.mark = ",")) + 
 	
-	labs(x = "Accessible Watershed Area", y = TeX("$S_{MAX}$ (Spawners at Max Recruitment)"))
+	labs(x = "Accessible Watershed Area", y = TeX("$S_{MAX}$ (Spawners at Max Recruitment)")) +
+	ggtitle("(B)")
 
 # ggsave("figure.png", width = 4, height = 3, dpi = 300) # REALLY IMPORTANT VISUAL
-dev.off()
+# dev.off()
+grid.arrange(logwareg, wareg, nrow = 1)
 
 
 #### Bar plot comparison of SYNOPTIC values of SREP #################################################################################################
