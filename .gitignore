@@ -811,3 +811,12 @@ DataIn/UpperSoGChinook.csv
 DataOut/UpperSoGChinook_out_posteriorpredictive.csv
 R/alphaassumptionsfigure.r
 DataOut/UpperSoGChinook_out_posteriorpredictive_NEWWA.csv
+DataIn/ParkenUpdate_Aug2026/Harrison_SR_Results_surv_model.csv
+DataIn/ParkenUpdate_Aug2026/Harrison_stock_recruit_data (AUG 2026).xlsx
+DataIn/ParkenUpdate_Aug2026/L SHU SR data table (Nov 2024).xlsx
+DataIn/ParkenUpdate_Aug2026/Lower_Shuswap_SR_Parameters (Jan 8 2025).xlsx
+DataIn/ParkenUpdate_Aug2026/Nicola SR data table (June 5 2025) BY 1992-2020.xlsx
+DataIn/ParkenUpdate_Aug2026/Nicola_SR_results.xlsx
+DataIn/SRinputfile_parkenupdateaug26.csv
+DataIn/WatershedArea_parkenupdateaug26.csv
+DataOut/UpperSoGChinook_out_posteriorpredictive_UPDATEDAWA_Aug18.csv

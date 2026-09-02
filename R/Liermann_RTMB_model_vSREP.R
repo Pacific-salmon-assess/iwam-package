@@ -15,12 +15,13 @@ library(coda) # bayesian package
 library(beepr) # Sounds
 library(viridis) # Colours
 library(ggridges) # Ridge plots
+library(data.table) # Create data tables for pivoting
 
 here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
 source(here::here("R/helperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
-source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
+# source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
 
 options(scipen = 999)
 
@@ -42,13 +43,14 @@ LambertW0 <- ADjoint(
 
 # Raw data read-in ####
 WAin <- c("DataIn/Parken_evalstocks.csv") 
-	# c("DataIn/WCVIStocks.csv") or 
+	# c("DataIn/WCVIStocks.csv") or  
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
+	# c("DataIn/UpperSoGChinook.csv")
 
 # Data Manipulations ####
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) 
-	# Consider _TK ************************************
+	# Consider _TK **** as alternative with longer dataset
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 WAin <- read.csv(here::here(WAin))
 
@@ -101,8 +103,8 @@ lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>%
 dat <- list(srdat = srdat,
             WAbase = WAbase,
             WAin = WAin,
-            lineWA =  seq(min(WAbase$logWAshifted), 
-                          max(WAbase$logWAshifted), 0.1),
+            lineWA =  seq(min(WAbase$logWAshifted) - 0.1, 
+                          max(WAbase$logWAshifted) + 0.1, 0.1),
 			mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
             prioronly = 0) # 0-run with data, 1-prior prediction mode
@@ -176,28 +178,40 @@ f_srep <- function(par){
   }
   
   nll <- 0
-  
+
+  # IWAM EQUATION(S): 12 - 15 @@
+	# Explanation: Prior distributions of the watershed area regression slope and intercept parameters.
   # Can I remove the sum() from these arguments?
   nll <- nll - sum(dnorm(b0[1], 10, sd = 31.6, log = TRUE)) # Prior b0
   nll <- nll - sum(dnorm(b0[2], 0, sd = 31.6, log = TRUE)) # Prior b0
   nll <- nll - sum(dnorm(bWA[1], 0, sd = 31.6, log = TRUE)) # Prior bWA
   nll <- nll - sum(dnorm(bWA[2], 0, sd = 31.6, log = TRUE)) # Prior bWA
   
+  # IWAM EQUATION(S): 6 and 7 @@
+	# Explanation: The prior for mean log(productivity) for stream-type and adjustment for ocean-type.
   nll <- nll - sum(dnorm(Alpha0, 0.6, sd = 0.45, log = TRUE)) # Prior (rM)
   if(lhdiston) nll <- nll - sum(dnorm(Alpha02, 0, sd = 31.6, log = TRUE)) # Prior (rD)
   
   ## Second level of hierarchy - Ricker parameters:
   for (i in 1:N_Stk){
+	# IWAM EQUATION(S): 5 (8), and 10 (11) @@
+	  # Explanation: Eq. 5 is the population level log productivity, with Uniform prior (8) for standard deviation.
+	  # Eq. 10 is the random effect term accounting for process error, with a Uniform prior (11) for standard deviation.
     nll <- nll - dnorm(logSREP_re[i], 0, sd = 1, log = TRUE) # Median of E
-	
+	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
+		
+	# IWAM EQUATION(S): 9 @@
+	  # Explanation: The watershed area regression equation, parameterized for SREP.
     logSREP[i] <- b0[1] + b0[2]*type[i] + (bWA[1] + bWA[2]*type[i]) * WAbase$logWAshifted[i] + logSREP_re[i]*logSREP_sd + biaslogSREP
     SREP[i] <- exp(logSREP[i])
-    
-	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
 
+	# IWAM EQUATION(S): 4 @@
+	  # Explanation: The Ricker stock-specific (i) productivity.
     if(lhdiston) logAlpha[i] <- Alpha0 + Alpha02*type[i] + Alpha_re[i]*Alpha_sd + biaslogAlpha
     else logAlpha[i] <- Alpha0 + Alpha_re[i]*Alpha_sd + biaslogAlpha
 
+	# IWAM EQUATION(S): 3 @@
+	  # Explanation: The prior for the stock-specific (i) precision for the spawner-recruit model.
     nll <- nll - dgamma(tauobs[i], shape = 0.0001, scale = 1/0.0001, log = TRUE)
   }
 
@@ -205,8 +219,13 @@ f_srep <- function(par){
   for (i in 1:N_Obs){
 	# logRS_pred[i] <- logAlpha[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
 	Alpha_pred <- exp(logAlpha)
+	
+	# IWAM EQUATION(S): 1 @@
+	  # Explanation: The Ricker spawner-recruit model, parameterized for SREP.
 	logRS_pred[i] <- Alpha_pred[stk[i]]*(1 - S[i]/SREP[stk[i]]) + biaslogRS[stk[i]]
 
+	# IWAM EQUATION(S): 2 @@
+	  # Explanation: The deviation in recruits per spawners.
     if(!prioronly){ # If prioronly is 1, then likelihood is not calculated, if 0 then it is
       nll <- nll - dnorm(logRS[i], logRS_pred[i], sd = sqrt(1/tauobs[stk[i]]), log = TRUE)
     } 
@@ -217,6 +236,9 @@ f_srep <- function(par){
   BETA_r = numeric(nrow(WAbase))
   SMAX_r = numeric(nrow(WAbase))
   
+  # IWAM EQUATION(S): 17 and 19 @@
+	# Explanation: The calculation of the population management benchmarks SMSY and SREP, and Ricker
+	# parameter Beta.
   for (i in 1:N_Stk){
     BETA_r[i] <- Alpha_pred[i] / SREP[i]
 	SMAX_r[i] <- 1/BETA_r[i]
@@ -243,13 +265,20 @@ f_srep <- function(par){
     SREP_tar[i] <- exp(logSREP_tar[i])
     
 	Alpha_tar <- exp(logAlpha_tar)
+
     # Predict BETA
     BETA[i] <- Alpha_tar[i]/SREP_tar[i]
+
 	# Predict SMAX
 	SMAX[i] <- 1/BETA[i]
+
     # Predict SMSY
     SMSY[i] <- (1-LambertW0(exp(1 - Alpha_tar[i])))/BETA[i]
-    # Predict SGEN
+
+    # Predict SGEN 
+	# IWAM EQUATION(S): 20 @@
+		# Explanation: The calculation of the population management benchmark SGEN using Lambert's W function
+		# as described in Scheuerell (2006).
     SGEN[i] <- -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i])))
   }
   
@@ -264,10 +293,8 @@ f_srep <- function(par){
     
   REPORT(b0) # Testing simulate()
   REPORT(bWA) # Testing simulate()
-  
   REPORT(logRS_pred)  
   # REPORT(logRS) # logRS for all 501 data points
-  
   REPORT(logSREP_re)
   REPORT(logSREP_sd)
   REPORT(SREP) # E (Srep) for all synoptic data set rivers (25)
@@ -336,9 +363,9 @@ init <- function() {
 
        tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
-       # Should these be 0.01 to 100s? Would that be more accurate?
-       logSREP_sd = runif(1, 0.01, 3), # Positive
-       Alpha_sd = runif(1, 0.01, 3) # Positive
+       # Should these be 0.01 to 100s? Would that be more accurate? e.g. runif(1, 0.01, 100)
+       logSREP_sd = runif(1, 0.01, 3), # Positive for Uniform prior
+       Alpha_sd = runif(1, 0.01, 3) # Positive for Uniform prior
   )
   
   if (lhdiston) {
@@ -369,22 +396,43 @@ set.seed(1) ; fitstan <- tmbstan(obj, iter = 5000, warmup = 2500, # default iter
 # Acquire outputs of MCMC ####
 derived_obj <- derived_post(fitstan, model = 'SREP'); beep(2)
 	# add stocknames - see extra code from _Plots.R
-	dsrep <- derived_obj
-	fitsrep <- fitstan
+dsrep <- derived_obj
+dsreps <- derived_obj$deripost_summary
+dsrepf <- derived_obj$deripost_full
+fitsrep <- fitstan
+
+
 
 # Simulate alternative priors
-BS.srep <- dobootstrap(bsiters = 2000, # 20,000 for full iterations
-						adj = TRUE,
-						bias.cor = FALSE,
-						prod = c("LifeStageModel"),
-						MCMC = TRUE,
-						model = c("SREP"),
-						Ricprior = c(1, 0.3),
-						round = FALSE,
-						WAinname = c("DataIn/Parken_evalstocks.csv")) ; beep(2)
-						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv")
+	# simalpha_SREP.r IS UNDER WORK FOR SREP MODELS @@@@
+source(here::here("R/simalpha_SREP.r"))
+BS.srep <- simalpha(bsiters = 20000, 
+			newalpha = c(1, 0.3),
+			# prior_rho = c(-0.4),
+			WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
+# BS.srep <- BS.srep$BS.dfout 
+# head(BS.srep)
+# head(BS.srep$upr - BS.srep$lwr)
+# head(BS.srep.og$upr - BS.srep.og$lwr)
 
-BS.srep <- BS.srep$BS.dfout
+
+
+# Simulate alternative priors - PREVIOUS VERSION
+# BS.srep <- dobootstrap(bsiters = 2000, # 20,000 for full iterations
+						# adj = TRUE,
+						# bias.cor = FALSE,
+						# prod = c("LifeStageModel"),
+						# MCMC = TRUE,
+						# model = c("SREP"),
+						# Ricprior = c(1, 0.3),
+						# round = FALSE,
+						# WAinname = c("DataIn/Parken_evalstocks.csv")) ; beep(2)
+						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv") or c("DataIn/UpperSoGChinook.csv")
+
+# BS.srep <- BS.srep$BS.dfout
+
+
+
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} 

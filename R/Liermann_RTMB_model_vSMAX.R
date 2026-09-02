@@ -39,7 +39,7 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv")
 	# c("DataIn/WCVIStocks.csv") or  
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
@@ -99,7 +99,7 @@ lifehist <- srdat %>% dplyr::select(Stocknumber, Name, Stream) %>%
 dat <- list(srdat = srdat,
             WAbase = WAbase,
             WAin = WAin,
-            lineWA =  seq(min(WAbase$logWAshifted) - 0.1, 
+            lineWA =  seq(min(WAbase$logWAshifted) - 0.1,
                           max(WAbase$logWAshifted) + 0.1, 0.1),
 			mean_logWA = mean_logWA,
             logRS = log(srdat$Rec) - log(srdat$Sp),
@@ -122,8 +122,8 @@ par <- list(b0 = c(10, 0), # Initial values for WA regression intercepts
             Alpha0 = 0.6,
             Alpha_re = numeric(nrow(dat$WAbase)), # Zeroes
             tauobs = 0.01 + numeric(N_Stk), # Constrained positive
-            logSMAX_sd = 0, # 1 if Uniform, 0 if prior
-            Alpha_sd = 0 # 1 if Uniform, 0 if prior
+            logSMAX_sd = 1, # 1 if Uniform, 0 if prior
+            Alpha_sd = 1 # 1 if Uniform, 0 if prior
 )
 if (lhdiston) {
   par$Alpha02 <- 0
@@ -193,10 +193,10 @@ f_smax <- function(par){
     nll <- nll - dnorm(logSMAX_re[i], 0, sd = 1, log = TRUE)
 	nll <- nll - dnorm(Alpha_re[i], 0, sd = 1, log = TRUE)
 	
-	# Half-normal Prior
-	nll <- nll - dnorm(logSMAX_sd, 0, sd = 1, log = TRUE)
-	nll <- nll - dnorm(Alpha_sd, 0, sd = 1, log = TRUE)
-	# Half-student-t Prior
+	# Half-normal Prior - ADD IF STATEMENTS @@@@
+	# nll <- nll - dnorm(logSMAX_sd, 0, sd = 1, log = TRUE) 
+	# nll <- nll - dnorm(Alpha_sd, 0, sd = 1, log = TRUE)
+	# Half-student-t Prior @@@@
 		# Where: half-Cauchy distribution is a special case of the half-t distribution with df=1 degrees of freedom
 	# nll <- nll - dt(logSMAX_sd, df = 1, log = TRUE)
 	# nll <- nll - dt(Alpha_sd, df = 1, log = TRUE)
@@ -350,16 +350,17 @@ obj <- RTMB::MakeADFun(f_smax, par,
 upper <- numeric(length(obj$par)) + Inf
 lower <- numeric(length(obj$par)) + -Inf
 lower[names(obj$par) == "tauobs"] <- 0
-# upper[names(obj$par) == "logSMAX_sd"] <- 100 # Turn off for half dists. 
+upper[names(obj$par) == "logSMAX_sd"] <- 100 # Turn off for half dists. 
 lower[names(obj$par) == "logSMAX_sd"] <- 0 
-# upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
+upper[names(obj$par) == "Alpha_sd"] <- 100 # Turn off for half dists.
 lower[names(obj$par) == "Alpha_sd"] <- 0
 
 
 
 # RANDOM INIT - MATCHING PRIORS ####
 init <- function() {
-	listinit <- list(b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
+	listinit <- list(
+		b0 = c(rnorm(1, 10, 1), rnorm(1, 0, 1)), # Contains negatives
 		bWA = c(rnorm(1, 0, 1), rnorm(1, 0 ,1)), # Contains negatives
        
 		# logRS_pred = rnorm(N_Obs, 0, 1),
@@ -370,7 +371,7 @@ init <- function() {
 
 		tauobs = runif(N_Stk, min = 0.005, max = 0.015), # Uniform to REMAIN positive
        
-		# Should these be 0.01 to 100s? Would that be more accurate?
+		# Should these be 0.01 to 100s? Would that be more accurate? e.g. runif(1, 0.01, 100)
 		logSMAX_sd = runif(1, 0.01, 3), # Positive for Uniform prior
 		Alpha_sd = runif(1, 0.01, 3) # Positive for Uniform prior
 	)
@@ -407,19 +408,33 @@ dsmaxs <- derived_obj$deripost_summary
 dsmaxf <- derived_obj$deripost_full
 fitsmax <- fitstan
 
-outpp <- data.frame(
-	Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
-	SREP_median = dsmaxs$SREP_adj$Median, SREP_mean = dsmaxs$SREP_adj$Mean, SREP_lwr5 = dsmaxs$SREP_adj$LQ_5, SREP_upr95 = dsmaxs$SREP_adj$UQ_95, 
-	SMSY_median = dsmaxs$SMSY_adj$Median, SMSY_mean = dsmaxs$SMSY_adj$Mean, SMSY_lwr5 = dsmaxs$SMSY_adj$LQ_5, SMSY_upr95 = dsmaxs$SMSY_adj$UQ_95,
-	SGEN_median = dsmaxs$SGEN_adj$Median, SGEN_mean = dsmaxs$SGEN_adj$Mean, SGEN_lwr5 = dsmaxs$SGEN_adj$LQ_5, SGEN_upr95 = dsmaxs$SGEN_adj$UQ_95,
-	SMAX_median = dsmaxs$SMAX_tar_adj$Median, SMAX_mean = dsmaxs$SMAX_tar_adj$Mean, SMAX_lwr5 = dsmaxs$SMAX_tar_adj$LQ_5, SMAX_upr95 = dsmaxs$SMAX_tar_adj$UQ_95
-)
-outpp <- outpp %>% mutate(across(where(is.numeric), round))
-# outname <- paste("DataOut/", "UpperSoGChinook", "_out_posteriorpredictive_NEWWA.csv", sep = "")
+# outpp <- data.frame(
+	# Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
+	# SREP_median = dsmaxs$SREP_adj$Median, SREP_mean = dsmaxs$SREP_adj$Mean, SREP_lwr5 = dsmaxs$SREP_adj$LQ_5, SREP_upr95 = dsmaxs$SREP_adj$UQ_95, 
+	# SMSY_median = dsmaxs$SMSY_adj$Median, SMSY_mean = dsmaxs$SMSY_adj$Mean, SMSY_lwr5 = dsmaxs$SMSY_adj$LQ_5, SMSY_upr95 = dsmaxs$SMSY_adj$UQ_95,
+	# SGEN_median = dsmaxs$SGEN_adj$Median, SGEN_mean = dsmaxs$SGEN_adj$Mean, SGEN_lwr5 = dsmaxs$SGEN_adj$LQ_5, SGEN_upr95 = dsmaxs$SGEN_adj$UQ_95,
+	# SMAX_median = dsmaxs$SMAX_tar_adj$Median, SMAX_mean = dsmaxs$SMAX_tar_adj$Mean, SMAX_lwr5 = dsmaxs$SMAX_tar_adj$LQ_5, SMAX_upr95 = dsmaxs$SMAX_tar_adj$UQ_95
+# )
+
+# outpp <- outpp %>% mutate(across(where(is.numeric), round))
+# outname <- paste("DataOut/", "UpperSoGChinook", "_out_posteriorpredictive_UPDATEDAWA_Aug18.csv", sep = "")
 # write.csv(outpp, here::here(outname), row.names = FALSE)
 
 
 # Simulate alternative priors
+source(here::here("R/simalpha_SMAX.r"))
+BS.smax <- simalpha(bsiters = 20000, 
+			newalpha = c(1, 0.3),
+			# prior_rho = c(-0.4),
+			WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
+# BS.smax <- BS.smax$BS.dfout 
+# head(BS.smax)
+# head(BS.smax$upr - BS.smax$lwr)
+# head(BS.smax.og$upr - BS.smax.og$lwr)
+
+
+
+# Simulate alternative priors - PREVIOUS VERSION
 # source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
 # BS.smax.og <- dobootstrap(bsiters = 20000, # 20,000 for full iterations
 						# adj = TRUE,
@@ -434,23 +449,6 @@ outpp <- outpp %>% mutate(across(where(is.numeric), round))
 						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv") or c("DataIn/UpperSoGChinook.csv")
 # BS.smax.og <- BS.smax.og$BS.dfout
 # BS.bpar <- BS.smax$bpar
-
-source(here::here("R/simalpha.r"))
-BS.smax <- simalpha(bsiters = 20000, 
-			newalpha = c(1, 0.3),
-			# prior_rho = c(-0.4),
-			WAinname = c("DataIn/WCVIStocks.csv")); beep(2)
-
-# BS.smax5 <- simalpha(bsiters = 20000, 
-			# newalpha = c(1, 0.5),
-			# WAinname = c("DataIn/WCVIStocks.csv")); beep(2)
-			
-# BS.smax3 <- BS.smax3$BS.dfout
-# BS.smax5 <- BS.smax5$BS.dfout
-# head(BS.smax)
-
-# head(BS.smax$upr - BS.smax$lwr)
-# head(BS.smax.og$upr - BS.smax.og$lwr)
 
 
 

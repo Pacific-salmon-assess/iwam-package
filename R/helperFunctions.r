@@ -219,13 +219,16 @@ Sgen.fn2 <- function ( a.par, SREP,  explicit = TRUE , plot=FALSE) {
 }
 
 # SMAX sgen.fn
-Sgen.fn4 <- function(a.par, SMAX, explicit = TRUE, plot = FALSE) {
+Sgen.fn4 <- function(a.par, SMAX, SREPparam = FALSE, explicit = TRUE, plot = FALSE) {
 # Function to convert SMAX from watershed-area model with independent alpha into SGEN
 # The main difference from .fn2 is that the beta par here is unaffected by the NEW assumed alpha
 # In .fn2 - the b.par is affected by the residual information in SREP AND the NEW assumed alpha - which warps it
 # When you use the SMAX model - but calculate b.par THROUGH SREP - you can get to similar answers
   b.par <- 1 / SMAX
   SREP <- log(a.par) / b.par
+  
+  if (SREPparam == TRUE) b.par <- log(a.par)/SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
+  if (SREPparam == TRUE) SREP <- SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
   
   if (explicit){
     SMSY <- (1 - gsl::lambert_W0(exp(1 - log(a.par) ))) / (b.par)

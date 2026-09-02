@@ -157,8 +157,8 @@ derived_post <- function(x, model) {
 		dataframes[[i]]$Median <- apply(matrices[[i]], 2 , median)
 		dataframes[[i]]$PosteriorMode <- apply(matrices[[i]], 2, 
 			function(col) {posterior.mode(as.mcmc(col))}) 
-		dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[1,] # 0.05
-		dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.05, 0.95))[2,] # 0.95
+		dataframes[[i]]$LQ_5 <- apply(matrices[[i]], 2, quantile, probs = c(0.025, 0.975))[1,] # 0.05
+		dataframes[[i]]$UQ_95 <- apply(matrices[[i]], 2, quantile, probs = c(0.025, 0.975))[2,] # 0.95
 		# Consider adding HDPI intervals here
 			# Using and apply function with hdi(x, credMass = 0.89)
 		# dataframes[[i]]$HDIlwr <- sapply(hdi_list, `[`, 1) # lower bound
