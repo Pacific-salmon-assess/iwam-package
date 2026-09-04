@@ -19,7 +19,7 @@ library(data.table) # Create data tables for pivoting
 
 here::i_am("R/LambertWs.R") # For non-RStudio functionality
 source(here::here("R/LambertWs.R")) # Lambert W function
-source(here::here("R/helperFunctions.R")) # For bootstrapping
+source(here::here("R/IWAM_HelperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 # source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
 

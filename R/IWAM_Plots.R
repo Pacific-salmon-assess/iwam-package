@@ -19,7 +19,7 @@ library(scales)
 library(ggnewscale)
 
 source(here::here("R/LambertWs.R")) # Lambert W function
-source(here::here("R/helperFunctions.R")) # For bootstrapping
+source(here::here("R/IWAM_HelperFunctions.R")) # For bootstrapping
 source(here::here("R/derived_post.R")) # For posterior extraction
 
 options(scipen = 999)

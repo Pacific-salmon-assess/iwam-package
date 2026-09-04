@@ -9,7 +9,7 @@ library(beepr) # Sounds
 library(MASS)
 
 source(here::here("R/LambertWs.R")) # Lambert W function
-source(here::here("R/helperFunctions.R")) # For bootstrapping
+source(here::here("R/IWAM_HelperFunctions.R")) # For bootstrapping
 
 options(scipen = 999)
 
