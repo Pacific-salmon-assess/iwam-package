@@ -39,7 +39,7 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/Parken_evalstocks.csv")
+WAin <- c("DataIn/UpperSoGChinook_iter1.csv")
 	# c("DataIn/WCVIStocks.csv") or  
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
@@ -408,17 +408,17 @@ dsmaxs <- derived_obj$deripost_summary
 dsmaxf <- derived_obj$deripost_full
 fitsmax <- fitstan
 
-# outpp <- data.frame(
-	# Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
+outpp <- data.frame(
+	Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
 	# SREP_median = dsmaxs$SREP_adj$Median, SREP_mean = dsmaxs$SREP_adj$Mean, SREP_lwr5 = dsmaxs$SREP_adj$LQ_5, SREP_upr95 = dsmaxs$SREP_adj$UQ_95, 
 	# SMSY_median = dsmaxs$SMSY_adj$Median, SMSY_mean = dsmaxs$SMSY_adj$Mean, SMSY_lwr5 = dsmaxs$SMSY_adj$LQ_5, SMSY_upr95 = dsmaxs$SMSY_adj$UQ_95,
 	# SGEN_median = dsmaxs$SGEN_adj$Median, SGEN_mean = dsmaxs$SGEN_adj$Mean, SGEN_lwr5 = dsmaxs$SGEN_adj$LQ_5, SGEN_upr95 = dsmaxs$SGEN_adj$UQ_95,
-	# SMAX_median = dsmaxs$SMAX_tar_adj$Median, SMAX_mean = dsmaxs$SMAX_tar_adj$Mean, SMAX_lwr5 = dsmaxs$SMAX_tar_adj$LQ_5, SMAX_upr95 = dsmaxs$SMAX_tar_adj$UQ_95
-# )
+	logSMAX_median = dsmaxs$logSMAX_tar_adj$Median, logSMAX_mean = dsmaxs$logSMAX_tar_adj$Mean, SMAX_lwr025 = dsmaxs$logSMAX_tar_adj$LQ_025, SMAX_upr975 = dsmaxs$logSMAX_tar_adj$UQ_975
+)
 
 # outpp <- outpp %>% mutate(across(where(is.numeric), round))
-# outname <- paste("DataOut/", "UpperSoGChinook", "_out_posteriorpredictive_UPDATEDAWA_Aug18.csv", sep = "")
-# write.csv(outpp, here::here(outname), row.names = FALSE)
+outname <- paste("DataOut/", "UpperSoGChinook", "_posteriorpredictive_Sept25_iter1.csv", sep = "")
+write.csv(outpp, here::here(outname), row.names = FALSE)
 
 
 # Simulate alternative priors

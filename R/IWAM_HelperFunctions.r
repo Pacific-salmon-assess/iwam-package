@@ -1,3 +1,9 @@
+# New LambertW0 see: https://github.com/pbs-assess/renewassess/blob/main/code/RTMB/PosteriorPredictiveSample.r
+LambertW0 <- ADjoint(
+  function(x){gsl::lambert_W0(x)},
+  function(x, y, dy) {dy / (x + exp(y))}
+)
+
 # Inverse logit and logit funcitons can come in handy =====================================================================
 inv_logit <- function(x){
   exp(x)/(1+exp(x))
@@ -226,25 +232,28 @@ Sgen.fn4 <- function(a.par, SMAX, SREPparam = FALSE, explicit = TRUE, plot = FAL
 # When you use the SMAX model - but calculate b.par THROUGH SREP - you can get to similar answers
   b.par <- 1 / SMAX
   SREP <- log(a.par) / b.par
+  sgen.out <- numeric(length(a.par))
   
   if (SREPparam == TRUE) b.par <- log(a.par)/SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
   if (SREPparam == TRUE) SREP <- SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
   
   if (explicit){
-    SMSY <- (1 - gsl::lambert_W0(exp(1 - log(a.par) ))) / (b.par)
+    SMSY <- (1 - LambertW0(exp(1 - log(a.par) ))) / (b.par) # updated from gsl::lambert_W0
+	
+	# SGEN = -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i])))
+	sgen.out <- -1/b.par * LambertW0(-b.par * SMSY/(exp(a.par)))
     }
   # In instances of a.par > 1 - creates negative SMSY
   
   if( !explicit ){
     SMSY <- log(a.par)/ b.par * (0.5 - 0.07 * log(a.par))
+	
+	# Optimize for SGEN
+	for (i in 1:length(a.par)){
+		sgen.out[i] <- sGenSolver( log(a.par[i]), b.par[i])
+	}
   }
   
-  sgen.out <- numeric(length(a.par))
-  
-  for (i in 1:length(a.par)){
-    sgen.out[i] <- sGenSolver( log(a.par[i]), b.par[i])
-  }
-
   if(plot){
     Rpred <- NA
     for (i in 1:1000){ Rpred[i]<- a.par * i * exp (- b.par * i)}
