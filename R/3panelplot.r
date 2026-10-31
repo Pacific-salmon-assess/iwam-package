@@ -111,6 +111,7 @@ for (i in 1:100){
 # y_lim <- range(c(dsmax$deripost_full$b0[,1] + dsmax$deripost_full$b0[,2], b02newseq))
 
 x_lim <- c(-0.2, 2.3)
+x_lim_real <- c(0, 10)
 y_lim <- c(7.5, 10.6)
 
 # p_scatter: scatter w/o lines
@@ -182,7 +183,20 @@ o_scatter <- ggplot(data.frame(x = exp(dsmax$deripost_full$Alpha0 + dsmax$deripo
 		axis.title = element_text(size = 18)) +
 	coord_cartesian(xlim = x_lim, ylim = y_lim) + # to map all 3 figures to the same coordinate grid
 	labs(title = "A")
-
+	
+o_scatter_real <- ggplot(data.frame(x = exp(exp(dsmax$deripost_full$Alpha0 + dsmax$deripost_full$Alpha02)), y = dsmax$deripost_full$b0[,1] + dsmax$deripost_full$b0[,2]),
+	aes(x = x, y = y)) +
+	geom_point(alpha = 0.2, show.legend = FALSE) + 
+	annotate("point", x = exp(mean(RicA$seq)), y = mean(b02newseq), color = 'red', size = 4) + 
+	geom_point(data = data.frame(x = exp(logalphai2), y = bnewi2), aes(x = exp(logalphai2), y = bnewi2), color = "pink", size = 3, alpha = 0.4) +
+	xlab(TeX("$\\alpha$")) + 
+	ylab(TeX("$S_{MAX}$")) + 
+	theme_classic() + 
+	theme(legend.position="none") + 
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim_real, ylim = y_lim) # + # to map all 3 figures to the same coordinate grid
+	# labs(title = "A")
 
 # p_top: logAlpha0 vs. RicAdf
 o_top <- ggplot() + 
@@ -199,6 +213,20 @@ o_top <- ggplot() +
 		axis.title = element_text(size = 18)) +
 	coord_cartesian(xlim = x_lim) +
 	labs(title = "B")
+	
+o_top_real <- ggplot() + 
+	geom_line(data = alpha02df, aes(x = exp(alpha02seq), y = alpha02dnorm), linewidth = 1.5) + 
+	geom_line(data = RicAdf, aes(x = exp(seq), y = dnorm), color = "red", linewidth = 1.5) + 
+	geom_segment(aes(x = exp(mean(alpha02seq)), y = 0, xend = exp(mean(alpha02seq)), yend = max(alpha02dnorm)), alpha = 0.4, linetype = "dashed", linewidth = 1.2) + 
+	# geom_label(aes(x = exp(mean(alpha02seq)), y = max(alpha02dnorm + 0.2), label = "Hierarchical Global Productivity")) + 
+	geom_segment(aes(x = exp(mean(RicA$seq)), y = 0, xend = exp(mean(RicA$seq)), yend = max(alpha02dnorm)), color = "red", alpha = 0.4, linetype = "dashed", linewidth = 1.2) + 
+	# geom_label(aes(x = exp(mean(RicA$seq)), y = max(alpha02dnorm + 0.2), label = "Updated Productivity")) + 
+	xlab(TeX("$\\alpha$")) + 
+	ylab("Density") + 
+	theme_classic() + 
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_cartesian(xlim = x_lim_real)
 
 
 # p_right: b0
@@ -216,6 +244,23 @@ o_right <- ggplot() +
 		axis.title = element_text(size = 18)) +
 	coord_flip(xlim = y_lim) +
 	labs(title = "C")
+	
+o_right_real <- ggplot() + 
+	geom_line(data = b02df, aes(x = b02seq, y = b02dnorm), linewidth = 1.2) + # smoothed SMAX original
+	geom_line(data = b02newdf, aes(x = b02newseq, y = b02newdnorm), color = "red", linewidth = 1.2) + # smoothed new smax
+	# geom_vline(xintercept = mean(b02seq), alpha = 0.2, linetype = "dashed", linewidth = 1.2) + 
+	geom_segment(aes(x = mean(b02seq), y = 0, xend = mean(b02seq), yend = max(b02dnorm)), alpha = 0.4, linetype = "dashed", linewidth = 1.2) + 
+	# geom_vline(xintercept = mean(b02newseq), alpha = 0.2, linetype = "dashed", color = "red", linewidth = 1.2) +
+	geom_segment(aes(x = mean(b02newseq), y = 0, xend = mean(b02newseq), yend = max(b02newdnorm)), color = "red", alpha = 0.4, linetype = "dashed", linewidth = 1.2) + 
+	geom_segment(aes(x = mean(b02seq), xend = mean(b02newseq), y = 0.6, yend = 0.6),
+		arrow = arrow(length = unit(0.3, "cm")), color = "red", linewidth = 1.2) + 
+	xlab(TeX("$S_{MAX}$")) + 
+	ylab("Density") + 
+	theme_classic() +
+	theme(axis.text = element_text(size = 18),
+		axis.title = element_text(size = 18)) +
+	coord_flip(xlim = y_lim) # +
+	# labs(title = "C")
 
 # patchwork setup
 (p_top + plot_spacer() + p_scatter + p_right) + 
@@ -225,6 +270,10 @@ o_right <- ggplot() +
 (o_top + plot_spacer() + o_scatter + o_right) + 
 	plot_layout(ncol = 2, widths  = c(3, 1), heights = c(1, 3)) + 
 	plot_annotation(title = TeX("Relationship of $\\alpha$ and the Regression Intercept for Ocean-type Populations"))
+	
+(o_top_real + plot_spacer() + o_scatter_real + o_right_real) + 
+	plot_layout(ncol = 2, widths  = c(3, 1), heights = c(1, 3)) + 
+	plot_annotation(title = TeX("Relationship of $\\alpha$ and $S_{MAX}$"))
 
 # Second patchwork of Benchmarks 
 # logSMAX_sd <- dsmax$deripost_summary$logSMAX_sd$Mean
@@ -303,6 +352,7 @@ originalparam <- list(
 	SGEN = list(mu = SGENmu, sigma = SGENsd),
 	SREP = list(mu = SREPmu, sigma = SREPsd)
 )
+
 Louis <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[10], p$sigma[10]))
 Maria <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[25], p$sigma[25]))
 Thompson <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[24], p$sigma[24]))
@@ -554,7 +604,7 @@ Somass <- lapply(originalparam, function(p) make_dnorm_dist(p$mu[17], p$sigma[17
 # Somass (largest) - 17
 # Kaouk (mean WA) - 8
 # Tranquil (smallest) - 20
-
+# BS.smax <- BS.smax$BS.dfout
 # What if we just extract mean and sd of each benchmark from bootstrapped simulations?
 newSMAXmu <- log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMAX"]) # SMAX Median
 newSMAXsd <- (log(BS.smax$Value[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMAX"]) - log(BS.smax$lwr[BS.smax$Stock == "Tranquil" & BS.smax$RP == "SMAX"]))/1.96
@@ -587,7 +637,7 @@ newSMSYsdSomass <- (log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == 
 newSMSYseqSomass <- seq(newSMSYmuSomass - 4*newSMSYsdSomass, newSMSYmuSomass + 4*newSMSYsdSomass, length.out = 500)
 newSMSYdnormSomass <- dnorm(newSMSYseqSomass, mean = newSMSYmuSomass, sd = newSMSYsdSomass)
 
-newSGEMmuSomass <- log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]) # SMAX Median
+newSGEMmuSomass <- log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]) 
 newSGENsdSomass <- (log(BS.smax$Value[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]) - log(BS.smax$lwr[BS.smax$Stock == "Somass" & BS.smax$RP == "SGEN"]))/1.96
 newSGENseqSomass <- seq(newSGEMmuSomass - 4*newSGENsdSomass, newSGEMmuSomass + 4*newSGENsdSomass, length.out = 500)
 newSGENdnormSomass <- dnorm(newSGENseqSomass, mean = newSGEMmuSomass, sd = newSGENsdSomass)

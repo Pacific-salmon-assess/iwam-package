@@ -234,14 +234,14 @@ Sgen.fn4 <- function(a.par, SMAX, SREPparam = FALSE, explicit = TRUE, plot = FAL
   SREP <- log(a.par) / b.par
   sgen.out <- numeric(length(a.par))
   
-  if (SREPparam == TRUE) b.par <- log(a.par)/SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
-  if (SREPparam == TRUE) SREP <- SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
+  # if (SREPparam == TRUE) b.par <- log(a.par)/SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
+  # if (SREPparam == TRUE) SREP <- SMAX # where if SREPparam = TRUE, the SMAX input will be SREP
   
   if (explicit){
     SMSY <- (1 - LambertW0(exp(1 - log(a.par) ))) / (b.par) # updated from gsl::lambert_W0
 	
 	# SGEN = -1/BETA[i]*LambertW0(-BETA[i]*SMSY[i]/(exp(Alpha_tar[i])))
-	sgen.out <- -1/b.par * LambertW0(-b.par * SMSY/(exp(a.par)))
+	sgen.out <- -1/b.par * LambertW0(-b.par * SMSY/(a.par)) # adjusted as a.par is real-scale
     }
   # In instances of a.par > 1 - creates negative SMSY
   

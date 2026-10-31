@@ -39,7 +39,7 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/UpperSoGChinook_iter1.csv")
+WAin <- c("DataIn/WCVIStocks.csv")
 	# c("DataIn/WCVIStocks.csv") or  
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
@@ -50,6 +50,14 @@ srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv"))
 	# Consider _TK **** as alternative with longer dataset
 WAbase <- read.csv(here::here("DataIn/WatershedArea.csv"))
 WAin <- read.csv(here::here(WAin))
+
+# Create a simulation test set for WAin
+# simWAin <- data.frame(Stock = c(paste0("stock_small_", 1:100), paste0("stock_medium_", 1:100), paste0("stock_large_", 1:100)),
+						# lh = 0,
+						# WA = c(rep(100, 100), rep(500, 100), rep(1000, 100)) )
+# WAin <- simWAin
+# check: sd(dsmaxf$logSMAX_tar_adj[,1:100]) to verify that is equal to dsmaxs$logSMAX_sd
+# or check sd(dsmaxf$logSMAX_tar_adj - dsmaxf$logSMAX_tar) to dsmaxs$logSMAX_sd
 
 # Data setup ####
 # Remove Hoko and Hoh stocks - consider removing Skagit OR Chehalis
@@ -408,17 +416,17 @@ dsmaxs <- derived_obj$deripost_summary
 dsmaxf <- derived_obj$deripost_full
 fitsmax <- fitstan
 
-outpp <- data.frame(
-	Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
+# outpp <- data.frame(
+	# Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
 	# SREP_median = dsmaxs$SREP_adj$Median, SREP_mean = dsmaxs$SREP_adj$Mean, SREP_lwr5 = dsmaxs$SREP_adj$LQ_5, SREP_upr95 = dsmaxs$SREP_adj$UQ_95, 
 	# SMSY_median = dsmaxs$SMSY_adj$Median, SMSY_mean = dsmaxs$SMSY_adj$Mean, SMSY_lwr5 = dsmaxs$SMSY_adj$LQ_5, SMSY_upr95 = dsmaxs$SMSY_adj$UQ_95,
 	# SGEN_median = dsmaxs$SGEN_adj$Median, SGEN_mean = dsmaxs$SGEN_adj$Mean, SGEN_lwr5 = dsmaxs$SGEN_adj$LQ_5, SGEN_upr95 = dsmaxs$SGEN_adj$UQ_95,
-	logSMAX_median = dsmaxs$logSMAX_tar_adj$Median, logSMAX_mean = dsmaxs$logSMAX_tar_adj$Mean, SMAX_lwr025 = dsmaxs$logSMAX_tar_adj$LQ_025, SMAX_upr975 = dsmaxs$logSMAX_tar_adj$UQ_975
-)
+	# logSMAX_median = dsmaxs$logSMAX_tar_adj$Median, logSMAX_mean = dsmaxs$logSMAX_tar_adj$Mean, SMAX_lwr025 = dsmaxs$logSMAX_tar_adj$LQ_025, SMAX_upr975 = dsmaxs$logSMAX_tar_adj$UQ_975
+# )
 
 # outpp <- outpp %>% mutate(across(where(is.numeric), round))
-outname <- paste("DataOut/", "UpperSoGChinook", "_posteriorpredictive_Sept25_iter1.csv", sep = "")
-write.csv(outpp, here::here(outname), row.names = FALSE)
+# outname <- paste("DataOut/", "UpperSoGChinook", "_posteriorpredictive_Sept25_iter1.csv", sep = "")
+# write.csv(outpp, here::here(outname), row.names = FALSE)
 
 
 # Simulate alternative priors
@@ -426,7 +434,7 @@ source(here::here("R/simalpha_SMAX.r"))
 BS.smax <- simalpha(bsiters = 20000, 
 			newalpha = c(1, 0.3),
 			# prior_rho = c(-0.4),
-			WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
+			WAinname = c("DataIn/WCVIStocks.csv")); beep(2)
 # BS.smax <- BS.smax$BS.dfout 
 # head(BS.smax)
 # head(BS.smax$upr - BS.smax$lwr)
@@ -455,4 +463,4 @@ BS.smax <- simalpha(bsiters = 20000,
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")
 # if(dat$prioronly == 1) {save(derived_obj, file = "derived_obj_prioronly.RData")} else 
-	# {save(derived_obj, file = "derived_obj.RData")}
+	# {save(derived_obj, file = "derived_obj.RData")}# Liermann SMAX (B) RTMB Model with MCMC Sampling ####
