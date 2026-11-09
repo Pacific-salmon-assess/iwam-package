@@ -2,7 +2,9 @@
 
 R Package for the Integrated Watershed Area Model. Used for estimating LRP's.
 
-**Warning: This is a pre-release development version. This repository is for testing and as an initial preview of the final released package. Core data is private, but available upon request.**
+**Warning: This is a pre-release development version. This repository is for testing and as an initial preview of the final released package.**
+
+**Update: Core data was private, but has now been released! If you have any issues please reach out.**
 
 ## Authors
 
