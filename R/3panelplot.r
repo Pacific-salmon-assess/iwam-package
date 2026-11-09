@@ -21,7 +21,7 @@ RicAdf <- data.frame(seq = RicA$seq, dnorm = RicA$dnorm)
 
 
 # Get draws of posterior and calculate change in b0
-# poplen <- ncol(dsmax$deripost_full$Alpha_tar_adj) # 25 stock predictions to be made
+# poplen <- ncol(dsmax$deripost_full$Alpha_tar_pp) # 25 stock predictions to be made
 # logSMAX_sd <- dsmax$deripost_summary$logSMAX_sd$Mean
 b0 <- dsmax$deripost_full$b0
 bWA <- dsmax$deripost_full$bWA
@@ -190,7 +190,7 @@ o_scatter_real <- ggplot(data.frame(x = exp(exp(dsmax$deripost_full$Alpha0 + dsm
 	annotate("point", x = exp(mean(RicA$seq)), y = mean(b02newseq), color = 'red', size = 4) + 
 	geom_point(data = data.frame(x = exp(logalphai2), y = bnewi2), aes(x = exp(logalphai2), y = bnewi2), color = "pink", size = 3, alpha = 0.4) +
 	xlab(TeX("$\\alpha$")) + 
-	ylab(TeX("$S_{MAX}$")) + 
+	ylab(TeX("$b0$ (Intercept of the Regression) for ocean-type")) + 
 	theme_classic() + 
 	theme(legend.position="none") + 
 	theme(axis.text = element_text(size = 18),
@@ -254,7 +254,7 @@ o_right_real <- ggplot() +
 	geom_segment(aes(x = mean(b02newseq), y = 0, xend = mean(b02newseq), yend = max(b02newdnorm)), color = "red", alpha = 0.4, linetype = "dashed", linewidth = 1.2) + 
 	geom_segment(aes(x = mean(b02seq), xend = mean(b02newseq), y = 0.6, yend = 0.6),
 		arrow = arrow(length = unit(0.3, "cm")), color = "red", linewidth = 1.2) + 
-	xlab(TeX("$S_{MAX}$")) + 
+	xlab(TeX("$b0$ (Intercept of the Regression) for ocean-type")) + 
 	ylab("Density") + 
 	theme_classic() +
 	theme(axis.text = element_text(size = 18),
@@ -273,7 +273,7 @@ o_right_real <- ggplot() +
 	
 (o_top_real + plot_spacer() + o_scatter_real + o_right_real) + 
 	plot_layout(ncol = 2, widths  = c(3, 1), heights = c(1, 3)) + 
-	plot_annotation(title = TeX("Relationship of $\\alpha$ and $S_{MAX}$"))
+	plot_annotation(title = TeX("Relationship of $\\alpha$ and the Regression Intercept for Ocean-type Populations"))
 
 # Second patchwork of Benchmarks 
 # logSMAX_sd <- dsmax$deripost_summary$logSMAX_sd$Mean
@@ -290,8 +290,8 @@ o_right_real <- ggplot() +
 # newlogSMAXdnormMaria <- dnorm(newlogSMAXseqMaria, mean = newlogSMAXMaria, sd = logSMAX_sd)
 
 # original logSMAX distribution - posterior predictive
-SMAXmu <- log(dsmax$deripost_summary$SMAX_tar_adj$Mean) # mean of the medians 
-SMAXsd <- apply(log(dsmax$deripost_full$SMAX_tar_adj), 2, sd)
+SMAXmu <- log(dsmax$deripost_summary$SMAX_tar_pp$Mean) # mean of the medians 
+SMAXsd <- apply(log(dsmax$deripost_full$SMAX_tar_pp), 2, sd)
 
 # Then calculate SMSY and SGEN based on new SMAX and alpha?
 	# draw rnorms for new SMAX distribution
@@ -314,8 +314,8 @@ SMAXsd <- apply(log(dsmax$deripost_full$SMAX_tar_adj), 2, sd)
 # newSMSYdnormMaria <- dnorm(newSMSYseqMaria, mean = mean(logSMSYMaria), sd = sd(logSMSYMaria))
 
 # ORIGINAL SMSY
-SMSYmu <- log(dsmax$deripost_summary$SMSY_adj$Median) # mean of the medians 
-SMSYsd <- apply(log(dsmax$deripost_full$SMSY_adj), 2, sd)
+SMSYmu <- log(dsmax$deripost_summary$SMSY_pp$Median) # mean of the medians 
+SMSYsd <- apply(log(dsmax$deripost_full$SMSY_pp), 2, sd)
 
 # NEW SGEN
 # SGENLouis <- -1/BETALouis * LambertW0(-BETALouis * SMSYLouis/(exp(RicArnorm)))
@@ -329,8 +329,8 @@ SMSYsd <- apply(log(dsmax$deripost_full$SMSY_adj), 2, sd)
 # newSGENdnormMaria <- dnorm(newSGENseqMaria, mean = mean(logSGENMaria), sd = sd(logSGENMaria))
 
 # ORIGINAL SGEN
-SGENmu <- log(dsmax$deripost_summary$SGEN_adj$Median) # mean of the medians 
-SGENsd <- apply(log(dsmax$deripost_full$SGEN_adj), 2, sd)
+SGENmu <- log(dsmax$deripost_summary$SGEN_pp$Median) # mean of the medians 
+SGENsd <- apply(log(dsmax$deripost_full$SGEN_pp), 2, sd)
 
 # NEW SREP
 # logSREPLouis <- log(RicArnorm/BETALouis)
@@ -342,8 +342,8 @@ SGENsd <- apply(log(dsmax$deripost_full$SGEN_adj), 2, sd)
 # newSREPdnormMaria <- dnorm(newSREPseqMaria, mean = mean(logSREPMaria), sd = sd(logSREPMaria))
 
 # ORIGINAL SREP
-SREPmu <- log(dsmax$deripost_summary$SREP_adj$Median) # mean of the medians 
-SREPsd <- apply(log(dsmax$deripost_full$SREP_adj), 2, sd)
+SREPmu <- log(dsmax$deripost_summary$SREP_pp$Median) # mean of the medians 
+SREPsd <- apply(log(dsmax$deripost_full$SREP_pp), 2, sd)
 
 # ORIGINAL POSTERIORS:
 originalparam <- list(

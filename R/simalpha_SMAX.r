@@ -36,7 +36,7 @@ simalpha <- function(bsiters = 1000, # Simulation iterations
     pb <- txtProgressBar(min = 1, max = bsiters, style = 3, title = "Bootstrapping")
     start_time <- Sys.time()
   
-	poplen <- ncol(dsmax$deripost_full$Alpha_tar_adj) # 25 stock predictions to be made
+	poplen <- ncol(dsmax$deripost_full$Alpha_tar_pp) # 25 stock predictions to be made
 	
 	logSMAX_sd <- dsmax$deripost_summary$logSMAX_sd$Mean
 	

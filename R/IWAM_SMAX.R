@@ -39,11 +39,12 @@ LambertW0 <- ADjoint(
 
 
 # Raw data read-in ####
-WAin <- c("DataIn/WCVIStocks.csv")
+WAin <- c("DataIn/Parken_evalstocks.csv")
 	# c("DataIn/WCVIStocks.csv") or  
 	# c("DataIn/Parken_evalstocks.csv") or 
 	# c("DataIn/Ordered_backcalculated_noagg.csv")
 	# c("DataIn/UpperSoGChinook.csv")
+	# c("DataIn/SRinput_ParkenNov2026_predictioninput.csv")
 
 # Data Manipulations ####
 srdatwna <- read.csv(here::here("DataIn/SRinputfile.csv")) 
@@ -56,8 +57,8 @@ WAin <- read.csv(here::here(WAin))
 						# lh = 0,
 						# WA = c(rep(100, 100), rep(500, 100), rep(1000, 100)) )
 # WAin <- simWAin
-# check: sd(dsmaxf$logSMAX_tar_adj[,1:100]) to verify that is equal to dsmaxs$logSMAX_sd
-# or check sd(dsmaxf$logSMAX_tar_adj - dsmaxf$logSMAX_tar) to dsmaxs$logSMAX_sd
+# check: sd(dsmaxf$logSMAX_tar_pp[,1:100]) to verify that is equal to dsmaxs$logSMAX_sd
+# or check sd(dsmaxf$logSMAX_tar_pp - dsmaxf$logSMAX_tar) to dsmaxs$logSMAX_sd
 
 # Data setup ####
 # Remove Hoko and Hoh stocks - consider removing Skagit OR Chehalis
@@ -418,10 +419,10 @@ fitsmax <- fitstan
 
 # outpp <- data.frame(
 	# Stock = WAin$Stock, WA = WAin$WA, lh = WAin$lh,
-	# SREP_median = dsmaxs$SREP_adj$Median, SREP_mean = dsmaxs$SREP_adj$Mean, SREP_lwr5 = dsmaxs$SREP_adj$LQ_5, SREP_upr95 = dsmaxs$SREP_adj$UQ_95, 
-	# SMSY_median = dsmaxs$SMSY_adj$Median, SMSY_mean = dsmaxs$SMSY_adj$Mean, SMSY_lwr5 = dsmaxs$SMSY_adj$LQ_5, SMSY_upr95 = dsmaxs$SMSY_adj$UQ_95,
-	# SGEN_median = dsmaxs$SGEN_adj$Median, SGEN_mean = dsmaxs$SGEN_adj$Mean, SGEN_lwr5 = dsmaxs$SGEN_adj$LQ_5, SGEN_upr95 = dsmaxs$SGEN_adj$UQ_95,
-	# logSMAX_median = dsmaxs$logSMAX_tar_adj$Median, logSMAX_mean = dsmaxs$logSMAX_tar_adj$Mean, SMAX_lwr025 = dsmaxs$logSMAX_tar_adj$LQ_025, SMAX_upr975 = dsmaxs$logSMAX_tar_adj$UQ_975
+	# SREP_median = dsmaxs$SREP_pp$Median, SREP_mean = dsmaxs$SREP_pp$Mean, SREP_lwr5 = dsmaxs$SREP_pp$LQ_5, SREP_upr95 = dsmaxs$SREP_pp$UQ_95, 
+	# SMSY_median = dsmaxs$SMSY_pp$Median, SMSY_mean = dsmaxs$SMSY_pp$Mean, SMSY_lwr5 = dsmaxs$SMSY_pp$LQ_5, SMSY_upr95 = dsmaxs$SMSY_pp$UQ_95,
+	# SGEN_median = dsmaxs$SGEN_pp$Median, SGEN_mean = dsmaxs$SGEN_pp$Mean, SGEN_lwr5 = dsmaxs$SGEN_pp$LQ_5, SGEN_upr95 = dsmaxs$SGEN_pp$UQ_95,
+	# logSMAX_median = dsmaxs$logSMAX_tar_pp$Median, logSMAX_mean = dsmaxs$logSMAX_tar_pp$Mean, SMAX_lwr025 = dsmaxs$logSMAX_tar_pp$LQ_025, SMAX_upr975 = dsmaxs$logSMAX_tar_pp$UQ_975
 # )
 
 # outpp <- outpp %>% mutate(across(where(is.numeric), round))
@@ -435,30 +436,12 @@ BS.smax <- simalpha(bsiters = 20000,
 			newalpha = c(1, 0.3),
 			# prior_rho = c(-0.4),
 			WAinname = c("DataIn/WCVIStocks.csv")); beep(2)
-# BS.smax <- BS.smax$BS.dfout 
+# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv") or c("DataIn/UpperSoGChinook.csv")
+
+BS.smax <- BS.smax$BS.dfout 
 # head(BS.smax)
 # head(BS.smax$upr - BS.smax$lwr)
 # head(BS.smax.og$upr - BS.smax.og$lwr)
-
-
-
-# Simulate alternative priors - PREVIOUS VERSION
-# source(here::here("R/Liermann_RTMB_model_Bootstrap.R")) # Bootstrapping simulations of alternative Ricker alpha priors
-# BS.smax.og <- dobootstrap(bsiters = 20000, # 20,000 for full iterations
-						# adj = TRUE,
-						# bias.cor = FALSE,
-						# prod = c("LifeStageModel"),
-						# MCMC = TRUE,
-						# model = c("SMAX"),
-						# Ricprior = c(1, 0.3),
-						# prior_rho = c(-0.4),
-						# round = FALSE,
-						# WAinname = c("DataIn/Parken_evalstocks.csv")); beep(2)
-						# c("DataIn/WCVIStocks.csv") or c("DataIn/Parken_evalstocks.csv") or c("DataIn/Nanaimo_test.csv") or c("DataIn/UpperSoGChinook.csv")
-# BS.smax.og <- BS.smax.og$BS.dfout
-# BS.bpar <- BS.smax$bpar
-
-
 
 # SAVING R OBJECTS: ####
 # save(derived_obj, file = "derived_obj.RData")

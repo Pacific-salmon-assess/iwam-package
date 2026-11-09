@@ -59,21 +59,21 @@ derived_post <- function(x, model) {
 		if (model == 'SREP'){
 		# monte carlo integration - WRONG
 		# This creates a prediction interval - including new site variability
-			# If you take the mean of logE_tar_adj --> marginal mean - WRONG
-		matrices$logSREP_tar_adj <- apply(matrices$logSREP_tar, 2, 
+			# If you take the mean of logE_tar_pp --> marginal mean - WRONG
+		matrices$logSREP_tar_pp <- apply(matrices$logSREP_tar, 2, 
 			FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
 
-		matrices$logSREP_line_ocean_adj <- apply(matrices$logSREP_line_ocean, 2, 
+		matrices$logSREP_line_ocean_pp <- apply(matrices$logSREP_line_ocean, 2, 
 			FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
 		
-		matrices$logSREP_line_stream_adj <- apply(matrices$logSREP_line_stream, 2, 
+		matrices$logSREP_line_stream_pp <- apply(matrices$logSREP_line_stream, 2, 
 			FUN = function(x)rnorm(length(x), x, sd = matrices$logSREP_sd))
 
-		# mean(exp(matrices$logE_tar_adj[,1])) # Should be the same as below - larger
-		# exp(mean(matrices$logE_tar_adj[,1] + matrices$logESD^2/2)) # Should be the same as above - smaller
+		# mean(exp(matrices$logE_tar_pp[,1])) # Should be the same as below - larger
+		# exp(mean(matrices$logE_tar_pp[,1] + matrices$logESD^2/2)) # Should be the same as above - smaller
 		# NOT CURRENTLY THE SAME - SOMETHING IS WRONG
 
-		matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
+		matrices$logAlpha_tar_pp <- apply(matrices$logAlpha_tar, 2, 
 			FUN = function(x)rnorm(length(x), x, sd = matrices$Alpha_sd))
 
 		# Instead of doing this false conditional estimate
@@ -87,43 +87,43 @@ derived_post <- function(x, model) {
 			# BETA, SMSY, and SGEN with these new values
 			# Would this be done on EVERY iteration for EACH chain?
 		# e.g.
-		matrices$Alpha_tar_adj <- exp(matrices$logAlpha_tar_adj) # matrices$logAlpha_tar_adj is actually loglog - needs to be exp
+		matrices$Alpha_tar_pp <- exp(matrices$logAlpha_tar_pp) # matrices$logAlpha_tar_pp is actually loglog - needs to be exp
 	  
-		matrices$SREP_tar_adj <- exp(matrices$logSREP_tar_adj) # for transformed E
-		matrices$BETA_adj <- matrices$Alpha_tar_adj / matrices$SREP_tar_adj
-		matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$Alpha_tar_adj))) / matrices$BETA_adj
-		matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
-			LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$Alpha_tar_adj)))
+		matrices$SREP_tar_pp <- exp(matrices$logSREP_tar_pp) # for transformed E
+		matrices$BETA_pp <- matrices$Alpha_tar_pp / matrices$SREP_tar_pp
+		matrices$SMSY_pp <- (1 - LambertW0(exp(1 - matrices$Alpha_tar_pp))) / matrices$BETA_pp
+		matrices$SGEN_pp <- -1/ matrices$BETA_pp * 
+			LambertW0(- matrices$BETA_pp * matrices$SMSY_pp / (exp(matrices$Alpha_tar_pp)))
 
-		matrices$SREP_line_ocean_adj <- exp(matrices$logSREP_line_ocean_adj) 
-		matrices$SREP_line_stream_adj <- exp(matrices$logSREP_line_stream_adj)
+		matrices$SREP_line_ocean_pp <- exp(matrices$logSREP_line_ocean_pp) 
+		matrices$SREP_line_stream_pp <- exp(matrices$logSREP_line_stream_pp)
 		}
 	  
 		if (model == 'SMAX'){
-			matrices$logSMAX_tar_adj <- apply(matrices$logSMAX_tar, 2, 
+			matrices$logSMAX_tar_pp <- apply(matrices$logSMAX_tar, 2, 
 				FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
 
-			matrices$logSMAX_line_ocean_adj <- apply(matrices$logSMAX_line_ocean, 2, 
+			matrices$logSMAX_line_ocean_pp <- apply(matrices$logSMAX_line_ocean, 2, 
 				FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
 			
-			matrices$logSMAX_line_stream_adj <- apply(matrices$logSMAX_line_stream, 2, 
+			matrices$logSMAX_line_stream_pp <- apply(matrices$logSMAX_line_stream, 2, 
 				FUN = function(x)rnorm(length(x), x, sd = matrices$logSMAX_sd))
 
 			# Does this calculate the marginal posterior OR the posterior predictive distribution?
-			matrices$logAlpha_tar_adj <- apply(matrices$logAlpha_tar, 2, 
+			matrices$logAlpha_tar_pp <- apply(matrices$logAlpha_tar, 2, 
 				FUN = function(x)rnorm(length(x), x, sd = matrices$Alpha_sd))
 
-			matrices$Alpha_tar_adj <- exp(matrices$logAlpha_tar_adj)
+			matrices$Alpha_tar_pp <- exp(matrices$logAlpha_tar_pp)
 
-			matrices$SMAX_tar_adj <- exp(matrices$logSMAX_tar_adj) 
-			matrices$BETA_adj <- 1 / matrices$SMAX_tar_adj
-			matrices$SREP_adj <- matrices$Alpha_tar_adj/matrices$BETA_adj
-			matrices$SMSY_adj <- (1 - LambertW0(exp(1 - matrices$Alpha_tar_adj))) / matrices$BETA_adj
-			matrices$SGEN_adj <- -1/ matrices$BETA_adj * 
-				LambertW0(- matrices$BETA_adj * matrices$SMSY_adj / (exp(matrices$Alpha_tar_adj)))
+			matrices$SMAX_tar_pp <- exp(matrices$logSMAX_tar_pp) 
+			matrices$BETA_pp <- 1 / matrices$SMAX_tar_pp
+			matrices$SREP_pp <- matrices$Alpha_tar_pp/matrices$BETA_pp
+			matrices$SMSY_pp <- (1 - LambertW0(exp(1 - matrices$Alpha_tar_pp))) / matrices$BETA_pp
+			matrices$SGEN_pp <- -1/ matrices$BETA_pp * 
+				LambertW0(- matrices$BETA_pp * matrices$SMSY_pp / (exp(matrices$Alpha_tar_pp)))
 
-			matrices$SMAX_line_ocean_adj <- exp(matrices$logSMAX_line_ocean_adj) 
-			matrices$SMAX_line_stream_adj <- exp(matrices$logSMAX_line_stream_adj)
+			matrices$SMAX_line_ocean_pp <- exp(matrices$logSMAX_line_ocean_pp) 
+			matrices$SMAX_line_stream_pp <- exp(matrices$logSMAX_line_stream_pp)
 		}
 	}
 
